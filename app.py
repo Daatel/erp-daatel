@@ -6,9 +6,9 @@ from database import fetch_all, run_query
 
 os.chdir(Path(__file__).parent)
 
-if 'logged_user' not in st.session_state or st.session_state['logged_user'] is None:
-    st.session_state['logged_user'] = 'Administrador de Testes'
-    st.session_state['user_role'] = 'ADMIN'
+if 'logged_user' not in st.session_state:
+    st.session_state['logged_user'] = None
+    st.session_state['user_role'] = None
 
 def login_form_page():
     st.set_page_config(page_title="Login - Fábrica de Alho", page_icon="🔐", layout="centered")
@@ -29,17 +29,16 @@ def login_form_page():
 
         
         with st.form("login_form"):
-            email = st.text_input("E-mail").strip().lower()
-            senha = st.text_input("Senha", type="password").strip()
+            st.markdown("### Acesso Temporário (Homologação)")
+            senha = st.text_input("Senha de Acesso", type="password").strip()
             
             if st.form_submit_button("Entrar no Sistema", use_container_width=True):
-                user = fetch_all("SELECT id, nome, nivel_permissao FROM usuarios WHERE email=? AND senha=? AND status='ATIVO'", (email, senha))
-                if not user.empty:
-                    st.session_state['logged_user'] = user.iloc[0]['nome']
-                    st.session_state['user_role'] = user.iloc[0]['nivel_permissao']
+                if senha == "daatel2026":
+                    st.session_state['logged_user'] = 'Administrador de Testes'
+                    st.session_state['user_role'] = 'ADMIN'
                     st.rerun()
                 else:
-                    st.error("Credenciais inválidas ou usuário inativo!")
+                    st.error("Senha incorreta!")
         
         st.markdown("---")
         st.caption("Contas padrão criadas para homologação:")
