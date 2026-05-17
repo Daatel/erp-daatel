@@ -28,6 +28,7 @@ def release_connection(conn):
 
 def format_pg(sql):
     if "DATABASE_URL" in st.secrets:
+        sql = sql.replace("%", "%%")
         sql = sql.replace("?", "%s")
         sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
         sql = sql.replace("DATETIME DEFAULT CURRENT_TIMESTAMP", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -517,72 +518,42 @@ def create_tables():
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO empresa_config (razao_social, nome_fantasia, cnpj, endereco_completo) VALUES ('Empório do Alho LTDA', 'Empório do Alho', '00.000.000/0001-00', 'Rua Principal, 123 - Centro')")
 
-    # Migração: Adicionar colunas se não existirem
-    try:
-        cursor.execute("ALTER TABLE compras_itens ADD COLUMN unidade TEXT")
-    except: pass
-    try:
-        cursor.execute("ALTER TABLE compras_itens ADD COLUMN quantidade_estoque REAL")
-    except: pass
-    try:
-        cursor.execute("ALTER TABLE compras_itens ADD COLUMN produto_nome TEXT")
-    except: pass
-    try:
-        cursor.execute("ALTER TABLE produtos ADD COLUMN embalagem_master TEXT")
-    except: pass
-    try:
-        cursor.execute("ALTER TABLE produtos ADD COLUMN cod_emb_master TEXT")
-    except: pass
-    try:
-        cursor.execute("ALTER TABLE producao_diaria ADD COLUMN custo_total_lote REAL")
-    except: pass
-    try:
-        cursor.execute("ALTER TABLE producao_diaria ADD COLUMN custo_unitario_lote REAL")
-    except: pass
-    try:
-        cursor.execute("ALTER TABLE producao_diaria ADD COLUMN data_validade DATE")
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE vendas ADD COLUMN lote_impresso TEXT"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE vendas ADD COLUMN validade_impressa TEXT"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE tabelas_preco ADD COLUMN pct_contrato REAL DEFAULT 0.0"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE tabelas_preco ADD COLUMN pct_comissao_auxiliar REAL DEFAULT 0.0"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE tabelas_preco ADD COLUMN pct_acordo_logistico REAL DEFAULT 0.0"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE vendas ADD COLUMN custo_acordos_rede REAL DEFAULT 0.0"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE clientes ADD COLUMN taxa_descarga REAL DEFAULT 0.0"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE clientes ADD COLUMN regras_descarga TEXT"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE contas_a_pagar ADD COLUMN comprovante_url TEXT"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE vendas ADD COLUMN custo_descarga REAL DEFAULT 0.0"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE maquinario ADD COLUMN patrimônio TEXT"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE maquinario ADD COLUMN numero_serie TEXT"))
-    except: pass
-    try:
-        cursor.execute(format_pg("ALTER TABLE maquinario ADD COLUMN localizacao TEXT DEFAULT 'Fábrica'"))
-    except: pass
+    conn.commit() # Salva as tabelas base antes das migrações de coluna
 
-    conn.commit()
+    # Migração: Adicionar colunas se não existirem
+    alter_queries = [
+        "ALTER TABLE compras_itens ADD COLUMN unidade TEXT",
+        "ALTER TABLE compras_itens ADD COLUMN quantidade_estoque REAL",
+        "ALTER TABLE compras_itens ADD COLUMN produto_nome TEXT",
+        "ALTER TABLE produtos ADD COLUMN embalagem_master TEXT",
+        "ALTER TABLE produtos ADD COLUMN cod_emb_master TEXT",
+        "ALTER TABLE producao_diaria ADD COLUMN custo_total_lote REAL",
+        "ALTER TABLE producao_diaria ADD COLUMN custo_unitario_lote REAL",
+        "ALTER TABLE producao_diaria ADD COLUMN data_validade DATE",
+        "ALTER TABLE vendas ADD COLUMN lote_impresso TEXT",
+        "ALTER TABLE vendas ADD COLUMN validade_impressa TEXT",
+        "ALTER TABLE tabelas_preco ADD COLUMN pct_contrato REAL DEFAULT 0.0",
+        "ALTER TABLE tabelas_preco ADD COLUMN pct_comissao_auxiliar REAL DEFAULT 0.0",
+        "ALTER TABLE tabelas_preco ADD COLUMN pct_acordo_logistico REAL DEFAULT 0.0",
+        "ALTER TABLE vendas ADD COLUMN custo_acordos_rede REAL DEFAULT 0.0",
+        "ALTER TABLE clientes ADD COLUMN taxa_descarga REAL DEFAULT 0.0",
+        "ALTER TABLE clientes ADD COLUMN regras_descarga TEXT",
+        "ALTER TABLE contas_a_pagar ADD COLUMN comprovante_url TEXT",
+        "ALTER TABLE vendas ADD COLUMN custo_descarga REAL DEFAULT 0.0",
+        "ALTER TABLE maquinario ADD COLUMN patrimônio TEXT",
+        "ALTER TABLE maquinario ADD COLUMN numero_serie TEXT",
+        "ALTER TABLE maquinario ADD COLUMN localizacao TEXT DEFAULT 'Fábrica'"
+    ]
+    
+    for q in alter_queries:
+        try:
+            cursor.execute(format_pg(q))
+            conn.commit()
+        except:
+            if hasattr(conn, 'rollback'):
+                conn.rollback()
+
+    # Fechar pool se necessário
     release_connection(conn)
 
 def run_query(query, params=()):
