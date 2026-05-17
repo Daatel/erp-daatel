@@ -24,39 +24,17 @@ def login_form_page():
         st.markdown("<h2 style='text-align: center; color: #01743d;'>Login - ERP Fábrica de Alho</h2>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center;'>Acesse com seu e-mail e senha departamental.</p>", unsafe_allow_html=True)
         
-        if "DATABASE_URL" not in st.secrets:
-            st.warning("⚠️ Modo Local (SQLite). Se você está na nuvem, verifique as Secrets do Streamlit!")
-
-        
         with st.form("login_form"):
-            st.markdown("### Acesso Temporário (Homologação)")
+            st.markdown("### Acesso ao Sistema")
             senha = st.text_input("Senha de Acesso", type="password").strip()
             
             if st.form_submit_button("Entrar no Sistema", use_container_width=True):
                 if senha == "daatel2026":
-                    st.session_state['logged_user'] = 'Administrador de Testes'
+                    st.session_state['logged_user'] = 'Administrador'
                     st.session_state['user_role'] = 'ADMIN'
                     st.rerun()
                 else:
-                    st.error("Senha incorreta!")
-        
-        st.markdown("---")
-        st.caption("Contas padrão criadas para homologação:")
-        st.caption("- admin@alho.com / admin123 (Acesso Total)")
-        st.caption("- vendas@alho.com / vend123 (Vendedor)")
-        st.caption("- fabrica@alho.com / fab123 (Produção)")
-        st.caption("- fin@alho.com / fin123 (Financeiro)")
-        st.caption("- compras@alho.com / comp123 (Compras)")
-
-        # ----- DEBUG TEMPORÁRIO -----
-        st.markdown("---")
-        st.error("DEBUG: Usuários encontrados no banco de dados atualmente:")
-        try:
-            debug_users = fetch_all("SELECT email, nivel_permissao, status FROM usuarios")
-            st.dataframe(debug_users)
-        except Exception as e:
-            st.error(f"Erro ao buscar usuários: {e}")
-        # ----------------------------
+                    st.error("Senha incorreta. Tente novamente.")
 
 if not st.session_state['logged_user']:
     pg = st.navigation([st.Page(login_form_page, title="Login", icon="🔐")])
