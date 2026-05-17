@@ -1,0 +1,124 @@
+import streamlit as st
+import pandas as pd
+from pathlib import Path
+import os
+from database import fetch_all, run_query
+
+os.chdir(Path(__file__).parent)
+
+if 'logged_user' not in st.session_state or st.session_state['logged_user'] is None:
+    st.session_state['logged_user'] = 'Administrador de Testes'
+    st.session_state['user_role'] = 'ADMIN'
+
+def login_form_page():
+    st.set_page_config(page_title="Login - Fábrica de Alho", page_icon="🔐", layout="centered")
+    from estilo import carregar_estilo
+    carregar_estilo()
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        logo_path = Path(__file__).parent / "logo.png"
+        if logo_path.exists():
+            st.image(str(logo_path), width=150)
+            
+        st.markdown("<h2 style='text-align: center; color: #01743d;'>Login - ERP Fábrica de Alho</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center;'>Acesse com seu e-mail e senha departamental.</p>", unsafe_allow_html=True)
+        
+        if "DATABASE_URL" not in st.secrets:
+            st.warning("⚠️ Modo Local (SQLite). Se você está na nuvem, verifique as Secrets do Streamlit!")
+
+        
+        with st.form("login_form"):
+            email = st.text_input("E-mail").strip().lower()
+            senha = st.text_input("Senha", type="password").strip()
+            
+            if st.form_submit_button("Entrar no Sistema", use_container_width=True):
+                user = fetch_all("SELECT id, nome, nivel_permissao FROM usuarios WHERE email=? AND senha=? AND status='ATIVO'", (email, senha))
+                if not user.empty:
+                    st.session_state['logged_user'] = user.iloc[0]['nome']
+                    st.session_state['user_role'] = user.iloc[0]['nivel_permissao']
+                    st.rerun()
+                else:
+                    st.error("Credenciais inválidas ou usuário inativo!")
+        
+        st.markdown("---")
+        st.caption("Contas padrão criadas para homologação:")
+        st.caption("- admin@alho.com / admin123 (Acesso Total)")
+        st.caption("- vendas@alho.com / vend123 (Vendedor)")
+        st.caption("- fabrica@alho.com / fab123 (Produção)")
+        st.caption("- fin@alho.com / fin123 (Financeiro)")
+        st.caption("- compras@alho.com / comp123 (Compras)")
+
+        # ----- DEBUG TEMPORÁRIO -----
+        st.markdown("---")
+        st.error("DEBUG: Usuários encontrados no banco de dados atualmente:")
+        try:
+            debug_users = fetch_all("SELECT email, nivel_permissao, status FROM usuarios")
+            st.dataframe(debug_users)
+        except Exception as e:
+            st.error(f"Erro ao buscar usuários: {e}")
+        # ----------------------------
+
+if not st.session_state['logged_user']:
+    pg = st.navigation([st.Page(login_form_page, title="Login", icon="🔐")])
+    pg.run()
+    st.stop()
+
+# --- ROTEAMENTO COM ST.NAVIGATION (SINGLE TASK) ---
+p_dash = st.Page("pages/0_Dashboard.py", title="Dashboard", icon="📊", default=True)
+p_cadastros = st.Page("pages/1_Cadastros.py", title="Cadastros Básicos", icon="📝")
+p_compras = st.Page("pages/2_Compras.py", title="Compras & XML", icon="🛒")
+p_pessoas = st.Page("pages/3_Pessoas.py", title="Pessoas", icon="👥")
+p_producao = st.Page("pages/4_Producao.py", title="Chão de Fábrica", icon="🏭")
+p_estoque = st.Page("pages/5_Estoque.py", title="Controle de Estoque", icon="📦")
+p_vendas = st.Page("pages/6_Pedidos_de_Venda.py", title="Pedidos de Venda", icon="🛒")
+p_fat = st.Page("pages/7_Faturamento.py", title="Faturamento e Logística", icon="🧾")
+p_log = st.Page("pages/8_Logistica.py", title="Logística (Opcional)", icon="🚚")
+p_fin = st.Page("pages/9_Financeiro.py", title="Financeiro e Tesouraria", icon="💰")
+p_dre = st.Page("pages/10_DRE.py", title="DRE e Lucratividade", icon="🏛️")
+p_ativos = st.Page("pages/11_Ativos_Comodatos.py", title="Ativos e Comodatos", icon="❄️")
+
+role = st.session_state['user_role']
+pages_dict = {}
+
+if role == 'ADMIN':
+    pages_dict = {
+        "Menu Executivo": [p_dash, p_dre],
+        "Comercial": [p_vendas, p_fat, p_ativos],
+        "Operação": [p_producao, p_estoque, p_compras],
+        "Backoffice": [p_fin, p_cadastros, p_pessoas, p_log]
+    }
+elif role == 'VENDAS':
+    pages_dict = {
+        "Minhas Vendas": [p_dash, p_vendas, p_ativos],
+        "Consultas": [p_pessoas, p_estoque]
+    }
+elif role == 'PRODUCAO':
+    pages_dict = {
+        "Operação": [p_dash, p_producao],
+        "Consultas": [p_estoque, p_cadastros]
+    }
+elif role == 'COMPRAS':
+    pages_dict = {
+        "Suprimentos": [p_dash, p_compras],
+        "Consultas": [p_estoque, p_cadastros, p_pessoas]
+    }
+elif role == 'FINANCEIRO':
+    pages_dict = {
+        "Financeiro": [p_dash, p_fin, p_fat, p_dre],
+        "Consultas": [p_cadastros, p_pessoas]
+    }
+else:
+    pages_dict = {"Principal": [p_dash]}
+
+pg = st.navigation(pages_dict)
+
+st.sidebar.markdown(f"### 👤 {st.session_state['logged_user']}")
+st.sidebar.markdown(f"**Cargo:** {st.session_state['user_role']}")
+if st.sidebar.button("Sair / Logout", use_container_width=True):
+    st.session_state['logged_user'] = None
+    st.session_state['user_role'] = None
+    st.rerun()
+
+# Run the selected page
+pg.run()

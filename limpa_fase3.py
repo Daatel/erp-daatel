@@ -1,0 +1,11 @@
+import sqlite3
+c = sqlite3.connect('erp_fabrica.db')
+c.execute("DELETE FROM vendas")
+c.execute("DELETE FROM contas_a_receber")
+c.execute("DELETE FROM estoque_movimentos WHERE origem = 'Expedicao Nota Fiscal (NF)'")
+c.execute("DELETE FROM contas_a_pagar WHERE descricao LIKE 'Taxa Descarga%'")
+c.execute("UPDATE contas_a_pagar SET status='PENDENTE', data_pagamento=NULL")
+c.execute("DELETE FROM fluxo_caixa")
+c.commit()
+c.close()
+print("Limpeza OK - pronto para tentar Fases 3 a 5 novamente")

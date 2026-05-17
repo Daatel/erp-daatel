@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Manual — Pedidos de Venda | ERP Fábrica de Alho</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; color:#1e293b; background:#fff; font-size:14px; }
+
+  .cover { background:linear-gradient(135deg,#01743d 0%,#014d29 100%); color:#fff; min-height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:40px; text-align:center; border-radius:0 0 32px 32px; margin-bottom:36px; }
+  .cover .emoji { font-size:52px; margin-bottom:12px; }
+  .cover h1 { font-size:28px; font-weight:800; letter-spacing:-0.5px; }
+  .cover h2 { font-size:16px; font-weight:400; opacity:.85; margin-top:8px; }
+  .cover .badge { background:rgba(255,255,255,0.2); border-radius:20px; padding:4px 16px; font-size:12px; margin-top:16px; }
+
+  .page { max-width:760px; margin:0 auto; padding:0 32px 48px; }
+
+  h3 { font-size:17px; font-weight:700; color:#01743d; margin:28px 0 10px; border-left:4px solid #01743d; padding-left:10px; }
+  h4 { font-size:14px; font-weight:700; color:#292d77; margin:16px 0 6px; }
+  p  { line-height:1.75; color:#374151; margin-bottom:10px; }
+  ul { margin-left:18px; margin-bottom:10px; }
+  li { line-height:1.8; color:#374151; }
+
+  .tip  { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .warn { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .tip strong, .warn strong { display:block; margin-bottom:4px; }
+
+  /* CARDS ABAS */
+  .destinos { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin:16px 0 24px; }
+  .destino-card { border-radius:12px; padding:16px; text-align:center; }
+  .destino-card .icon { font-size:28px; margin-bottom:6px; }
+  .destino-card h5 { font-size:13px; font-weight:700; margin-bottom:4px; }
+  .destino-card p  { font-size:12px; margin:0; }
+  .d-mp   { background:#eff6ff; border:1.5px solid #93c5fd; }
+  .d-rv   { background:#f0fdf4; border:1.5px solid #86efac; }
+  .d-ci   { background:#fef3c7; border:1.5px solid #fcd34d; }
+
+  .footer { text-align:center; color:#94a3b8; font-size:12px; padding:24px 0 16px; border-top:1px solid #e2e8f0; margin-top:40px; }
+
+  @media print {
+    body { font-size:13px; }
+    .cover { border-radius:0 0 20px 20px; }
+    .page { padding:0 20px 32px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="emoji">📝</div>
+  <h1>Módulo de Pedidos de Venda</h1>
+  <h2>Captação comercial, fila de aprovação e comissionamento</h2>
+  <div class="badge">ERP Fábrica de Alho · Manual do Usuário</div>
+</div>
+
+<div class="page">
+
+  <h3>O que é este módulo?</h3>
+  <p>Este é o módulo exclusivo do setor <strong>Comercial</strong>. É aqui que os vendedores e representantes tiram os pedidos solicitados pelos supermercados e atacadistas.</p>
+  <p><strong>Ponto Crucial de Arquitetura:</strong> Apenas aprovar um pedido de venda nesta tela <strong>NÃO</strong> tira o alho do estoque e <strong>NÃO</strong> gera boletos no financeiro. O pedido fica com o status <span style="background:#ffffe0; border:1px solid #ccc; padding:2px 6px; border-radius:4px; font-weight:bold;">APROVADO</span> e é empurrado para a Fila Logística (o Módulo de Faturamento).</p>
+
+  <h3>O Tour pelas 4 Abas</h3>
+
+  <div class="destinos" style="grid-template-columns:1fr 1fr;">
+    <div class="destino-card d-mp">
+      <div class="icon">🛒</div>
+      <h5>Aba 1: Lançar Pedido</h5>
+      <p>O Vendedor aponta cliente, produto, quantidade e negocia o preço (que vem pré-preenchido do cadastro).</p>
+    </div>
+    <div class="destino-card d-ci">
+      <div class="icon">📋</div>
+      <h5>Aba 2: Meus Pedidos</h5>
+      <p>A lista geral. Pedidos amarelos estão pendentes na logística. Pedidos verdes já foram enviados.</p>
+    </div>
+    <div class="destino-card d-rv">
+      <div class="icon">💎</div>
+      <h5>Aba 3: Comissões (RH)</h5>
+      <p>Calculadora de repasse que lê as travas do sistema (se a comissão é liberada no Faturamento ou só quando o Cliente pagar).</p>
+    </div>
+    <div class="destino-card d-mp">
+      <div class="icon">🖨️</div>
+      <h5>Aba 4: Extrato do Vendedor</h5>
+      <p>Relatório pronto para imprimir e entregar para o Vendedor cobrar as notas que ele tem direito.</p>
+    </div>
+  </div>
+
+  <h3>O Mecanismo de Comissões</h3>
+  <p>O ERP não trabalha com achismos, mas sim com o "Motor de Comissionamento Multi-Nível" (que pode ser configurado em <strong>Cadastros > Comissões</strong>). Quando um pedido é lançado na Aba 1, o sistema verifica silenciosamente:</p>
+  <ul>
+    <li>O Representante 'X' tem regra para a Rede de Clientes 'Y'?</li>
+    <li>Se sim, ele tem uma taxa diferente só para o Alho Descascado?</li>
+    <li>Se sim, o sistema calcula o exato valor do passivo comercial na hora do pedido.</li>
+  </ul>
+
+  <div class="tip">
+    <strong>💡 Gatilhos de Liberação</strong>
+    Você pode dizer ao sistema (no cadastro do Vendedor) se ele ganha a comissão <strong>"No Faturamento"</strong> (assim que a fábrica despachar) ou <strong>"Na Liquidação"</strong> (ele só tem direito a receber se o boleto constar como pago no banco pelo Financeiro). A Aba 3 audita e colore essas travas perfeitamente.
+  </div>
+
+  <div class="warn">
+    <strong>⚠️ Estoque Insuficiente</strong>
+    O Comercial tem permissão para tirar o pedido mesmo sem ter saldo físico suficiente. Cabe à logística (no próximo módulo) decidir se "fatura a descoberto" ou se liga para a produção acelerar o lote. O Vendedor nunca é travado.
+  </div>
+
+  <h3>Dúvidas Frequentes</h3>
+
+  <h4>Lancei um pedido, mas ele não está no DRE nem no Banco. Cadê?</h4>
+  <p>Pedidos de Venda representam apenas a intenção de compra. O dinheiro só "existe" após a expedição efetiva da mercadoria e a geração do Título (Módulo 7 - Faturamento).</p>
+
+  <h4>O Vendedor pode dar desconto?</h4>
+  <p>Sim. O "Preço Base" vem do catálogo, mas o campo de preço é aberto para o comercial digitar o valor final acordado. A comissão incidirá sobre o valor bruto resultante.</p>
+
+  <div class="footer">
+    ERP Fábrica de Alho · Módulo Pedidos de Venda · Versão 2.0 · Abril 2026
+  </div>
+
+</div>
+</body>
+</html>

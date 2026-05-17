@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Manual — Módulo de Cadastros | ERP Empório do Alho</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    color: #333;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: #f9fafb;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 40px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  }
+  .header {
+    background: linear-gradient(135deg, #01743d 0%, #005a2e 100%);
+    color: white;
+    padding: 40px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    text-align: center;
+  }
+  .header h1 { margin: 0; font-size: 2.5em; font-weight: 800; }
+  .header p { margin: 10px 0 0; opacity: 0.9; font-size: 1.2em; }
+  .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+    margin-top: 15px;
+  }
+  h2 { color: #292d77; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-top: 40px; }
+  h3 { color: #01743d; margin-top: 30px; }
+  .tip-box {
+    background: #edf7f1;
+    border-left: 4px solid #01743d;
+    padding: 15px 20px;
+    border-radius: 0 8px 8px 0;
+    margin: 20px 0;
+  }
+  .warning-box {
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    padding: 15px 20px;
+    border-radius: 0 8px 8px 0;
+    margin: 20px 0;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  }
+  .card.green { border-top: 4px solid #01743d; }
+  .card.blue { border-top: 4px solid #292d77; }
+  .card.amber { border-top: 4px solid #f59e0b; }
+  .card h4 { margin: 0 0 10px 0; color: #292d77; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+  }
+  th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  th { background-color: #01743d; color: white; font-weight: 600; }
+  tr:nth-child(even) { background-color: #f9fafb; }
+  .footer {
+    text-align: center;
+    margin-top: 50px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+    color: #6b7280;
+    font-size: 0.9em;
+  }
+  .svg-container {
+    width: 100%;
+    padding: 20px;
+    border: 2px dashed #ccc;
+    text-align: center;
+    color: #999;
+    background: #fdfdfd;
+    border-radius: 8px;
+    margin: 20px 0;
+  }
+  @media print {
+    body { background-color: white; }
+    .container { box-shadow: none; padding: 0; }
+    .header { padding: 30px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>Manual: Cadastros Base</h1>
+    <p>O Coração do ERP Empório do Alho</p>
+    <div class="badge">Versão 1.0 • Atualizado em 2026</div>
+  </div>
+
+  <h2>1. O que é este módulo?</h2>
+  <p>O módulo de <strong>Cadastros Base</strong> é o cérebro de todo o sistema. É aqui que você informa ao ERP quais produtos a fábrica produz, quem são os clientes, fornecedores e colaboradores, e como funcionam as regras de comissão. <strong>Sem os cadastros preenchidos corretamente, nenhum outro módulo (Compras, Vendas, RH, DRE) irá funcionar.</strong></p>
+  
+  <div class="warning-box">
+    <strong>⚠️ Princípio do Histórico (Inativos):</strong> No ERP, <strong>nunca excluímos</strong> clientes, fornecedores ou produtos que já tiveram movimentação. Nós apenas mudamos o status para <strong>INATIVO</strong>. Isso garante que as notas fiscais e relatórios financeiros antigos nunca percam os dados de quem comprou ou vendeu.
+  </div>
+
+  <!-- ESPAÇO PARA O ESQUEMA VISUAL -->
+  <h3>Visão Geral do Fluxo</h3>
+  <p>O esquema abaixo ilustra como o Módulo de Cadastros alimenta todas as outras engrenagens da empresa:</p>
+  
+  <div class="svg-container">
+    <svg
+       viewBox="0 0 1200 850"
+       style="background-color: white; font-family: 'Inter', 'Roboto', sans-serif;"
+       version="1.1"
+       id="svg31"
+       sodipodi:docname="FLUXO MODULO DE COMPRAS.svg"
+       inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+       xml:space="preserve"
+       xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+       xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+       xmlns="http://www.w3.org/2000/svg"
+       xmlns:svg="http://www.w3.org/2000/svg"><sodipodi:namedview
+         id="namedview31"
+         pagecolor="#ffffff"
+         bordercolor="#000000"
+         borderopacity="0.25"
+         inkscape:showpageshadow="2"
+         inkscape:pageopacity="0.0"
+         inkscape:pagecheckerboard="0"
+         inkscape:deskcolor="#d1d1d1"
+         showguides="true"
+         inkscape:zoom="0.41844084"
+         inkscape:cx="303.50766"
+         inkscape:cy="515.00709"
+         inkscape:window-width="1280"
+         inkscape:window-height="705"
+         inkscape:window-x="-8"
+         inkscape:window-y="-8"
+         inkscape:window-maximized="1"
+         inkscape:current-layer="svg31"><sodipodi:guide
+           position="480.76541,681.85885"
+           orientation="0,-1"
+           id="guide37"
+           inkscape:locked="false" /><sodipodi:guide
+           position="326.21099,632.52601"
+           orientation="1,0"
+           id="guide38"
+           inkscape:locked="false" /><sodipodi:guide
+           position="727.70144,554.85672"
+           orientation="1,0"
+           id="guide39"
+           inkscape:locked="false" /><sodipodi:guide
+           position="328.60081,532.75085"
+           orientation="0,-1"
+           id="guide2"
+           inkscape:locked="false" /><sodipodi:guide
+           position="594.83101,655.66601"
+           orientation="1,0"
+           id="guide3"
+           inkscape:locked="false" /></sodipodi:namedview><defs
+         id="defs3"><marker
+           id="arrowGreen"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0 0 L 10 5 L 0 10 z"
+             fill="#01743d"
+             id="path1" /></marker><marker
+           id="arrowBlue"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0 0 L 10 5 L 0 10 z"
+             fill="#292d77"
+             id="path2" /></marker><marker
+           id="arrowGold"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0 0 L 10 5 L 0 10 z"
+             fill="#c7a332"
+             id="path3" /></marker><marker
+           id="arrowBlue-4"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0,0 10,5 0,10 Z"
+             fill="#292d77"
+             id="path2-5" /></marker><marker
+           id="arrowGreen-0"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0,0 10,5 0,10 Z"
+             fill="#01743d"
+             id="path1-9" /></marker><marker
+           id="arrowBlue-48"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0,0 10,5 0,10 Z"
+             fill="#292d77"
+             id="path2-8" /></marker><marker
+           id="arrowGold-2"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0,0 10,5 0,10 Z"
+             fill="#c7a332"
+             id="path3-4" /></marker><marker
+           id="marker4"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0,0 10,5 0,10 Z"
+             fill="#292d77"
+             id="path4-5" /></marker><marker
+           id="marker5"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0,0 10,5 0,10 Z"
+             fill="#01743d"
+             id="path5" /></marker><marker
+           id="marker6"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0,0 10,5 0,10 Z"
+             fill="#01743d"
+             id="path6-5" /></marker><marker
+           id="marker7"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0,0 10,5 0,10 Z"
+             fill="#292d77"
+             id="path7-1" /></marker><marker
+           id="marker8"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0,0 10,5 0,10 Z"
+             fill="#c7a332"
+             id="path8-7" /></marker><marker
+           id="marker9"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0,0 10,5 0,10 Z"
+             fill="#292d77"
+             id="path9" /></marker><marker
+           id="marker10"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0,0 10,5 0,10 Z"
+             fill="#c7a332"
+             id="path10-1" /></marker><marker
+           id="arrowGreen-6"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0 0 L 10 5 L 0 10 z"
+             fill="#01743d"
+             id="path1-0" /></marker><marker
+           id="arrowBlue-2"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0 0 L 10 5 L 0 10 z"
+             fill="#292d77"
+             id="path2-4" /></marker><marker
+           id="arrowAmber"
+           viewBox="0 0 10 10"
+           refX="10"
+           refY="5"
+           markerWidth="6"
+           markerHeight="6"
+           orient="auto-start-reverse"><path
+             d="M 0 0 L 10 5 L 0 10 z"
+             fill="#f59e0b"
+             id="path3-8" /></marker></defs><text
+         x="1749.1053"
+         y="-34.493042"
+         font-size="32px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#333333"
+         id="text3">MÃ³dulo de Compras</text><path
+         d="m 1749.1054,45.506959 v 40"
+         stroke="#333333"
+         stroke-width="2"
+         fill="none"
+         id="path4" /><path
+         d="m 1679.4903,45.477409 -0.4519,39.19351 -201.933,-1.87627 v 32.712311"
+         stroke="#01743d"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowGreen)"
+         id="path6"
+         sodipodi:nodetypes="cccc" /><path
+         d="M 1749.1054,85.506959 V 115.50696"
+         stroke="#292d77"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowBlue)"
+         id="path7" /><path
+         d="m 1817.5944,44.105369 0.4307,40.04366 230.1468,-0.12998 0.9335,31.487911"
+         stroke="#c7a332"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowGold)"
+         id="path8"
+         sodipodi:nodetypes="cccc"
+         style="stroke:#d45500" /><path
+         d="m 1749.1054,195.50696 v 120"
+         stroke="#292d77"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowBlue)"
+         id="path10" /><path
+         d="m 1657.3532,388.44731 1.3189,44.80606 -184.0729,-0.24706 0.6727,32.22816"
+         stroke="#01743d"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowGreen)"
+         id="path11"
+         sodipodi:nodetypes="cccc" /><path
+         d="m 1549.1054,495.50696 h 132 l -1.1551,-64.08793 115.9037,1.31664 -1.5421,-47.31944"
+         stroke="#01743d"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowGreen)"
+         id="path12"
+         sodipodi:nodetypes="ccccc" /><path
+         d="m 1849.1054,365.50696 v 100"
+         stroke="#292d77"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowBlue)"
+         id="path13" /><path
+         d="m 2049.1054,195.50696 0.5974,271.19491"
+         stroke="#c7a332"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowGold)"
+         id="path14"
+         style="stroke:#d45500"
+         sodipodi:nodetypes="cc" /><path
+         d="m 1849.1054,525.50696 v 50 h -100 v 40"
+         stroke="#292d77"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowBlue)"
+         id="path15" /><path
+         d="m 2049.1054,525.50696 2,130 h -150"
+         stroke="#c7a332"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowGold)"
+         id="path16"
+         style="stroke:#d45500"
+         sodipodi:nodetypes="ccc" /><rect
+         x="1624.1053"
+         y="-4.493041"
+         width="250"
+         height="50"
+         rx="8"
+         fill="#ffffff"
+         stroke="#01743d"
+         stroke-width="2"
+         id="rect16" /><text
+         x="1747.1053"
+         y="15.506959"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#333333"
+         id="text16"><tspan
+           sodipodi:role="line"
+           id="tspan31"
+           x="1747.1053"
+           y="15.506959">Nota Fiscal de</tspan><tspan
+           sodipodi:role="line"
+           id="tspan32"
+           x="1747.1053"
+           y="38.006958">Entrada (NF)</tspan></text><rect
+         x="1370.6276"
+         y="115.50696"
+         width="227.30081"
+         height="80"
+         rx="6.0613546"
+         fill="#01743d"
+         id="rect17"
+         style="fill:#ffffff;stroke:#01743d;stroke-width:2;stroke-dasharray:none;stroke-opacity:1" /><text
+         x="1485.1053"
+         y="150.50696"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text17"
+         style="fill:#000000">MatÃ©ria-Prima</text><text
+         x="1485.1053"
+         y="175.50696"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text18"
+         style="fill:#000000">Ex.: Alho, Embalagens, Sacos</text><rect
+         x="1624.1053"
+         y="115.50696"
+         width="250"
+         height="80"
+         rx="8"
+         fill="#292d77"
+         id="rect18"
+         style="fill:#ffffff;stroke:#292d77;stroke-width:2;stroke-dasharray:none;stroke-opacity:0.901961" /><text
+         x="1749.1053"
+         y="150.50696"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text19"
+         style="fill:#000000">Produto p/ Revenda</text><text
+         x="1749.1053"
+         y="175.50696"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text20"
+         style="fill:#000000">Produtos prontos</text><rect
+         x="1927.1053"
+         y="115.50696"
+         width="225.64612"
+         height="80"
+         rx="6.01723"
+         fill="#c7a332"
+         id="rect20"
+         style="fill:#ffffff;stroke:#d45500;stroke-width:2;stroke-dasharray:none;stroke-opacity:0.52549" /><text
+         x="2037.1053"
+         y="150.50696"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text21"
+         style="fill:#000000">Consumo Interno</text><text
+         x="2037.1053"
+         y="175.50696"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text22"
+         style="fill:#000000">Ex.: Limpeza, EscritÃ³rio</text><rect
+         x="1603.2445"
+         y="235.50696"
+         width="294.97018"
+         height="150"
+         rx="6.554893"
+         fill="#1062b3"
+         id="rect22"
+         style="stroke-width:0.739081" /><text
+         x="1749.1053"
+         y="270.50696"
+         font-size="22px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text23">ESTOQUE</text><rect
+         x="1632.0961"
+         y="301.35254"
+         width="104.55338"
+         height="60.308849"
+         rx="2.8514559"
+         fill="#c6ebd6"
+         stroke="#01743d"
+         stroke-width="0.69115"
+         id="rect23" /><text
+         x="1683.1053"
+         y="326.50696"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#01743d"
+         id="text24"
+         style="fill:#004f00;fill-opacity:1"><tspan
+           sodipodi:role="line"
+           id="tspan33"
+           x="1683.1053"
+           y="326.50696">MatÃ©ria</tspan><tspan
+           sodipodi:role="line"
+           id="tspan34"
+           x="1683.1053"
+           y="349.00696">Prima</tspan></text><rect
+         x="1768.4034"
+         y="299.34976"
+         width="102.86908"
+         height="60.314407"
+         rx="2.8055203"
+         fill="#cddbfa"
+         stroke="#292d77"
+         stroke-width="0.685593"
+         id="rect24" /><text
+         x="1821.1053"
+         y="334.50696"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#292d77"
+         id="text25">Produtos</text><rect
+         x="1377.1053"
+         y="465.50696"
+         width="200"
+         height="60"
+         rx="8"
+         fill="#01743d"
+         id="rect25"
+         style="fill:#004f00;fill-opacity:1;stroke:#014c28;stroke-opacity:1" /><text
+         x="1477.1053"
+         y="500.50696"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text26">PRODUÃ‡ÃƒO</text><rect
+         x="1725.1053"
+         y="465.50696"
+         width="200"
+         height="60"
+         rx="8"
+         fill="#292d77"
+         id="rect26" /><text
+         x="1825.1053"
+         y="500.50696"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text27">VENDAS</text><rect
+         x="1955.1053"
+         y="465.50696"
+         width="200"
+         height="60"
+         rx="8"
+         fill="#c7a332"
+         id="rect27"
+         style="fill:#d45500" /><text
+         x="2055.1055"
+         y="490.50696"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text28">DRE</text><text
+         x="2055.1055"
+         y="510.50696"
+         font-size="12px"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text29">Fora do estoque</text><rect
+         x="1605.1053"
+         y="615.50696"
+         width="292.20352"
+         height="80"
+         rx="6.8753767"
+         fill="#01743d"
+         id="rect29"
+         style="fill:#004f00;fill-opacity:1;stroke:#014c28;stroke-width:0.92705;stroke-opacity:1" /><text
+         x="1749.1053"
+         y="650.50696"
+         font-size="20px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text30">FINANCEIRO</text><text
+         x="1749.1053"
+         y="675.50696"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text31">Duplicatas geradas automaticamente</text><rect
+         style="fill:#ffffff;stroke:none;stroke-width:1.89737;stroke-dasharray:none;stroke-opacity:0.52549"
+         id="rect39"
+         width="79.845932"
+         height="7.6043739"
+         x="1529.7465"
+         y="430.06958" /><rect
+         style="font-family:Inter, Roboto, sans-serif;fill:#ffffff;stroke:none;stroke-width:1.66762;stroke-dasharray:none;stroke-opacity:0.52549"
+         id="rect39-1"
+         width="61.679928"
+         height="7.6043739"
+         x="1601.2714"
+         y="491.50696" /><text
+         x="1532.8561"
+         y="428.7793"
+         font-size="14px"
+         fill="#333333"
+         id="text12-8"
+         style="font-family:Inter, Roboto, sans-serif"><tspan
+           sodipodi:role="line"
+           id="tspan36-2"
+           x="1532.8561"
+           y="428.7793">RequisiÃ§Ã£o</tspan><tspan
+           sodipodi:role="line"
+           x="1532.8561"
+           y="446.2793"
+           id="tspan37">deEstoque</tspan></text><text
+         x="1603.6804"
+         y="491.67896"
+         font-size="14px"
+         fill="#333333"
+         id="text12"><tspan
+           sodipodi:role="line"
+           id="tspan35"
+           x="1603.6804"
+           y="491.67896">Produto</tspan><tspan
+           sodipodi:role="line"
+           id="tspan36"
+           x="1603.6804"
+           y="509.17896">Acabado</tspan></text><g
+         id="g1"><text
+           x="-335.99362"
+           y="15.594915"
+           font-size="32px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#333333"
+           id="text3-5"
+           style="font-family:Inter, Roboto, sans-serif">MÃ³dulo de Compras</text><path
+           d="M -335.99359,95.594915 V 135.59492"
+           stroke="#333333"
+           stroke-width="2"
+           fill="none"
+           id="path11-2"
+           style="font-family:Inter, Roboto, sans-serif" /><path
+           d="m -405.60863,95.565365 -0.45191,39.193515 -201.93305,-1.87627 v 32.71231"
+           stroke="#01743d"
+           stroke-width="2"
+           fill="none"
+           marker-end="url(#arrowGreen-0)"
+           id="path12-7"
+           sodipodi:nodetypes="cccc"
+           style="font-family:Inter, Roboto, sans-serif;marker-end:url(#arrowGreen-0)" /><path
+           d="m -335.99359,135.59492 v 30"
+           stroke="#292d77"
+           stroke-width="2"
+           fill="none"
+           marker-end="url(#arrowBlue-48)"
+           id="path13-6"
+           style="font-family:Inter, Roboto, sans-serif;marker-end:url(#arrowBlue-48)" /><path
+           d="m -267.50452,94.193325 0.43065,40.043665 230.146828,-0.12998 0.9335,31.48791"
+           stroke="#c7a332"
+           stroke-width="2"
+           fill="none"
+           marker-end="url(#arrowGold-2)"
+           id="path14-1"
+           sodipodi:nodetypes="cccc"
+           style="font-family:Inter, Roboto, sans-serif;stroke:#d45500;marker-end:url(#arrowGold-2)" /><path
+           d="m -335.99359,245.59492 v 120"
+           stroke="#292d77"
+           stroke-width="2"
+           fill="none"
+           marker-end="url(#arrowBlue-48)"
+           id="path15-4"
+           style="font-family:Inter, Roboto, sans-serif;marker-end:url(#arrowBlue-48)" /><path
+           d="m -427.74573,438.53527 1.31893,44.80606 -184.07298,-0.24706 0.67277,32.22816"
+           stroke="#01743d"
+           stroke-width="2"
+           fill="none"
+           marker-end="url(#arrowGreen-0)"
+           id="path16-2"
+           sodipodi:nodetypes="cccc"
+           style="font-family:Inter, Roboto, sans-serif;marker-end:url(#arrowGreen-0)" /><path
+           d="m -535.99359,545.59492 h 132 l -1.15507,-64.08793 115.90375,1.31664 -1.54217,-47.31944"
+           stroke="#01743d"
+           stroke-width="2"
+           fill="none"
+           marker-end="url(#arrowGreen-0)"
+           id="path17"
+           sodipodi:nodetypes="ccccc"
+           style="font-family:Inter, Roboto, sans-serif;marker-end:url(#arrowGreen-0)" /><path
+           d="m -235.99359,415.59492 v 100"
+           stroke="#292d77"
+           stroke-width="2"
+           fill="none"
+           marker-end="url(#arrowBlue-48)"
+           id="path18"
+           style="font-family:Inter, Roboto, sans-serif;marker-end:url(#arrowBlue-48)" /><path
+           d="m -35.993542,245.59492 0.5974,271.19491"
+           stroke="#c7a332"
+           stroke-width="2"
+           fill="none"
+           marker-end="url(#arrowGold-2)"
+           id="path19"
+           style="font-family:Inter, Roboto, sans-serif;stroke:#d45500;marker-end:url(#arrowGold-2)"
+           sodipodi:nodetypes="cc" /><path
+           d="m -235.99359,575.59492 v 50 h -100 v 40"
+           stroke="#292d77"
+           stroke-width="2"
+           fill="none"
+           marker-end="url(#arrowBlue-48)"
+           id="path20"
+           style="font-family:Inter, Roboto, sans-serif;marker-end:url(#arrowBlue-48)" /><path
+           d="m -35.993542,575.59492 2,130 H -183.99354"
+           stroke="#c7a332"
+           stroke-width="2"
+           fill="none"
+           marker-end="url(#arrowGold-2)"
+           id="path21"
+           style="font-family:Inter, Roboto, sans-serif;stroke:#d45500;marker-end:url(#arrowGold-2)"
+           sodipodi:nodetypes="ccc" /><rect
+           x="-460.99362"
+           y="45.594913"
+           width="250"
+           height="50"
+           rx="8"
+           fill="#ffffff"
+           stroke="#01743d"
+           stroke-width="2"
+           id="rect16-3"
+           style="font-family:Inter, Roboto, sans-serif" /><text
+           x="-337.99362"
+           y="65.594917"
+           font-size="18px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#333333"
+           id="text16-2"
+           style="font-family:Inter, Roboto, sans-serif"><tspan
+             sodipodi:role="line"
+             id="tspan31-2"
+             x="-337.99362"
+             y="65.594917">Nota Fiscal de</tspan><tspan
+             sodipodi:role="line"
+             id="tspan32-1"
+             x="-337.99362"
+             y="88.094917">Entrada (NF)</tspan></text><rect
+           x="-714.47131"
+           y="165.59491"
+           width="227.30081"
+           height="80"
+           rx="6.0613546"
+           fill="#01743d"
+           id="rect17-6"
+           style="font-family:Inter, Roboto, sans-serif;fill:#ffffff;stroke:#01743d;stroke-width:2;stroke-dasharray:none;stroke-opacity:1" /><text
+           x="-599.99359"
+           y="200.59491"
+           font-size="18px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text17-8"
+           style="font-family:Inter, Roboto, sans-serif;fill:#000000">MatÃ©ria-Prima</text><text
+           x="-599.99359"
+           y="225.59491"
+           font-size="14px"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text18-5"
+           style="font-family:Inter, Roboto, sans-serif;fill:#000000">Ex.: Alho, Embalagens, Sacos</text><rect
+           x="-460.99362"
+           y="165.59491"
+           width="250"
+           height="80"
+           rx="8"
+           fill="#292d77"
+           id="rect18-7"
+           style="font-family:Inter, Roboto, sans-serif;fill:#ffffff;stroke:#292d77;stroke-width:2;stroke-dasharray:none;stroke-opacity:0.901961" /><text
+           x="-335.99362"
+           y="200.59491"
+           font-size="18px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text19-6"
+           style="font-family:Inter, Roboto, sans-serif;fill:#000000">Produto p/ Revenda</text><text
+           x="-335.99362"
+           y="225.59491"
+           font-size="14px"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text20-1"
+           style="font-family:Inter, Roboto, sans-serif;fill:#000000">Produtos prontos</text><rect
+           x="-157.99356"
+           y="165.59491"
+           width="225.64612"
+           height="80"
+           rx="6.01723"
+           fill="#c7a332"
+           id="rect20-8"
+           style="font-family:Inter, Roboto, sans-serif;fill:#ffffff;stroke:#d45500;stroke-width:2;stroke-dasharray:none;stroke-opacity:0.52549" /><text
+           x="-47.993557"
+           y="200.59491"
+           font-size="18px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text21-9"
+           style="font-family:Inter, Roboto, sans-serif;fill:#000000">Consumo Interno</text><text
+           x="-47.993557"
+           y="225.59491"
+           font-size="14px"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text22-2"
+           style="font-family:Inter, Roboto, sans-serif;fill:#000000">Ex.: Limpeza, EscritÃ³rio</text><rect
+           x="-481.85446"
+           y="285.59491"
+           width="294.97018"
+           height="150"
+           rx="6.554893"
+           fill="#1062b3"
+           id="rect22-7"
+           style="font-family:Inter, Roboto, sans-serif;stroke-width:0.739081" /><text
+           x="-335.99362"
+           y="320.59491"
+           font-size="22px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text23-9"
+           style="font-family:Inter, Roboto, sans-serif">ESTOQUE</text><rect
+           x="-453.0029"
+           y="351.44049"
+           width="104.55338"
+           height="60.308849"
+           rx="2.8514559"
+           fill="#c6ebd6"
+           stroke="#01743d"
+           stroke-width="0.69115"
+           id="rect23-5"
+           style="font-family:Inter, Roboto, sans-serif" /><text
+           x="-401.99362"
+           y="376.59491"
+           font-size="18px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#01743d"
+           id="text24-4"
+           style="font-family:Inter, Roboto, sans-serif;fill:#004f00;fill-opacity:1"><tspan
+             sodipodi:role="line"
+             id="tspan33-3"
+             x="-401.99362"
+             y="376.59491">MatÃ©ria</tspan><tspan
+             sodipodi:role="line"
+             id="tspan34-1"
+             x="-401.99362"
+             y="399.09491">Prima</tspan></text><rect
+           x="-316.69553"
+           y="349.43768"
+           width="102.86908"
+           height="60.314407"
+           rx="2.8055203"
+           fill="#cddbfa"
+           stroke="#292d77"
+           stroke-width="0.685593"
+           id="rect24-2"
+           style="font-family:Inter, Roboto, sans-serif" /><text
+           x="-263.99362"
+           y="384.59491"
+           font-size="18px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#292d77"
+           id="text25-3"
+           style="font-family:Inter, Roboto, sans-serif">Produtos</text><rect
+           x="-707.99359"
+           y="515.59491"
+           width="200"
+           height="60"
+           rx="8"
+           fill="#01743d"
+           id="rect25-3"
+           style="font-family:Inter, Roboto, sans-serif;fill:#004f00;fill-opacity:1;stroke:#014c28;stroke-opacity:1" /><text
+           x="-607.99359"
+           y="550.59491"
+           font-size="18px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text26-4"
+           style="font-family:Inter, Roboto, sans-serif">PRODUÃ‡ÃƒO</text><rect
+           x="-359.99362"
+           y="515.59491"
+           width="200"
+           height="60"
+           rx="8"
+           fill="#292d77"
+           id="rect26-1"
+           style="font-family:Inter, Roboto, sans-serif" /><text
+           x="-259.99362"
+           y="550.59491"
+           font-size="18px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text27-1"
+           style="font-family:Inter, Roboto, sans-serif">VENDAS</text><rect
+           x="-129.99356"
+           y="515.59491"
+           width="200"
+           height="60"
+           rx="8"
+           fill="#c7a332"
+           id="rect27-3"
+           style="font-family:Inter, Roboto, sans-serif;fill:#d45500" /><text
+           x="-29.993559"
+           y="540.59491"
+           font-size="18px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text28-8"
+           style="font-family:Inter, Roboto, sans-serif">DRE</text><text
+           x="-29.993559"
+           y="560.59491"
+           font-size="12px"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text29-7"
+           style="font-family:Inter, Roboto, sans-serif">Fora do estoque</text><rect
+           x="-479.99362"
+           y="665.59491"
+           width="292.20352"
+           height="80"
+           rx="6.8753767"
+           fill="#01743d"
+           id="rect29-4"
+           style="font-family:Inter, Roboto, sans-serif;fill:#004f00;fill-opacity:1;stroke:#014c28;stroke-width:0.92705;stroke-opacity:1" /><text
+           x="-335.99362"
+           y="700.59491"
+           font-size="20px"
+           font-weight="bold"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text30-2"
+           style="font-family:Inter, Roboto, sans-serif">FINANCEIRO</text><text
+           x="-335.99362"
+           y="725.59491"
+           font-size="14px"
+           text-anchor="middle"
+           fill="#ffffff"
+           id="text31-7"
+           style="font-family:Inter, Roboto, sans-serif">Duplicatas geradas automaticamente</text><rect
+           style="font-family:Inter, Roboto, sans-serif;fill:#ffffff;stroke:none;stroke-width:1.89737;stroke-dasharray:none;stroke-opacity:0.52549"
+           id="rect39-7"
+           width="79.845932"
+           height="7.6043739"
+           x="-555.35242"
+           y="480.15753" /><rect
+           style="font-family:Inter, Roboto, sans-serif;fill:#ffffff;stroke:none;stroke-width:1.66762;stroke-dasharray:none;stroke-opacity:0.52549"
+           id="rect39-1-9"
+           width="61.679928"
+           height="7.6043739"
+           x="-483.82761"
+           y="541.59491" /><text
+           x="-552.24286"
+           y="478.86725"
+           font-size="14px"
+           fill="#333333"
+           id="text12-8-3"
+           style="font-family:Inter, Roboto, sans-serif"><tspan
+             sodipodi:role="line"
+             id="tspan36-2-1"
+             x="-552.24286"
+             y="478.86725">RequisiÃ§Ã£o</tspan><tspan
+             sodipodi:role="line"
+             x="-552.24286"
+             y="496.36725"
+             id="tspan37-9">deEstoque</tspan></text><text
+           x="-481.41861"
+           y="541.76691"
+           font-size="14px"
+           fill="#333333"
+           id="text12-86"
+           style="font-family:Inter, Roboto, sans-serif"><tspan
+             sodipodi:role="line"
+             id="tspan35-5"
+             x="-481.41861"
+             y="541.76691">Produto</tspan><tspan
+             sodipodi:role="line"
+             id="tspan36-0"
+             x="-481.41861"
+             y="559.26691">Acabado</tspan></text></g><text
+         x="662.25244"
+         y="158.68565"
+         font-size="28px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#333333"
+         id="text3-6"
+         style="font-size:32px;font-family:Inter, Roboto, sans-serif">MÃ³dulo de Cadastros Base</text><path
+         d="m 593.35552,289.41031 -0.22093,28.60111 -280.04612,0.0611 -0.83601,30.61309"
+         stroke="#01743d"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowGreen-6)"
+         id="path6-0"
+         style="font-family:Inter, Roboto, sans-serif;marker-end:url(#arrowGreen-6);stroke:#d45500"
+         sodipodi:nodetypes="cccc" /><path
+         d="m 662.25246,288.68566 v 60"
+         stroke="#292d77"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowBlue-2)"
+         id="path7-0"
+         style="font-family:Inter, Roboto, sans-serif;marker-end:url(#arrowBlue-2)"
+         sodipodi:nodetypes="cc" /><path
+         d="m 728.78085,290.28527 -0.93991,25.98502 283.06056,0.323 1.351,32.09237"
+         stroke="#f59e0b"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowAmber)"
+         id="path8-6"
+         style="font-family:Inter, Roboto, sans-serif;stroke:#d45500"
+         sodipodi:nodetypes="cccc" /><path
+         d="m 312.25246,528.68566 v 60"
+         stroke="#01743d"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowGreen-6)"
+         id="path9-1"
+         style="font-family:Inter, Roboto, sans-serif;marker-end:url(#arrowGreen-6)" /><path
+         d="m 662.25246,528.68566 v 60"
+         stroke="#292d77"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowBlue-2)"
+         id="path10-3"
+         style="font-family:Inter, Roboto, sans-serif;marker-end:url(#arrowBlue-2)" /><path
+         d="m 1012.2525,528.68566 v 60"
+         stroke="#f59e0b"
+         stroke-width="2"
+         fill="none"
+         marker-end="url(#arrowAmber)"
+         id="path11-8"
+         style="font-family:Inter, Roboto, sans-serif;stroke:#d45500" /><rect
+         x="462.25247"
+         y="188.68565"
+         width="400"
+         height="100"
+         rx="10"
+         fill="#ffffff"
+         stroke="#292d77"
+         stroke-width="3"
+         id="rect11"
+         style="font-family:Inter, Roboto, sans-serif" /><text
+         x="662.25244"
+         y="233.68565"
+         font-size="20px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#292d77"
+         id="text11"
+         style="font-family:Inter, Roboto, sans-serif">MÃ“DULO DE CADASTROS</text><text
+         x="662.25244"
+         y="263.68567"
+         font-size="16px"
+         text-anchor="middle"
+         fill="#666666"
+         id="text12-9"
+         style="font-family:Inter, Roboto, sans-serif">(CoraÃ§Ã£o do ERP)</text><rect
+         x="162.25246"
+         y="348.68567"
+         width="300"
+         height="180"
+         rx="8"
+         fill="#ffffff"
+         stroke="#01743d"
+         stroke-width="2"
+         id="rect12"
+         style="font-family:Inter, Roboto, sans-serif" /><rect
+         x="162.25246"
+         y="348.68567"
+         width="300"
+         height="50"
+         rx="8"
+         fill="#01743d"
+         id="rect13"
+         style="font-family:Inter, Roboto, sans-serif;stroke:#d45500" /><text
+         x="312.25247"
+         y="380.68567"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text13"
+         style="font-family:Inter, Roboto, sans-serif">O que negociamos</text><text
+         x="312.25247"
+         y="438.68567"
+         font-size="16px"
+         text-anchor="middle"
+         fill="#333333"
+         id="text14"
+         style="font-family:Inter, Roboto, sans-serif">â€¢ Produtos</text><text
+         x="312.25247"
+         y="468.68567"
+         font-size="16px"
+         text-anchor="middle"
+         fill="#333333"
+         id="text15"
+         style="font-family:Inter, Roboto, sans-serif">â€¢ MatÃ©ria-Prima</text><rect
+         x="512.25244"
+         y="348.68567"
+         width="300"
+         height="180"
+         rx="8"
+         fill="#ffffff"
+         stroke="#292d77"
+         stroke-width="2"
+         id="rect15"
+         style="font-family:Inter, Roboto, sans-serif" /><rect
+         x="512.25244"
+         y="348.68567"
+         width="300"
+         height="50"
+         rx="8"
+         fill="#292d77"
+         id="rect16-34"
+         style="font-family:Inter, Roboto, sans-serif" /><text
+         x="662.25244"
+         y="380.68567"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text16-4"
+         style="font-family:Inter, Roboto, sans-serif">Com quem negociamos</text><text
+         x="662.25244"
+         y="428.68567"
+         font-size="15px"
+         text-anchor="middle"
+         fill="#333333"
+         id="text17-6"
+         style="font-family:Inter, Roboto, sans-serif">â€¢ Clientes e Fornecedores</text><text
+         x="662.25244"
+         y="458.68567"
+         font-size="15px"
+         text-anchor="middle"
+         fill="#333333"
+         id="text18-0"
+         style="font-family:Inter, Roboto, sans-serif">â€¢ Redes e Grupos</text><text
+         x="662.25244"
+         y="488.68567"
+         font-size="15px"
+         text-anchor="middle"
+         fill="#333333"
+         id="text19-66"
+         style="font-family:Inter, Roboto, sans-serif">â€¢ Colaboradores</text><rect
+         x="862.25244"
+         y="348.68567"
+         width="300"
+         height="180"
+         rx="8"
+         fill="#ffffff"
+         stroke="#f59e0b"
+         stroke-width="2"
+         id="rect19"
+         style="font-family:Inter, Roboto, sans-serif;stroke:#d45500" /><rect
+         x="862.25244"
+         y="348.68567"
+         width="300"
+         height="50"
+         rx="8"
+         fill="#f59e0b"
+         id="rect20-1"
+         style="font-family:Inter, Roboto, sans-serif;fill:#d45500;fill-opacity:1" /><text
+         x="1012.2524"
+         y="380.68567"
+         font-size="18px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text20-8"
+         style="font-family:Inter, Roboto, sans-serif">Estrutura do NegÃ³cio</text><text
+         x="1012.2524"
+         y="423.68567"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#333333"
+         id="text21-4"
+         style="font-family:Inter, Roboto, sans-serif">â€¢ Contas e Plano de Contas</text><text
+         x="1012.2524"
+         y="453.68567"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#333333"
+         id="text22-9"
+         style="font-family:Inter, Roboto, sans-serif">â€¢ Regras de ComissÃµes</text><text
+         x="1012.2524"
+         y="483.68567"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#333333"
+         id="text23-6"
+         style="font-family:Inter, Roboto, sans-serif">â€¢ MaquinÃ¡rio / Ativos</text><rect
+         x="162.25246"
+         y="588.68567"
+         width="300"
+         height="100"
+         rx="8"
+         fill="#01743d"
+         id="rect23-3"
+         style="font-family:Inter, Roboto, sans-serif" /><text
+         x="312.25247"
+         y="623.68567"
+         font-size="16px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text24-7"
+         style="font-family:Inter, Roboto, sans-serif">Alimenta:</text><text
+         x="312.25247"
+         y="653.68567"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text25-8"
+         style="font-family:Inter, Roboto, sans-serif">Compras, Estoque,</text><text
+         x="312.25247"
+         y="673.68567"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text26-8"
+         style="font-family:Inter, Roboto, sans-serif">Vendas e ProduÃ§Ã£o</text><rect
+         x="512.25244"
+         y="588.68567"
+         width="300"
+         height="100"
+         rx="8"
+         fill="#292d77"
+         id="rect26-2"
+         style="font-family:Inter, Roboto, sans-serif" /><text
+         x="662.25244"
+         y="623.68567"
+         font-size="16px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text27-9"
+         style="font-family:Inter, Roboto, sans-serif">Alimenta:</text><text
+         x="662.25244"
+         y="653.68567"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text28-1"
+         style="font-family:Inter, Roboto, sans-serif">Vendas, Compras,</text><text
+         x="662.25244"
+         y="673.68567"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text29-3"
+         style="font-family:Inter, Roboto, sans-serif">RH e LogÃstica</text><rect
+         x="862.25244"
+         y="588.68567"
+         width="300"
+         height="100"
+         rx="8"
+         fill="#f59e0b"
+         id="rect29-5"
+         style="font-family:Inter, Roboto, sans-serif;fill:#d45500;fill-opacity:1" /><text
+         x="1012.2524"
+         y="623.68567"
+         font-size="16px"
+         font-weight="bold"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text30-9"
+         style="font-family:Inter, Roboto, sans-serif">Alimenta:</text><text
+         x="1012.2524"
+         y="653.68567"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text31-8"
+         style="font-family:Inter, Roboto, sans-serif">MÃ³dulos de Financeiro</text><text
+         x="1012.2524"
+         y="673.68567"
+         font-size="14px"
+         text-anchor="middle"
+         fill="#ffffff"
+         id="text32"
+         style="font-family:Inter, Roboto, sans-serif">e GestÃ£o de DRE</text></svg>
+  </div>
+
+  <h2>2. Os 3 Grandes Pilares dos Cadastros</h2>
+  
+  <div class="grid">
+    <div class="card green">
+      <h4>📦 Produtos e Insumos</h4>
+      <p>Registra o que compramos e o que vendemos. É vital marcar a caixa <strong>"É Matéria-Prima?"</strong> para insumos (como Alho Cru ou Sacos Plásticos), pois eles irão para a Produção. Produtos sem essa marcação vão direto para a expedição e revenda.</p>
+    </div>
+    
+    <div class="card blue">
+      <h4>👥 Pessoas e Empresas</h4>
+      <p>Controla os Clientes (com vínculo a Redes/Grupos), os Fornecedores e os Colaboradores do RH. Cada cliente possui regras próprias de prazo de pagamento e vendedor responsável.</p>
+    </div>
+
+    <div class="card amber">
+      <h4>🔐 Estrutura e Governança</h4>
+      <p>Configura o Plano de Contas (para o DRE), as Contas Bancárias, o Maquinário (para cálculo de depreciação na contabilidade) e os <strong>Usuários do Sistema</strong> (com hierarquia de acesso).</p>
+    </div>
+  </div>
+
+  <h2>3. Ordem Sugerida de Preenchimento</h2>
+  <p>Como as tabelas conversam entre si, o ideal é seguir esta ordem de cadastro para não ter problemas de campos vazios:</p>
+  <ol>
+    <li><strong>Plano de Contas:</strong> Cadastre as categorias do DRE primeiro.</li>
+    <li><strong>Redes e Grupos:</strong> Cadastre redes atacadistas (Ex: Assaí, Carrefour) antes dos clientes.</li>
+    <li><strong>Colaboradores (RH):</strong> Cadastre os vendedores primeiro, pois os clientes exigem um vendedor responsável.</li>
+    <li><strong>Fornecedores e Clientes:</strong> Agora você já pode vinculá-los ao plano de contas e aos vendedores.</li>
+    <li><strong>Produtos:</strong> Cadastre tanto as matérias-primas quanto os produtos acabados.</li>
+    <li><strong>Regras de Comissão:</strong> O último passo, pois depende de Vendedores, Produtos e Redes já existirem.</li>
+  </ol>
+
+  <h2>4. Destaque: Regras de Comissão e Gatilhos</h2>
+  <p>O ERP permite regras de comissão flexíveis e dinâmicas. Você pode criar comissões específicas por Produto ou por Rede de Clientes.</p>
+
+  <div class="tip-box">
+    <strong>💡 Gatilho de Pagamento:</strong> Ao cadastrar a regra de um vendedor, você deve escolher <strong>quando</strong> ele ganha a comissão:
+    <ul>
+      <li><strong>FATURAMENTO:</strong> A comissão é liberada assim que o caminhão é faturado (mesmo que o cliente pague daqui a 30 dias).</li>
+      <li><strong>LIQUIDAÇÃO DE TÍTULO:</strong> A comissão fica bloqueada e só é repassada ao vendedor quando o Financeiro confirmar que o boleto do cliente foi pago.</li>
+    </ul>
+  </div>
+
+  <h2>5. Destaque: Hierarquia de Acesso (Usuários)</h2>
+  <p>Na aba "Usuários", você cadastra quem pode fazer login no ERP. O nível de permissão (Hierarquia) define o que o usuário pode ver ou alterar:</p>
+  <ul>
+    <li><strong>Administrador Geral:</strong> Acesso irrestrito a todas as áreas, incluindo DRE e Financeiro Estratégico.</li>
+    <li><strong>Engenharia P&D / Operador de Máquina:</strong> Acesso focado no chão de fábrica, módulo de Produção e requisições de estoque.</li>
+    <li><strong>Comercial / Rotas:</strong> Acesso restrito a Lançamentos de Vendas, acompanhamento de expedição e logística.</li>
+    <li><strong>Tesouraria:</strong> Foco exclusivo em Contas a Pagar/Receber e fluxo de caixa.</li>
+  </ul>
+
+  <h2>6. Dúvidas Frequentes (FAQ)</h2>
+  
+  <table>
+    <tr>
+      <th>Dúvida</th>
+      <th>Solução</th>
+    </tr>
+    <tr>
+      <td>Por que não há botão de "Excluir" em clientes e produtos?</td>
+      <td>Para proteger a contabilidade e o histórico. Se o supermercado parou de comprar, apenas altere o status dele para <strong>INATIVO</strong>. O registro contábil de notas antigas dele será preservado.</td>
+    </tr>
+    <tr>
+      <td>Esqueci de marcar "É Matéria-Prima" no Alho Roxo. O que acontece?</td>
+      <td>O sistema vai achar que é um produto para revenda direta e não o deixará ser usado na aba de Produção. Vá em "Editar Informações Rápidas" e corrija a flag.</td>
+    </tr>
+    <tr>
+      <td>Onde configuro o salário do Operário?</td>
+      <td>Na aba "Colaboradores". Lá você define a Remuneração Fixa, Ajuda de Custo e Regime de Contratação. O módulo de RH vai usar esses dados para processar a folha de pagamento.</td>
+    </tr>
+    <tr>
+      <td>Uma transportadora nova chegou. Onde cadastro?</td>
+      <td>Na aba "Fornecedores". E certifique-se de atrelá-la ao Plano de Contas correto (ex: Custo Variável - Fretes).</td>
+    </tr>
+  </table>
+
+  <div class="footer">
+    <p>Manual gerado em 2026 — Empório do Alho ERP. Documento de circulação interna.</p>
+  </div>
+</div>
+
+</body>
+</html>

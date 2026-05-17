@@ -1,0 +1,25 @@
+# Streamlit secrets (Security: do NOT remove this, contains passwords/keys)
+.streamlit/secrets.toml
+
+# Python cache & build files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Database files (Local SQLite databases)
+*.db
+*.db-journal
+*.sqlite3
+
+# Local backups & uploads
+versoes_backup/
+uploads/
+
+# Temporary / Scratch files
+tmp_crop.py
+
+# OS generated files
+.DS_Store
+Thumbs.db
