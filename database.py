@@ -28,6 +28,8 @@ def release_connection(conn):
 
 def format_pg(sql):
     if "DATABASE_URL" in st.secrets:
+        import re
+        sql = re.sub(r"(?i)\bas\s+'([^']+)'", r'as "\1"', sql)
         sql = sql.replace("%", "%%")
         sql = sql.replace("?", "%s")
         sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")

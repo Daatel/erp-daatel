@@ -63,10 +63,10 @@ with tab1:
     st.subheader("Posição Atual de Estoque e Indicadores")
 
     query_estoque = '''
-    SELECT p.id, p.nome as Produto, p.unidade_medida as Unidade, p.is_materia_prima as "Matéria Prima",
+    SELECT p.id, p.nome as "Produto", p.unidade_medida as "Unidade", p.is_materia_prima as "Matéria Prima",
            p.custo_unidade, COALESCE(p.estoque_minimo, 0) as estoque_minimo,
-           SUM(CASE WHEN m.tipo_movimento = 'Entrada' THEN m.quantidade ELSE 0 END) as Total_Entradas,
-           SUM(CASE WHEN m.tipo_movimento = 'Saída' THEN m.quantidade ELSE 0 END) as Total_Saidas
+           SUM(CASE WHEN m.tipo_movimento = 'Entrada' THEN m.quantidade ELSE 0 END) as "Total_Entradas",
+           SUM(CASE WHEN m.tipo_movimento = 'Saída' THEN m.quantidade ELSE 0 END) as "Total_Saidas"
     FROM produtos p
     LEFT JOIN estoque_movimentos m ON p.id = m.produto_id
     GROUP BY p.id, p.nome, p.unidade_medida, p.is_materia_prima, p.custo_unidade, p.estoque_minimo
@@ -251,9 +251,9 @@ with tab3:
         filtro_tipo = st.selectbox("Filtrar por Tipo de Movimento", ["Todos", "Entrada", "Saída"])
         
     query_hist = '''
-    SELECT m.data as Data, p.nome as Produto, m.tipo_movimento as Movimento, 
-           m.quantidade as Quantidade, m.origem as Origem, 
-           pc.nome as "Conta DRE", m.documento_referencia as Documento
+    SELECT m.data as "Data", p.nome as "Produto", m.tipo_movimento as "Movimento", 
+           m.quantidade as "Quantidade", m.origem as "Origem", 
+           pc.nome as "Conta DRE", m.documento_referencia as "Documento"
     FROM estoque_movimentos m
     JOIN produtos p ON m.produto_id = p.id
     LEFT JOIN planos_de_contas pc ON m.plano_conta_id = pc.id
