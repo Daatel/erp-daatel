@@ -66,7 +66,7 @@ try:
                 SUM(CASE WHEN e.tipo_movimento = 'Saída' THEN e.quantidade ELSE 0 END) as saldo_fisico
             FROM estoque_movimentos e
             JOIN produtos p ON e.produto_id = p.id
-            GROUP BY p.id
+            GROUP BY p.id, p.custo_unidade
         """
         df_est = fetch_all(query_est)
         valor_estoque = 0.0

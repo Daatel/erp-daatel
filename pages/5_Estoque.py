@@ -69,7 +69,7 @@ with tab1:
            SUM(CASE WHEN m.tipo_movimento = 'Saída' THEN m.quantidade ELSE 0 END) as Total_Saidas
     FROM produtos p
     LEFT JOIN estoque_movimentos m ON p.id = m.produto_id
-    GROUP BY p.id
+    GROUP BY p.id, p.nome, p.unidade_medida, p.is_materia_prima, p.custo_unidade, p.estoque_minimo
     '''
     df_estoque = fetch_all(query_estoque)
 

@@ -245,19 +245,19 @@ with tab2:
     
     query_prod = '''
         SELECT 
-            pd.id as 'OP (Lote)',
-            pd.data as 'Data Fabricação',
-            pd.data_validade as 'Validade',
-            pd.hora_inicio || ' às ' || pd.hora_fim as 'Turno (Duração)',
-            IFNULL((SELECT GROUP_CONCAT(p_ins.nome || ' (' || pi.quantidade || ')') 
+            pd.id as "OP (Lote)",
+            pd.data as "Data Fabricação",
+            pd.data_validade as "Validade",
+            pd.hora_inicio || ' às ' || pd.hora_fim as "Turno (Duração)",
+            COALESCE((SELECT string_agg(p_ins.nome || ' (' || pi.quantidade || ')', ', ') 
              FROM producao_insumos pi
              JOIN produtos p_ins ON pi.produto_id = p_ins.id
-             WHERE pi.producao_id = pd.id), 'Sem detalhe MP') as 'Matéria-Prima Consumida',
-            pf.nome || ' (' || pd.produto_final_kg || ')' as 'Produto Acabado (Qtd)',
-            pd.perdas_kg as 'Perda Kg',
-            pd.custo_total_lote as 'Custo Total (R$)',
-            pd.custo_unitario_lote as 'Custo Unitário Apurado (R$)',
-            pd.observacoes as 'Diário de Ocorrências'
+             WHERE pi.producao_id = pd.id), 'Sem detalhe MP') as "Matéria-Prima Consumida",
+            pf.nome || ' (' || pd.produto_final_kg || ')' as "Produto Acabado (Qtd)",
+            pd.perdas_kg as "Perda Kg",
+            pd.custo_total_lote as "Custo Total (R$)",
+            pd.custo_unitario_lote as "Custo Unitário Apurado (R$)",
+            pd.observacoes as "Diário de Ocorrências"
         FROM producao_diaria pd
         JOIN produtos pf ON pd.produto_id = pf.id
         ORDER BY pd.data DESC, pd.id DESC LIMIT 300

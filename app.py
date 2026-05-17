@@ -2,9 +2,11 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import os
-from database import fetch_all, run_query
+from database import fetch_all, run_query, create_tables
 
 os.chdir(Path(__file__).parent)
+create_tables()
+
 
 if 'logged_user' not in st.session_state:
     st.session_state['logged_user'] = None
