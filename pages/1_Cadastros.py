@@ -162,8 +162,8 @@ with tab2:
         )
         
         modelo_csv = (
-            "Razão Social,Nome Fantasia,CNPJ/CPF,Inscrição Estadual,Endereço,Bairro,CEP,Cidade,UF,Telefone,E-mail,Observações,Status,Rede de Clientes,Grupo de Lojas,PRAZO DE PAGAMENTO,Representante\n"
-            "Empresa Exemplo Ltda,Exemplo,00.000.000/0001-00,Isento,Rua das Flores 123,Centro,74000-000,Goiânia,GO,(62) 99999-9999,compras@exemplo.com,Entrega de manhã,ATIVO,,,,,,\n"
+            "Razão Social;Nome Fantasia;CNPJ/CPF;Inscrição Estadual;Endereço;Bairro;CEP;Cidade;UF;Telefone;E-mail;Observações;Status;Rede de Clientes;Grupo de Lojas;PRAZO DE PAGAMENTO;Representante\n"
+            "Empresa Exemplo Ltda;Exemplo;00.000.000/0001-00;Isento;Rua das Flores 123;Centro;74000-000;Goiânia;GO;(62) 99999-9999;compras@exemplo.com;Entrega de manhã;ATIVO;;;;\n"
         )
         st.download_button(
             label="📥 Baixar Planilha CSV Modelo",
