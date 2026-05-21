@@ -155,6 +155,210 @@ with tab1:
 with tab2:
     st.subheader("Cadastro de Clientes")
     
+    # --- NOVO IMPORTADOR DE CLIENTES VIA CSV ---
+    with st.expander("📥 Importação em Massa de Clientes (Planilha CSV)"):
+        st.warning(
+            "⚠️ **IMPORTANTE:** Para realizar a importação de clientes, certifique-se de que os seus **Representantes** (aba 'Colaboradores'), **Redes de Clientes** e **Grupos de Lojas** (aba 'Redes e Grupos') já estejam previamente cadastrados no sistema. A importação será bloqueada por segurança caso existam nomes na planilha não correspondentes aos registros prévios."
+        )
+        
+        modelo_csv = (
+            "Razão Social,Nome Fantasia,CNPJ/CPF,Inscrição Estadual,Endereço,Bairro,CEP,Cidade,UF,Telefone,E-mail,Observações,Status,Rede de Clientes,Grupo de Lojas,PRAZO DE PAGAMENTO,Representante\n"
+            "Empresa Exemplo Ltda,Exemplo,00.000.000/0001-00,Isento,Rua das Flores 123,Centro,74000-000,Goiânia,GO,(62) 99999-9999,compras@exemplo.com,Entrega de manhã,ATIVO,,,,,,\n"
+        )
+        st.download_button(
+            label="📥 Baixar Planilha CSV Modelo",
+            data=modelo_csv.encode('utf-8-sig'),
+            file_name="modelo_importacao_clientes.csv",
+            mime="text/csv",
+            help="Utilize este arquivo como modelo. Lembre-se de salvar em formato CSV (delimitado por vírgula ou ponto-e-vírgula)."
+        )
+        
+        uploaded_file = st.file_uploader("Selecione o arquivo CSV de clientes para importação", type=["csv"], key="import_clientes_uploader")
+        
+        if uploaded_file is not None:
+            try:
+                import io
+                content = uploaded_file.getvalue()
+                try:
+                    text_content = content.decode('utf-8')
+                except UnicodeDecodeError:
+                    text_content = content.decode('latin-1')
+                
+                # Detectar separador
+                primeira_linha = text_content.split('\n')[0]
+                sep = ';' if ';' in primeira_linha else ','
+                
+                df_import = pd.read_csv(io.StringIO(text_content), sep=sep)
+                df_import.columns = [str(c).strip() for c in df_import.columns]
+            except Exception as e:
+                st.error(f"Erro ao processar arquivo: {e}")
+                df_import = None
+                
+            if df_import is not None:
+                if 'Razão Social' not in df_import.columns:
+                    st.error("❌ O arquivo não possui a coluna obrigatória **'Razão Social'**. Verifique a planilha modelo.")
+                else:
+                    # Limpeza rápida
+                    def clean_val(x):
+                        if pd.isna(x): return ""
+                        v = str(x).strip()
+                        return "" if v.lower() == "nan" else v
+                        
+                    for col in df_import.columns:
+                        df_import[col] = df_import[col].apply(clean_val)
+                        
+                    st.success("📂 Arquivo de importação carregado!")
+                    st.markdown("**Prévia dos Dados (Primeiras 10 linhas):**")
+                    st.dataframe(df_import.head(10), use_container_width=True)
+                    
+                    # 1. Carregar dependências existentes no banco para validação
+                    df_reps_db = fetch_all("SELECT id, nome FROM funcionarios")
+                    existing_reps = set(df_reps_db['nome'].tolist()) if not df_reps_db.empty else set()
+                    rep_id_map = dict(zip(df_reps_db['nome'], df_reps_db['id'])) if not df_reps_db.empty else {}
+                    
+                    df_redes_db = fetch_all("SELECT nome FROM redes_clientes")
+                    existing_redes = set(df_redes_db['nome'].tolist()) if not df_redes_db.empty else set()
+                    
+                    df_grupos_db = fetch_all("SELECT nome FROM grupos_clientes")
+                    existing_grupos = set(df_grupos_db['nome'].tolist()) if not df_grupos_db.empty else set()
+                    
+                    df_existing_cnpj = fetch_all("SELECT cnpj_cpf FROM clientes")
+                    existing_cnpjs = set(df_existing_cnpj['cnpj_cpf'].tolist()) if not df_existing_cnpj.empty else set()
+                    
+                    # Listas para auditoria
+                    missing_reps = set()
+                    missing_redes = set()
+                    missing_grupos = set()
+                    duplicate_cnpjs = []
+                    cnpjs_na_planilha = {}
+                    
+                    valid_rows_count = 0
+                    
+                    for idx, row in df_import.iterrows():
+                        razao = row.get('Razão Social', '')
+                        if not razao:
+                            continue
+                            
+                        cnpj = row.get('CNPJ/CPF', '')
+                        rep = row.get('Representante', '')
+                        rede = row.get('Rede de Clientes', '')
+                        grupo = row.get('Grupo de Lojas', '')
+                        
+                        # Duplicados
+                        if cnpj:
+                            if cnpj in existing_cnpjs:
+                                duplicate_cnpjs.append(f"{razao} (CNPJ: {cnpj} - já cadastrado)")
+                            elif cnpj in cnpjs_na_planilha:
+                                duplicate_cnpjs.append(f"{razao} (CNPJ: {cnpj} - duplicado na planilha)")
+                            else:
+                                cnpjs_na_planilha[cnpj] = 1
+                                
+                        # Representantes pendentes
+                        if rep and rep not in existing_reps:
+                            missing_reps.add(rep)
+                            
+                        # Redes pendentes
+                        if rede and rede not in existing_redes:
+                            missing_redes.add(rede)
+                            
+                        # Grupos pendentes
+                        if grupo and grupo not in existing_grupos:
+                            missing_grupos.add(grupo)
+                            
+                        valid_rows_count += 1
+                        
+                    # Mostrar resultados da Validação
+                    st.markdown("#### 🔍 Relatório de Validação e Consistência:")
+                    is_blocked = False
+                    
+                    col_v1, col_v2, col_v3 = st.columns(3)
+                    with col_v1:
+                        if missing_reps:
+                            st.error(f"❌ **Representantes Ausentes ({len(missing_reps)}):**\n" + "\n".join([f"- {r}" for r in sorted(missing_reps)]))
+                            is_blocked = True
+                        else:
+                            st.success("✅ Representantes OK")
+                            
+                    with col_v2:
+                        if missing_redes:
+                            st.error(f"❌ **Redes Ausentes ({len(missing_redes)}):**\n" + "\n".join([f"- {r}" for r in sorted(missing_redes)]))
+                            is_blocked = True
+                        else:
+                            st.success("✅ Redes de Clientes OK")
+                            
+                    with col_v3:
+                        if missing_grupos:
+                            st.error(f"❌ **Grupos de Lojas Ausentes ({len(missing_grupos)}):**\n" + "\n".join([f"- {g}" for g in sorted(missing_grupos)]))
+                            is_blocked = True
+                        else:
+                            st.success("✅ Grupos de Lojas OK")
+                            
+                    if duplicate_cnpjs:
+                        st.warning(f"⚠️ **Clientes a serem ignorados por CNPJ duplicado ({len(duplicate_cnpjs)}):**\n" + "\n".join([f"- {d}" for d in duplicate_cnpjs]))
+                        
+                    if is_blocked:
+                        st.error("⚠️ **IMPORTAÇÃO BLOQUEADA:** Por segurança, realize o cadastro prévio das dependências ausentes apontadas acima nas abas correspondentes antes de prosseguir.")
+                        st.button("Confirmar Importação de Clientes", disabled=True, use_container_width=True, key="btn_import_disabled")
+                    else:
+                        st.success("🎉 Planilha validada com sucesso! Todos os relacionamentos estão em conformidade com os cadastros prévios do ERP.")
+                        limpar_banco = st.checkbox("🗑️ Excluir todos os clientes existentes atualmente no sistema antes de importar", value=False, key="import_limpar_banco")
+                        
+                        if st.button("Confirmar Importação de Clientes", use_container_width=True, type="primary", key="btn_import_active"):
+                            try:
+                                imported_count = 0
+                                ignored_count = 0
+                                
+                                if limpar_banco:
+                                    run_query("DELETE FROM clientes")
+                                    
+                                for idx, row in df_import.iterrows():
+                                    razao = row.get('Razão Social', '')
+                                    if not razao:
+                                        continue
+                                        
+                                    cnpj = row.get('CNPJ/CPF', '')
+                                    if not limpar_banco and cnpj and cnpj in existing_cnpjs:
+                                        ignored_count += 1
+                                        continue
+                                        
+                                    nome_fantasia = row.get('Nome Fantasia', '')
+                                    insc_estadual = row.get('Inscrição Estadual', '')
+                                    endereco = row.get('Endereço', '')
+                                    bairro = row.get('Bairro', '')
+                                    cep = row.get('CEP', '')
+                                    cidade = row.get('Cidade', '')
+                                    uf = row.get('UF', '')
+                                    telefone = row.get('Telefone', '')
+                                    email = row.get('E-mail', '')
+                                    observacoes = row.get('Observações', '')
+                                    status_val = row.get('Status', 'ATIVO')
+                                    if not status_val: status_val = 'ATIVO'
+                                    rede_val = row.get('Rede de Clientes', '')
+                                    grupo_val = row.get('Grupo de Lojas', '')
+                                    prazo_pag = row.get('PRAZO DE PAGAMENTO', '')
+                                    
+                                    rep_nome = row.get('Representante', '')
+                                    rep_id = rep_id_map.get(rep_nome, None) if rep_nome else None
+                                    
+                                    query_insert = """INSERT INTO clientes 
+                                               (nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual, 
+                                                bairro, cep, cidade, uf, email, observacoes, status, rede_clientes, 
+                                                grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga) 
+                                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                                    
+                                    run_query(query_insert, (
+                                        razao, telefone, endereco, nome_fantasia, cnpj, insc_estadual,
+                                        bairro, cep, cidade, uf, email, observacoes, status_val, rede_val,
+                                        grupo_val, prazo_pag, rep_id, None, 30, 0.0, ""
+                                    ))
+                                    imported_count += 1
+                                    
+                                st.success(f"✅ Importação finalizada! {imported_count} novos clientes importados. {ignored_count} registros ignorados por duplicidade de CNPJ.")
+                                import time; time.sleep(2); st.rerun()
+                            except Exception as ex:
+                                st.error(f"Erro ao inserir dados no banco: {ex}")
+    # --- FIM DO NOVO IMPORTADOR ---
+    
     df_reps = fetch_all("SELECT id, nome FROM funcionarios WHERE cargo LIKE '%Representante%' OR cargo LIKE '%Vendedor%'")
     rep_options = ["(Nenhum/Direto)"] + df_reps['nome'].tolist() if not df_reps.empty else ["(Nenhum/Direto)"]
     rep_dict = dict(zip(df_reps['nome'], df_reps['id'])) if not df_reps.empty else {}
