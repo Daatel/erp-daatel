@@ -49,7 +49,7 @@ with tab_empresa:
 
 def export_btn(df, filename, label="📥 Exportar Lista (CSV)"):
     if not df.empty:
-        csv = df.to_csv(index=False).encode('utf-8')
+        csv = df.to_csv(index=False, sep=';').encode('utf-8-sig')
         st.download_button(label=label, data=csv, file_name=filename, mime='text/csv')
 
 # ======= PRODUTOS =======
@@ -623,18 +623,38 @@ with tab4:
 # ======= PLANO DE CONTAS =======
 with tab5:
     st.subheader("Plano de Contas - Categorias do DRE")
+    
+    CATEGORIAS_MAP = {
+        "Receita Operacional": "RECEITA",
+        "Receita Não Operacional": "RECEITA_NAO_OP",
+        "Custo Variável": "CUSTO_VAR",
+        "Despesa Comercial / Marketing": "DESPESA_COM",
+        "Despesa Fixa": "DESPESA_FIXA",
+        "Despesa Administrativa": "DESPESA_ADM",
+        "Despesa Não Operacional": "DESPESA_NAO_OP",
+        "Investimento": "INVESTIMENTO"
+    }
+
     with st.form("form_plano", clear_on_submit=True):
-        c1, c2 = st.columns([1, 2])
-        categoria = c1.selectbox("Categoria", ["Receita Com Vendas", "Receita Operacional", "Custo Variável", "Despesa Fixa", "Despesa Financeira", "Investimento", "Outros"])
-        nome_conta = c2.text_input("Nome da Conta (Ex: Marketing)")
+        col_code, col_cat, col_name = st.columns([1, 2, 3])
+        codigo_conta = col_code.text_input("Código (Ex: 2.2.5)")
+        categoria_label = col_cat.selectbox("Categoria", list(CATEGORIAS_MAP.keys()))
+        nome_conta = col_name.text_input("Nome da Conta (Ex: Marketing)")
+        
         if st.form_submit_button("Adicionar Nova Conta"):
-            if nome_conta:
-                run_query("INSERT INTO planos_de_contas (categoria, nome) VALUES (?, ?)", (categoria, nome_conta))
+            if not codigo_conta:
+                st.error("Por favor, informe o Código da conta.")
+            elif not nome_conta:
+                st.error("Por favor, informe o Nome da conta.")
+            else:
+                db_categoria = CATEGORIAS_MAP[categoria_label]
+                run_query("INSERT INTO planos_de_contas (codigo, categoria, nome) VALUES (?, ?, ?)", 
+                          (codigo_conta.strip(), db_categoria, nome_conta.strip()))
                 st.success("Conta adicionada!")
                 import time; time.sleep(1); st.rerun()
                 
     st.markdown("---")
-    df_planos_view = fetch_all("SELECT id, categoria as 'Categoria Financeira', nome as 'Nome da Conta' FROM planos_de_contas ORDER BY categoria, nome")
+    df_planos_view = fetch_all("SELECT id, codigo as 'Código', categoria as 'Categoria Financeira', nome as 'Nome da Conta' FROM planos_de_contas ORDER BY codigo, nome")
     if not df_planos_view.empty:
         export_btn(df_planos_view, 'plano_de_contas.csv')
         st.dataframe(df_planos_view, width="stretch", hide_index=True)

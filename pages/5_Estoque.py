@@ -278,7 +278,7 @@ with tab3:
         st.dataframe(df_hist, width="stretch", hide_index=True)
         
         # Download
-        csv = df_hist.to_csv(index=False).encode('utf-8')
+        csv = df_hist.to_csv(index=False, sep=';').encode('utf-8-sig')
         st.download_button("📥 Exportar Extrato (CSV)", data=csv, file_name="extrato_estoque.csv", mime="text/csv")
     else:
         st.info("Nenhuma movimentação encontrada para o filtro atual.")

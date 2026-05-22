@@ -204,11 +204,65 @@ try:
     with tab2:
         st.subheader("Contas a Pagar (Passivo e Relacionamento)")
         
+        # --- LANÇADOR MANUAL DE DUPLICATA A PAGAR ---
+        with st.expander("➕ Lançar uma Duplicata a Pagar (Despesa / Passivo)"):
+            df_forn = fetch_all("SELECT id, nome_fantasia FROM fornecedores ORDER BY nome_fantasia")
+            op_forn = {}
+            if not df_forn.empty:
+                for _, r in df_forn.iterrows():
+                    op_forn[f"{r['nome_fantasia']}"] = r['id']
+            
+            df_pc = fetch_all("SELECT id, codigo, nome FROM planos_de_contas WHERE categoria NOT IN ('RECEITA', 'RECEITA_NAO_OP') ORDER BY codigo")
+            op_pc = {}
+            if not df_pc.empty:
+                for _, r in df_pc.iterrows():
+                    op_pc[f"{r['codigo']} - {r['nome']}"] = (r['id'], r['codigo'])
+                    
+            df_cli = fetch_all("SELECT id, nome, cnpj FROM clientes ORDER BY nome")
+            op_cli = {"-- SELECIONE CLIENTE (Obrigatório p/ 2.2.1, 2.2.2, 2.2.4) --": None}
+            if not df_cli.empty:
+                for _, r in df_cli.iterrows():
+                    op_cli[f"{r['nome']} ({r['cnpj']})"] = r['id']
+                    
+            with st.form("lancar_pagar_manual"):
+                col_m1, col_m2 = st.columns(2)
+                forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()) if op_forn else ["Nenhum Fornecedor Cadastrado"])
+                pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()) if op_pc else ["Nenhum Plano Cadastrado"])
+                
+                col_m3, col_m4 = st.columns(2)
+                cli_sel = col_m3.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()))
+                venc_p = col_m4.date_input("Vencimento", date.today() + timedelta(days=30))
+                
+                col_m5, col_m6 = st.columns([2, 1])
+                desc_p = col_m5.text_input("Descrição / Fatura (Ex: Nota Fiscal nº 123)")
+                val_p = col_m6.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0)
+                
+                if st.form_submit_button("Salvar Duplicata a Pagar"):
+                    if not op_pc:
+                        st.error("Nenhum plano de contas disponível.")
+                    elif not desc_p:
+                        st.error("Preencha a descrição do lançamento.")
+                    else:
+                        pc_id, pc_codigo = op_pc[pc_sel]
+                        forn_id = op_forn.get(forn_sel) if op_forn else None
+                        cli_id = op_cli[cli_sel]
+                        
+                        # Validação de Cliente Obrigatório para 2.2.1, 2.2.2, 2.2.4
+                        if pc_codigo in ('2.2.1', '2.2.2', '2.2.4') and cli_id is None:
+                            st.error(f"⚠️ A conta selecionada ({pc_sel}) exige a vinculação obrigatória de um Cliente (CNPJ) para cálculo de rentabilidade. Por favor, selecione um cliente.")
+                        else:
+                            run_query(
+                                "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                                (forn_id, pc_id, cli_id, desc_p, val_p, venc_p.strftime("%Y-%m-%d"))
+                            )
+                            st.success("✅ Duplicata a Pagar lançada com sucesso!")
+                            import time; time.sleep(1); st.rerun()
+
         df_all_contas = fetch_all("""
             SELECT c.id, f.nome_fantasia as 'Fornecedor', p.nome as 'Planta de Custo', 
                    c.descricao as 'Descrição/Fatura', c.data_vencimento as 'Vencimento', 
                    c.valor as 'Valor', c.status as 'Status', c.data_pagamento as 'Data PGTO',
-                   c.comprovante_url as 'Comprovante'
+                   c.comprovante_url as 'Comprovante', c.cliente_id
             FROM contas_a_pagar c
             LEFT JOIN fornecedores f ON c.fornecedor_id = f.id
             LEFT JOIN planos_de_contas p ON c.plano_conta_id = p.id
@@ -365,13 +419,17 @@ try:
                                 fat = r['Descrição/Fatura']
                                 plant = r['Planta de Custo'] if pd.notna(r['Planta de Custo']) else "Gasto"
                                 
+                                # Buscar o cliente_id da contas_a_pagar para propagar
+                                df_cap_cli = fetch_all("SELECT cliente_id FROM contas_a_pagar WHERE id=?", (c_id,))
+                                cap_cli_id = int(df_cap_cli.iloc[0]['cliente_id']) if not df_cap_cli.empty and pd.notna(df_cap_cli.iloc[0]['cliente_id']) else None
+
                                 # Atualiza Pagar
                                 run_query("UPDATE contas_a_pagar SET status='PAGO', data_pagamento=?, conta_bancaria_id=? WHERE id=?", 
                                           (d_pgto.strftime("%Y-%m-%d"), conta_id, c_id))
                                 
-                                # Injeta no Caixa com a Fonte Certa
-                                run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Saída', ?, ?, ?, ?, ?, 1)",
-                                          (d_pgto.strftime("%Y-%m-%d"), plant, f"PGTO Forn. {forn}: {fat}", v_base, c_id, conta_id))
+                                # Injeta no Caixa com a Fonte Certa e o cliente_id propagado
+                                run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado, cliente_id) VALUES (?, 'Saída', ?, ?, ?, ?, ?, 1, ?)",
+                                          (d_pgto.strftime("%Y-%m-%d"), plant, f"PGTO Forn. {forn}: {fat}", v_base, c_id, conta_id, cap_cli_id))
                                           
                             st.success(f"✔️ {len(selecionados)} contas liquidadas e debitadas do banco {conta_saida} com sucesso!")
                             import time; time.sleep(2); st.rerun()

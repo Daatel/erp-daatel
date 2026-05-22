@@ -21,7 +21,7 @@ df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios W
 df_produtos = fetch_all("SELECT id, nome, preco_venda_base FROM produtos WHERE is_materia_prima = 0")
 df_regras = fetch_all("SELECT vendedor_id, produto_id, rede_clientes, percentual FROM comissoes_regras")
 
-tab1, tab2, tab5 = st.tabs(["🛒 Lançar Novo Pedido", "📋 Meus Pedidos Abertos", "📊 Tabelas de Preços"])
+tab1, tab_deg, tab2, tab5 = st.tabs(["🛒 Lançar Novo Pedido", "🍇 Degustação & Amostras", "📋 Meus Pedidos Abertos", "📊 Tabelas de Preços"])
 
 # ======= 1. CAPTAÇÃO DE PEDIDO =======
 with tab1:
@@ -38,10 +38,11 @@ with tab1:
         vendedor_sel = st.selectbox("Vendedor / Representante", list(v_opts.keys()))
         
         st.markdown("##### Informações do Produto")
-        col3, col4, col5 = st.columns([2, 1, 1])
+        col3, col4, col_tipo, col5 = st.columns([2, 1, 1.2, 1.2])
         p_opts = {f"{r['nome']}": r for _, r in df_produtos.iterrows()}
         produto_sel = col3.selectbox("Produto Final Solicitado", list(p_opts.keys()))
         qtd = col4.number_input("Quantidade Negociada (Volumes/Kg)", min_value=1.0, step=1.0)
+        tipo_item = col_tipo.selectbox("Tipo de Lançamento", ["Comercial (Venda)", "Bonificado (Bonificação)"])
         
         # --- LÓGICA DE PRECIFICAÇÃO DINÂMICA ---
         cli_selecionado = c_opts[cliente_sel]
@@ -86,8 +87,13 @@ with tab1:
         if preco_tabela is None:
             preco_tabela = float(p_opts[produto_sel]['preco_venda_base'])
             
-        st.info(f"💡 Origem do Preço Aplicado: **{origem_preco}**")
-        preco = col5.number_input("Preço Unitário Fechado (R$)", min_value=0.0, value=preco_tabela, step=0.1)
+        if tipo_item == "Bonificado (Bonificação)":
+            preco_tabela = 0.0
+            st.info("🎁 **Item Bonificado**: Preço unitário fixado em R$ 0,00.")
+            preco = col5.number_input("Preço Unitário Fechado (R$)", min_value=0.0, max_value=0.0, value=0.0, disabled=True, key="preco_bonif")
+        else:
+            st.info(f"💡 Origem do Preço Aplicado: **{origem_preco}**")
+            preco = col5.number_input("Preço Unitário Fechado (R$)", min_value=0.0, value=preco_tabela, step=0.1, key="preco_venda")
         
         if st.button("Aprovar Pedido (Mandar para a Expedição)", type="primary", use_container_width=True):
             cli = c_opts[cliente_sel]
@@ -116,13 +122,84 @@ with tab1:
             # Acordos Comerciais Rede
             custo_acordos = v_total * (pct_contrato + pct_auxiliar + pct_logistica) / 100.0
             
-            run_query("INSERT INTO vendas (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, comissao_valor, custo_acordos_rede, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO')",
-                      (data_venda, cli['id'], ven['id'], prod['id'], qtd, preco, v_total, com_val, custo_acordos))
+            is_bonif = 1 if tipo_item == "Bonificado (Bonificação)" else 0
+            
+            run_query("INSERT INTO vendas (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, comissao_valor, custo_acordos_rede, is_bonificacao, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO')",
+                      (data_venda, cli['id'], ven['id'], prod['id'], qtd, preco, v_total, com_val, custo_acordos, is_bonif))
                       
             v_id = fetch_all("SELECT MAX(id) as lg FROM vendas").iloc[0]['lg']
             
             st.toast(f"✔️ Pedido #{v_id} lançado com sucesso!", icon="✅")
             st.success(f"✔️ Pedido #{v_id} lançado com sucesso! Ele já está na Fila do módulo de Faturamento aguardando expedição física.")
+
+# ======= 1.2. REMESSA DE DEGUSTAÇÃO & AMOSTRAS =======
+with tab_deg:
+    st.subheader("🍇 Lançamento de Amostras e Ações de Degustação")
+    st.markdown("Esta tela realiza a saída física imediata de mercadorias para ações de degustação ou amostras em clientes, calculando o custo via FIFO e debitando-o automaticamente no caixa na conta `2.2.1 Custo de Degustações e Amostras` vinculando o CNPJ.")
+
+    df_bancos = fetch_all("SELECT id, nome FROM contas_bancarias WHERE status='ATIVO'")
+    
+    if df_clientes.empty or df_produtos.empty:
+        st.warning("Cadastre Clientes e Produtos antes de realizar o lançamento!")
+    elif df_bancos.empty:
+        st.warning("Cadastre pelo menos uma Conta Bancária ativa em **Financeiro → 🏦 Contas Bancárias** para registrar a movimentação financeira correspondente.")
+    else:
+        with st.form("form_degustacao", clear_on_submit=True):
+            col_d1, col_d2 = st.columns([1, 2])
+            data_acao = col_d1.date_input("Data da Ação", value=date.today())
+            
+            c_opts_deg = {f"{r['nome']}": r for _, r in df_clientes.iterrows()}
+            cliente_deg_sel = col_d2.selectbox("Cliente / PDV Beneficiado (CNPJ Obrigatório)", list(c_opts_deg.keys()), key="deg_cli")
+            
+            col_d3, col_d4, col_d5 = st.columns([2, 1, 1])
+            p_opts_deg = {f"{r['nome']}": r for _, r in df_produtos.iterrows()}
+            prod_deg_sel = col_d3.selectbox("Produto Utilizado na Ação", list(p_opts_deg.keys()), key="deg_prod")
+            qtd_deg = col_d4.number_input("Quantidade Utilizada (unidades/Kg)", min_value=1.0, step=1.0, key="deg_qtd")
+            
+            b_opts = {f"{r['nome']}": r['id'] for _, r in df_bancos.iterrows()}
+            banco_sel = col_d5.selectbox("Conta Bancária (Débito)", list(b_opts.keys()), key="deg_banco")
+            
+            obs_deg = st.text_area("Ocorrências / Relatório da Degustação", placeholder="Escreva aqui detalhes da ação, promotor que executou, etc.")
+            
+            btn_deg = st.form_submit_button("🏁 Gravar Remessa e Debitar Custo", type="primary", use_container_width=True)
+            
+        if btn_deg:
+            from database import consumir_estoque_fifo
+            
+            cli_deg = c_opts_deg[cliente_deg_sel]
+            prod_deg = p_opts_deg[prod_deg_sel]
+            banco_id = b_opts[banco_sel]
+            
+            doc_ref = f"Amostra/Degustação: {cli_deg['nome']}"
+            
+            # 1. Rodar FIFO
+            custo_total, is_estimado = consumir_estoque_fifo(
+                produto_id=int(prod_deg['id']),
+                quantidade=float(qtd_deg),
+                data_mov=data_acao.strftime("%Y-%m-%d"),
+                origem="Degustação_Amostra",
+                doc_ref=doc_ref
+            )
+            
+            # 2. Lançar no Fluxo de Caixa (Saída)
+            desc_financeira = f"Custo Mercadoria Amostra - {cli_deg['nome']} ({prod_deg['nome']} x {qtd_deg:.0f})"
+            if obs_deg:
+                desc_financeira += f" | {obs_deg}"
+                
+            run_query(
+                """INSERT INTO fluxo_caixa 
+                   (data, tipo, categoria, descricao, valor, conta_bancaria_id, cliente_id, conciliado) 
+                   VALUES (?, 'SAÍDA', '2.2.1', ?, ?, ?, ?, 1)""",
+                (data_acao.strftime("%Y-%m-%d"), desc_financeira, custo_total, banco_id, int(cli_deg['id']))
+            )
+            
+            st.balloons()
+            st.success(f"✔️ Remessa registrada com sucesso! Saída física executada via FIFO.")
+            st.info(f"📊 **Custo Real FIFO apurado:** R$ {custo_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            
+            if is_estimado:
+                st.warning("⚠️ **Atenção:** O estoque físico no sistema estava insuficiente/zerado. O custo foi estimado provisoriamente usando o custo de cadastro do produto.")
+            st.rerun()
 
 # ======= 2. GESTÃO DE PEDIDOS =======
 with tab2:

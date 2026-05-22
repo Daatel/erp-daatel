@@ -40,7 +40,8 @@ TABELAS_PARA_LIMPAR = [
     "fichas_tecnicas_itens",
     "comodatos",
     "usuarios",
-    "empresa_config"
+    "empresa_config",
+    "planos_de_contas"
 ]
 
 DEFAULT_USERS = [
@@ -52,22 +53,48 @@ DEFAULT_USERS = [
 ]
 
 DEFAULT_PLANOS_DE_CONTAS = [
-    ("RECEITA",    "Venda de Produtos"),
-    ("RECEITA",    "Venda de Subprodutos"),
-    ("CMV",        "Custo da Mercadoria Vendida"),
-    ("CMV",        "Custo da Embalagem"),
-    ("COMPRA",     "Compra de Matéria-Prima"),
-    ("COMPRA",     "Compra de Embalagens"),
-    ("COMPRA",     "Compra de Insumos"),
-    ("DESPESA_OP", "Frete e Logística"),
-    ("DESPESA_OP", "Manutenção de Equipamentos"),
-    ("DESPESA_OP", "Energia Elétrica"),
-    ("DESPESA_OP", "Aluguel"),
-    ("RH",         "Salários e Encargos"),
-    ("RH",         "Comissões de Vendas"),
-    ("ACORDOS",    "Taxa de Descarga"),
-    ("ACORDOS",    "Acordo Logístico / Rebate de Rede"),
-    ("ACORDOS",    "Contrato Comercial"),
+    # 1. Entradas (Receitas)
+    ("1.1.1", "RECEITA", "Venda de Alho in natura"),
+    ("1.1.2", "RECEITA", "Venda de alho descascado"),
+    ("1.1.3", "RECEITA", "Venda de Temperos de alho"),
+    ("1.1.4", "RECEITA", "Venda de alho frito"),
+    ("1.1.5", "RECEITA", "outros"),
+    ("1.2.1", "RECEITA_NAO_OP", "Entrada de Empréstimos Bancários"),
+    ("1.2.2", "RECEITA_NAO_OP", "Aportes de Capital"),
+    ("1.2.3", "RECEITA_NAO_OP", "Venda de Ativos (Máquinas/Veículos)"),
+
+    # 2. Saídas Operacionais (Custos e Despesas)
+    # 2.1. Custos Variáveis
+    ("2.1.1", "CUSTO_VAR", "Compra de Matéria-Prima (Alho, Insumos)"),
+    ("2.1.2", "CUSTO_VAR", "Compra de Embalagens (Potes, Caixas, Redes)"),
+    ("2.1.3", "CUSTO_VAR", "Impostos sobre Vendas (Simples Nacional, etc.)"),
+    ("2.1.4", "CUSTO_VAR", "Comissões de Vendas"),
+    ("2.1.5", "CUSTO_VAR", "Fretes sobre Vendas (Entregas)"),
+    # 2.2. Despesas Comerciais e Marketing
+    ("2.2.1", "DESPESA_COM", "Custo de Degustações e Amostras"),
+    ("2.2.2", "DESPESA_COM", "Contratos Comerciais (Enxoval, Listing Fee, Rapel)"),
+    ("2.2.3", "DESPESA_COM", "Marketing e Feiras"),
+    ("2.2.4", "DESPESA_COM", "Custos de Promotores de Vendas (Diárias, Agências e Serviços)"),
+    # 2.3. Despesas Operacionais Fixas
+    ("2.3.1", "DESPESA_FIXA", "Energia Elétrica, Água, Internet da Fábrica"),
+    ("2.3.2", "DESPESA_FIXA", "Aluguel, IPTU, Seguros"),
+    ("2.3.3", "DESPESA_FIXA", "Manutenção de Máquinas e Utensílios"),
+    ("2.3.4", "DESPESA_FIXA", "Combustível, Pedágio e Manutenção de Veículos"),
+    ("2.3.5", "DESPESA_FIXA", "Salários da Equipe Fabril (Mão de Obra Fixa)"),
+    ("2.3.6", "DESPESA_FIXA", "Encargos Sociais, Provisões e Benefícios (VR, VT)"),
+
+    # 3. Despesas Administrativas e Outras Saídas
+    # 3.1. Despesas Administrativas
+    ("3.1.1", "DESPESA_ADM", "Escritório, Papelaria, Software ERP, Licenças"),
+    ("3.1.2", "DESPESA_ADM", "Honorários Contábeis e Advocatícios"),
+    ("3.1.3", "DESPESA_ADM", "Tarifas e Taxas Bancárias"),
+    ("3.1.4", "DESPESA_ADM", "Retirada de Pró-labore dos Sócios"),
+    ("3.1.5", "DESPESA_ADM", "Salários e Encargos da Equipe Administrativa"),
+    # 3.2. Despesas Não Operacionais
+    ("3.2.1", "DESPESA_NAO_OP", "Pagamento de Empréstimos Bancários (Amortização)"),
+    ("3.2.2", "DESPESA_NAO_OP", "Impostos e Taxas Extraordinárias"),
+    # 3.3. Investimentos
+    ("3.3.1", "INVESTIMENTO", "Compra de Máquinas, Freezers em Comodato ou Veículos")
 ]
 
 def load_pg_url():
@@ -110,7 +137,7 @@ def limpar_sqlite():
             
         # 2. Inserir planos de contas estruturais
         cur.executemany(
-            "INSERT INTO planos_de_contas (categoria, nome) VALUES (?,?)",
+            "INSERT INTO planos_de_contas (codigo, categoria, nome) VALUES (?,?,?)",
             DEFAULT_PLANOS_DE_CONTAS
         )
         print("  [SQLite] Planos de contas padrão reinseridos.")
@@ -165,7 +192,7 @@ def limpar_postgresql(pg_url):
         
         # 2. Inserir planos de contas estruturais
         cur.executemany(
-            "INSERT INTO planos_de_contas (categoria, nome) VALUES (%s, %s)",
+            "INSERT INTO planos_de_contas (codigo, categoria, nome) VALUES (%s, %s, %s)",
             DEFAULT_PLANOS_DE_CONTAS
         )
         print("  [Supabase] Planos de contas padrão reinseridos.")

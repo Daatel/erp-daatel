@@ -218,9 +218,9 @@ with tab1:
                           
             # C) Entrada do Produto Acabado no Estoque
             run_query("""INSERT INTO estoque_movimentos 
-                         (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia) 
-                         VALUES (?, ?, 'Entrada', ?, ?, ?)""",
-                      (data_prod.strftime("%Y-%m-%d"), pf_id, pf_gerado_qtd, "Produção_Entrada", ref_doc))
+                         (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+                         VALUES (?, ?, 'Entrada', ?, ?, ?, ?)""",
+                      (data_prod.strftime("%Y-%m-%d"), pf_id, pf_gerado_qtd, "Produção_Entrada", ref_doc, int(lote_id)))
                       
             # D) ATUALIZA O CUSTO DO PRODUTO (Estoque Financeiro)
             run_query("UPDATE produtos SET custo_unidade = ? WHERE id = ?", (custo_unit_pf, pf_id))

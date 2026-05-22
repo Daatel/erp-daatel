@@ -47,7 +47,7 @@ with tab1:
         
         st.dataframe(df_display, width='stretch', hide_index=True)
         
-        csv = df_display.to_csv(index=False).encode('utf-8')
+        csv = df_display.to_csv(index=False, sep=';').encode('utf-8-sig')
         st.download_button(
             label="📥 Exportar Lista de Colaboradores (CSV)",
             data=csv,
@@ -125,7 +125,7 @@ with tab2:
             df_pgtos['Data Pgto'] = pd.to_datetime(df_pgtos['Data Pgto']).dt.strftime('%d/%m/%Y')
             st.dataframe(df_pgtos, width="stretch", hide_index=True)
             
-            csv2 = df_pgtos.to_csv(index=False).encode('utf-8')
+            csv2 = df_pgtos.to_csv(index=False, sep=';').encode('utf-8-sig')
             st.download_button(
                 label="📥 Exportar Histórico (CSV)",
                 data=csv2,

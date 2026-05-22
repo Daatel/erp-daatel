@@ -248,6 +248,7 @@ def create_tables():
         origem TEXT, 
         plano_conta_id INTEGER,
         documento_referencia TEXT,
+        lote_origem_id INTEGER,
         FOREIGN KEY(produto_id) REFERENCES produtos(id),
         FOREIGN KEY(plano_conta_id) REFERENCES planos_de_contas(id)
     )
@@ -271,6 +272,8 @@ def create_tables():
         custo_frete_rateado REAL DEFAULT 0.0,
         status TEXT DEFAULT 'APROVADO',
         comprovante_url TEXT,
+        is_bonificacao BOOLEAN DEFAULT 0,
+        custo_cmv_real REAL DEFAULT 0.0,
         FOREIGN KEY(cliente_id) REFERENCES clientes(id),
         FOREIGN KEY(vendedor_id) REFERENCES funcionarios(id),
         FOREIGN KEY(produto_id) REFERENCES produtos(id),
@@ -290,6 +293,7 @@ def create_tables():
         fonte_id INTEGER,
         conta_bancaria_id INTEGER,
         conciliado BOOLEAN DEFAULT 0,
+        cliente_id INTEGER,
         FOREIGN KEY(conta_bancaria_id) REFERENCES contas_bancarias(id)
     )
     ''')
@@ -298,6 +302,7 @@ def create_tables():
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS planos_de_contas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        codigo TEXT,
         categoria TEXT NOT NULL,
         nome TEXT NOT NULL
     )
@@ -331,6 +336,7 @@ def create_tables():
         data_pagamento DATE,
         status TEXT NOT NULL DEFAULT 'PENDENTE',
         conta_bancaria_id INTEGER,
+        cliente_id INTEGER,
         FOREIGN KEY(compra_id) REFERENCES compras(id),
         FOREIGN KEY(fornecedor_id) REFERENCES fornecedores(id),
         FOREIGN KEY(plano_conta_id) REFERENCES planos_de_contas(id),
@@ -544,7 +550,13 @@ def create_tables():
         "ALTER TABLE vendas ADD COLUMN custo_descarga REAL DEFAULT 0.0",
         "ALTER TABLE maquinario ADD COLUMN patrimônio TEXT",
         "ALTER TABLE maquinario ADD COLUMN numero_serie TEXT",
-        "ALTER TABLE maquinario ADD COLUMN localizacao TEXT DEFAULT 'Fábrica'"
+        "ALTER TABLE maquinario ADD COLUMN localizacao TEXT DEFAULT 'Fábrica'",
+        "ALTER TABLE estoque_movimentos ADD COLUMN lote_origem_id INTEGER",
+        "ALTER TABLE fluxo_caixa ADD COLUMN cliente_id INTEGER",
+        "ALTER TABLE contas_a_pagar ADD COLUMN cliente_id INTEGER",
+        "ALTER TABLE vendas ADD COLUMN is_bonificacao BOOLEAN DEFAULT 0",
+        "ALTER TABLE vendas ADD COLUMN custo_cmv_real REAL DEFAULT 0.0",
+        "ALTER TABLE planos_de_contas ADD COLUMN codigo TEXT"
     ]
     
     for q in alter_queries:
@@ -586,6 +598,83 @@ def fetch_all(query, params=()):
         return pd.DataFrame()
     finally:
         release_connection(conn)
+
+def consumir_estoque_fifo(produto_id, quantidade, data_mov, origem, doc_ref):
+    """
+    Consome o estoque utilizando o algoritmo FIFO.
+    Retorna uma tupla: (custo_total_acumulado, is_estimado)
+    """
+    # 1. Obter os lotes ativos com saldo físico disponível > 0 ordenados por data/ID (FIFO)
+    query_lotes = """
+        SELECT pd.id, pd.custo_unitario_lote, pd.data, pd.produto_final_kg,
+               (pd.produto_final_kg - COALESCE((
+                    SELECT SUM(em.quantidade) 
+                    FROM estoque_movimentos em 
+                    WHERE em.lote_origem_id = pd.id AND em.tipo_movimento = 'Saída'
+               ), 0.0)) as saldo
+        FROM producao_diaria pd
+        WHERE pd.produto_id = ?
+        ORDER BY pd.data ASC, pd.id ASC
+    """
+    df_lotes = fetch_all(query_lotes, (produto_id,))
+    
+    quantidade_restante = float(quantidade)
+    custo_acumulado = 0.0
+    is_estimado = False
+    
+    # Filtrar apenas linhas com saldo > 0 em Python (evita problemas de tipo com SQLite/Postgres)
+    lotes_disponiveis = []
+    if not df_lotes.empty:
+        df_lotes['saldo'] = df_lotes['saldo'].astype(float)
+        lotes_disponiveis = df_lotes[df_lotes['saldo'] > 0.0].to_dict('records')
+        
+    for lot in lotes_disponiveis:
+        if quantidade_restante <= 0:
+            break
+            
+        lote_id = int(lot['id'])
+        custo_un_lote = float(lot['custo_unitario_lote'] or 0.0)
+        saldo_lote = float(lot['saldo'])
+        
+        if saldo_lote >= quantidade_restante:
+            # Consome tudo que resta do pedido deste lote
+            run_query(
+                """INSERT INTO estoque_movimentos 
+                   (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+                   VALUES (?, ?, 'Saída', ?, ?, ?, ?)""",
+                (data_mov, produto_id, quantidade_restante, origem, doc_ref, lote_id)
+            )
+            custo_acumulado += quantidade_restante * custo_un_lote
+            quantidade_restante = 0.0
+            break
+        else:
+            # Consome o saldo total do lote e continua para o próximo
+            run_query(
+                """INSERT INTO estoque_movimentos 
+                   (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+                   VALUES (?, ?, 'Saída', ?, ?, ?, ?)""",
+                (data_mov, produto_id, saldo_lote, origem, doc_ref, lote_id)
+            )
+            custo_acumulado += saldo_lote * custo_un_lote
+            quantidade_restante -= saldo_lote
+            
+    # Se ainda restar quantidade (estoque no vermelho/negativo)
+    if quantidade_restante > 0:
+        is_estimado = True
+        # Obter o custo unitário padrão cadastrado no produto
+        df_prod = fetch_all("SELECT custo_unidade FROM produtos WHERE id = ?", (produto_id,))
+        custo_padrao = float(df_prod.iloc[0]['custo_unidade'] or 0.0) if not df_prod.empty else 0.0
+        
+        run_query(
+            """INSERT INTO estoque_movimentos 
+               (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+               VALUES (?, ?, 'Saída', ?, ?, ?, NULL)""",
+            (data_mov, produto_id, quantidade_restante, origem, doc_ref)
+        )
+        custo_acumulado += quantidade_restante * custo_padrao
+        quantidade_restante = 0.0
+        
+    return custo_acumulado, is_estimado
 
 if __name__ == "__main__":
     create_tables()

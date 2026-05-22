@@ -11,6 +11,7 @@ Regras de negócio embutidas no seed:
 import sqlite3
 import os
 from datetime import date
+from limpar_banco_real import DEFAULT_PLANOS_DE_CONTAS
 
 DB_NAME = "erp_fabrica.db"
 
@@ -94,31 +95,8 @@ def reset_and_seed():
     # SEED — PLANOS DE CONTAS
     # ═════════════════════════════════════════
     cur.executemany(
-        "INSERT INTO planos_de_contas (categoria, nome) VALUES (?,?)",
-        [
-            # Receitas
-            ("RECEITA",    "Venda de Produtos"),
-            ("RECEITA",    "Venda de Subprodutos"),
-            # CMV / Custo Variável
-            ("CMV",        "Custo da Mercadoria Vendida"),
-            ("CMV",        "Custo da Embalagem"),
-            # Compras / Entradas
-            ("COMPRA",     "Compra de Matéria-Prima"),
-            ("COMPRA",     "Compra de Embalagens"),
-            ("COMPRA",     "Compra de Insumos"),
-            # Despesas Operacionais
-            ("DESPESA_OP", "Frete e Logística"),
-            ("DESPESA_OP", "Manutenção de Equipamentos"),
-            ("DESPESA_OP", "Energia Elétrica"),
-            ("DESPESA_OP", "Aluguel"),
-            # RH
-            ("RH",         "Salários e Encargos"),
-            ("RH",         "Comissões de Vendas"),
-            # Acordos Comerciais
-            ("ACORDOS",    "Taxa de Descarga"),
-            ("ACORDOS",    "Acordo Logístico / Rebate de Rede"),
-            ("ACORDOS",    "Contrato Comercial"),
-        ]
+        "INSERT INTO planos_de_contas (codigo, categoria, nome) VALUES (?,?,?)",
+        DEFAULT_PLANOS_DE_CONTAS
     )
     print("  ✓ Planos de contas inseridos")
 
@@ -131,13 +109,13 @@ def reset_and_seed():
            VALUES (?,?,?,?,?,?,?,?)""",
         [
             ("Fazenda São José do Alho",  "(62) 99800-0001", "12.345.678/0001-90",
-             "Senador Canedo", "GO", "Compra de Matéria-Prima", "ATIVO", "30 dias"),
+             "Senador Canedo", "GO", "Compra de Matéria-Prima (Alho, Insumos)", "ATIVO", "30 dias"),
             ("Plásticos SA",              "(11) 3344-5566",  "23.456.789/0001-01",
-             "São Paulo",      "SP", "Compra de Embalagens",    "ATIVO", "28 dias"),
+             "São Paulo",      "SP", "Compra de Embalagens (Potes, Caixas, Redes)",    "ATIVO", "28 dias"),
             ("Transportadora Rápida Ltda","(62) 3322-1100",  "34.567.890/0001-12",
-             "Goiânia",        "GO", "Frete e Logística",       "ATIVO", "15 dias"),
+             "Goiânia",        "GO", "Fretes sobre Vendas (Entregas)",       "ATIVO", "15 dias"),
             ("Manutenção Industrial GO",  "(62) 98877-6655", "45.678.901/0001-23",
-             "Aparecida de Goiânia", "GO", "Manutenção de Equipamentos", "ATIVO", "À Vista"),
+             "Aparecida de Goiânia", "GO", "Manutenção de Máquinas e Utensílios", "ATIVO", "À Vista"),
         ]
     )
     print("  ✓ Fornecedores inseridos")

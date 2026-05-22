@@ -124,9 +124,20 @@ with tab1:
                     else:
                         run_query("UPDATE vendas SET status='FATURADO', tipo_documento=?, lote_impresso=?, validade_impressa=? WHERE id=?", (tipo_doc, lote_impresso, validade_impressa, pid))
                     
-                    # 2. Baixa de Estoque
-                    run_query("INSERT INTO estoque_movimentos (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia) VALUES (?, ?, ?, ?, ?, ?)",
-                              (date.today().strftime("%Y-%m-%d"), prod_id, 'Saída', qtd, f'Expedição {tipo_doc}', f"Venda Lote #{pid}"))
+                    # 2. Baixa de Estoque via FIFO
+                    from database import consumir_estoque_fifo
+                    custo_cmv_real, is_estimado = consumir_estoque_fifo(
+                        produto_id=prod_id,
+                        quantidade=qtd,
+                        data_mov=date.today().strftime("%Y-%m-%d"),
+                        origem=f'Expedição {tipo_doc}',
+                        doc_ref=f"Venda Lote #{pid}"
+                    )
+                    
+                    run_query("UPDATE vendas SET custo_cmv_real = ? WHERE id = ?", (custo_cmv_real, pid))
+                    
+                    if is_estimado:
+                        st.warning(f"⚠️ O CMV do Pedido #{pid} ({cli_nome}) foi estimado por falta de lote correspondente no estoque (Estoque Negativo).")
                     
                     # 3. Lançamento Financeiro com Inteligência de Prazo do Cliente
                     cli_id_df = fetch_all("SELECT cliente_id FROM vendas WHERE id=?", (pid,))
@@ -149,11 +160,11 @@ with tab1:
                         rede_str = cli_rede_df.iloc[0]['rede_clientes'] if not cli_rede_df.empty and cli_rede_df.iloc[0]['rede_clientes'] else "Rede Desconhecida"
                         desc_acordo = f"Repasse Acordo Comercial (Contrato/Logística): REDE {str(rede_str).upper()} - Venda #{pid}"
                         
-                        p_c_acordo = fetch_all("SELECT id FROM planos_de_contas WHERE nome LIKE '%Acordo%' OR nome LIKE '%Comiss%' LIMIT 1")
+                        p_c_acordo = fetch_all("SELECT id FROM planos_de_contas WHERE codigo = '2.2.2' OR nome LIKE '%Acordo%' OR nome LIKE '%Comiss%' LIMIT 1")
                         pc_acord_id = int(p_c_acordo.iloc[0]['id']) if not p_c_acordo.empty else None
                         
-                        run_query("INSERT INTO contas_a_pagar (plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, 'PENDENTE')",
-                                  (pc_acord_id, desc_acordo, custo_acordos, venc_acordo.strftime("%Y-%m-%d")))
+                        run_query("INSERT INTO contas_a_pagar (plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 'PENDENTE')",
+                                  (pc_acord_id, cli_id, desc_acordo, custo_acordos, venc_acordo.strftime("%Y-%m-%d")))
                     
                     # 5. Taxa de Descarga do Cliente → Contas a Pagar imediato (D+0) + grava custo na venda
                     cli_taxa_df = fetch_all("SELECT taxa_descarga, regras_descarga, nome FROM clientes WHERE id=?", (cli_id,))
@@ -162,9 +173,13 @@ with tab1:
                         if taxa_desc > 0:
                             regra_str = cli_taxa_df.iloc[0]['regras_descarga'] or "Sem regras específicas"
                             desc_taxa = f"Taxa de Descarga CD - {cli_nome} - Venda #{pid} | Regra: {regra_str}"
-                            # Gera passivo financeiro
-                            run_query("INSERT INTO contas_a_pagar (plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, 'PENDENTE')",
-                                      (None, desc_taxa, taxa_desc, date.today().strftime("%Y-%m-%d")))
+                            
+                            p_c_descarga = fetch_all("SELECT id FROM planos_de_contas WHERE codigo = '2.1.5' OR nome LIKE '%Frete%' OR nome LIKE '%Descarga%' LIMIT 1")
+                            pc_desc_id = int(p_c_descarga.iloc[0]['id']) if not p_c_descarga.empty else None
+                            
+                            # Gera passivo financeiro vinculado ao cliente
+                            run_query("INSERT INTO contas_a_pagar (plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 'PENDENTE')",
+                                      (pc_desc_id, cli_id, desc_taxa, taxa_desc, date.today().strftime("%Y-%m-%d")))
                             # Grava na venda para o DRE classificar como custo comercial variável
                             run_query("UPDATE vendas SET custo_descarga=? WHERE id=?", (taxa_desc, pid))
 
@@ -229,11 +244,11 @@ with tab2:
             st.dataframe(df_export, hide_index=True)
             
             # Geração do Arquivo Físico para Download
-            csv_str = df_export.to_csv(index=False, sep=";")
+            csv_bytes = df_export.to_csv(index=False, sep=";").encode('utf-8-sig')
             
             st.download_button(
                 label="📥 Baixar Arquivo de Integração (CSV SEFAZ)",
-                data=csv_str,
+                data=csv_bytes,
                 file_name=f"export_sefaz_{mes_fiscal}.csv",
                 mime="text/csv",
                 type="primary"

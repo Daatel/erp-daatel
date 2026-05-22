@@ -13,41 +13,51 @@ st.markdown("A Verdade Nua e Crua: Sua fábrica dá lucro ou prejuízo faturando
 def f_br(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-# 1. Puxar Dados Brutos (Caixa)
-df_fc = fetch_all("SELECT * FROM fluxo_caixa")
+# 1. Puxar Dados Brutos (Caixa) com Plano de Contas Hierárquico
+df_fluxo_gerencial = fetch_all("""
+    SELECT fc.data, fc.tipo, fc.valor, fc.categoria, pc.codigo, pc.categoria as pc_cat, pc.nome as pc_nome
+    FROM fluxo_caixa fc
+    LEFT JOIN planos_de_contas pc ON fc.categoria = pc.nome
+""")
 hoje = pd.to_datetime('today')
 
-if not df_fc.empty:
-    df_fc['data'] = pd.to_datetime(df_fc['data'], errors='coerce')
+if not df_fluxo_gerencial.empty:
+    df_fluxo_gerencial['data'] = pd.to_datetime(df_fluxo_gerencial['data'], errors='coerce')
     
     # Corte Temporal
-    df_mes = df_fc[df_fc['data'] >= (hoje - timedelta(days=30))]
-    df_90d = df_fc[df_fc['data'] >= (hoje - timedelta(days=90))]
+    df_mes = df_fluxo_gerencial[df_fluxo_gerencial['data'] >= (hoje - timedelta(days=30))]
+    df_90d = df_fluxo_gerencial[df_fluxo_gerencial['data'] >= (hoje - timedelta(days=90))]
     
     # --- CALCULADORA CONTÁBIL ---
     
-    # Nível 1: Bruto
+    # Nível 1: Bruto (Receita Operacional Bruta - Entradas Totais de Caixa)
     rb_mes = float(df_mes[df_mes['tipo'] == 'Entrada']['valor'].sum())
     rb_90 = float(df_90d[df_90d['tipo'] == 'Entrada']['valor'].sum()) / 3
     
     # Nível 2: Deduções (Devoluções e Impostos sobre Venda)
-    dev_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'].str.contains('devolução|reembolso|estorno', case=False, na=False))]['valor'].sum())
-    dev_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'].str.contains('devolução|reembolso|estorno', case=False, na=False))]['valor'].sum()) / 3
+    dev_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'].str.contains('devolução|reembolso|estorno|logística reversa', case=False, na=False))]['valor'].sum())
+    dev_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'].str.contains('devolução|reembolso|estorno|logística reversa', case=False, na=False))]['valor'].sum()) / 3
     
-    imp_venda_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'].str.contains('imposto.*venda|simples|icms|pis|cofins|das', case=False, na=False))]['valor'].sum())
-    imp_venda_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'].str.contains('imposto.*venda|simples|icms|pis|cofins|das', case=False, na=False))]['valor'].sum()) / 3
+    imp_venda_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & ((df_mes['codigo'] == '2.1.3') | (df_mes['categoria'].str.contains('imposto.*venda|simples|icms|pis|cofins|das', case=False, na=False)))][ 'valor'].sum())
+    imp_venda_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & ((df_90d['codigo'] == '2.1.3') | (df_90d['categoria'].str.contains('imposto.*venda|simples|icms|pis|cofins|das', case=False, na=False)))][ 'valor'].sum()) / 3
     
     rl_mes = rb_mes - dev_mes - imp_venda_mes
     rl_90 = rb_90 - dev_90 - imp_venda_90
     
-    # Nível 2: Custo Variável (Fornecedores e Matéria Prima)
-    # Aqui assumimos que qualquer saída categorizada como MP, Fornecedor, Insumo ou Compra é Custo Direto (CMV/CPV)
-    chaves_cmv = ['Fornecedor', 'Fornecedores', 'Insumos', 'Matéria Prima', 'Matérias Primas', 'Compras', 'Materia Prima']
+    # Nível 2: Custo Variável - CMV FIFO Real (soma de custo_cmv_real das vendas faturadas no período)
+    df_vd_fat = fetch_all("SELECT data, custo_cmv_real FROM vendas WHERE status='FATURADO'")
+    if not df_vd_fat.empty:
+        df_vd_fat['data'] = pd.to_datetime(df_vd_fat['data'], errors='coerce')
+        df_vdf_mes = df_vd_fat[df_vd_fat['data'] >= (hoje - timedelta(days=30))]
+        df_vdf_90 = df_vd_fat[df_vd_fat['data'] >= (hoje - timedelta(days=90))]
+        
+        cv_mes = float(df_vdf_mes['custo_cmv_real'].sum())
+        cv_90 = float(df_vdf_90['custo_cmv_real'].sum()) / 3
+    else:
+        cv_mes = 0.0
+        cv_90 = 0.0
     
-    cv_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'].isin(chaves_cmv))]['valor'].sum())
-    cv_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'].isin(chaves_cmv))]['valor'].sum()) / 3
-    
-    # Nível 2.5: Despesas Comerciais Variáveis (Comissões, Logística, Acordos e Descargas)
+    # Nível 2.5: Despesas Comerciais Variáveis (Comissões, Logística, Acordos, Descargas, Degustações e Promotores)
     df_vd = fetch_all("SELECT data, custo_frete_rateado, comissao_valor, custo_acordos_rede, custo_descarga FROM vendas")
     df_vd['data'] = pd.to_datetime(df_vd['data'], errors='coerce')
     df_vd_mes = df_vd[df_vd['data'] >= (hoje - timedelta(days=30))]
@@ -59,74 +69,85 @@ if not df_fc.empty:
     comi_mes = df_vd_mes['comissao_valor'].sum() if not df_vd_mes.empty else 0.0
     comi_90 = (df_vd_90['comissao_valor'].sum() / 3) if not df_vd_90.empty else 0.0
     
-    acordos_mes = df_vd_mes['custo_acordos_rede'].sum() if not df_vd_mes.empty else 0.0
-    acordos_90 = (df_vd_90['custo_acordos_rede'].sum() / 3) if not df_vd_90.empty else 0.0
+    df_saidas_mes = df_mes[df_mes['tipo'] == 'Saída'].copy()
+    df_saidas_90 = df_90d[df_90d['tipo'] == 'Saída'].copy()
+    
+    # 2.2.2 Contratos Comerciais (Listing Fee / Enxovais / Acordos)
+    acordos_mes = float(df_saidas_mes[(df_saidas_mes['codigo'] == '2.2.2') | (df_saidas_mes['categoria'].str.contains('acordo|contrato|listing|rapel|enxoval', case=False, na=False))]['valor'].sum())
+    acordos_90 = float(df_saidas_90[(df_saidas_90['codigo'] == '2.2.2') | (df_saidas_90['categoria'].str.contains('acordo|contrato|listing|rapel|enxoval', case=False, na=False))]['valor'].sum()) / 3
     
     descarga_mes = df_vd_mes['custo_descarga'].sum() if not df_vd_mes.empty else 0.0
     descarga_90 = (df_vd_90['custo_descarga'].sum() / 3) if not df_vd_90.empty else 0.0
     
-    desp_com_mes = frete_mes + comi_mes + acordos_mes + descarga_mes
-    desp_com_90 = frete_90 + comi_90 + acordos_90 + descarga_90
+    # 2.2.1 Custo de Degustações e Amostras
+    degust_mes = float(df_saidas_mes[(df_saidas_mes['codigo'] == '2.2.1') | (df_saidas_mes['categoria'].str.contains('degustação|amostra', case=False, na=False))]['valor'].sum())
+    degust_90 = float(df_saidas_90[(df_saidas_90['codigo'] == '2.2.1') | (df_saidas_90['categoria'].str.contains('degustação|amostra', case=False, na=False))]['valor'].sum()) / 3
     
-    # Nível 3: Margem de Contribuição (O Negócio "Alho" se paga tirando a Produção e a Entrega?)
+    # 2.2.4 Custos de Promotores de Vendas
+    promotores_mes = float(df_saidas_mes[(df_saidas_mes['codigo'] == '2.2.4') | (df_saidas_mes['categoria'].str.contains('promotor', case=False, na=False))]['valor'].sum())
+    promotores_90 = float(df_saidas_90[(df_saidas_90['codigo'] == '2.2.4') | (df_saidas_90['categoria'].str.contains('promotor', case=False, na=False))]['valor'].sum()) / 3
+    
+    desp_com_mes = frete_mes + comi_mes + acordos_mes + descarga_mes + degust_mes + promotores_mes
+    desp_com_90 = frete_90 + comi_90 + acordos_90 + descarga_90 + degust_90 + promotores_90
+    
+    # Nível 3: Margem de Contribuição
     mc_mes = rl_mes - cv_mes - desp_com_mes
     mc_90 = rl_90 - cv_90 - desp_com_90
     mc_perc = (mc_mes / rl_mes * 100) if rl_mes > 0 else 0.0
     
-    # Nível 4: Despesas Fixas (O peso Administrativo ANTES do EBITDA)
-    # Excluímos também as categorias de Nível 5 (Abaixo do EBITDA)
-    chaves_abaixo_ebitda = ['Depreciação', 'Impostos sobre Lucro', 'IRPJ', 'CSLL', 'Financiamento', 'Empréstimos', 'Juros', 'Despesas Financeiras', 'JCP', 'Juros sobre Capital Próprio', 'Dividendos', 'Distribuição de Lucros', 'Distribuição de Lucro']
-    
-    # Excluímos despesas comerciais para evitar dupla contagem com Nível 2.5
-    regex_comercial = 'frete|logística|transporte|comissão|comissoes|venda'
-    
-    # Filtragem robusta para Mês Atual
-    df_saidas_mes = df_mes[df_mes['tipo'] == 'Saída'].copy()
-    df_s1 = df_saidas_mes[~df_saidas_mes['categoria'].isin(chaves_cmv + chaves_abaixo_ebitda)]
-    df_fixas_mes = df_s1[~df_s1['categoria'].str.contains(regex_comercial, case=False, na=False)]
-    df_mes_val = float(df_fixas_mes['valor'].sum()) if not df_fixas_mes.empty else 0.0
-    
-    # Filtragem robusta para 90 Dias
-    df_saidas_90 = df_90d[df_90d['tipo'] == 'Saída'].copy()
-    df_s90 = df_saidas_90[~df_saidas_90['categoria'].isin(chaves_cmv + chaves_abaixo_ebitda)]
-    df_fixas_90 = df_s90[~df_s90['categoria'].str.contains(regex_comercial, case=False, na=False)]
-    df_90 = float(df_fixas_90['valor'].sum() / 3) if not df_fixas_90.empty else 0.0
-    
-    # Rastreio Direcionado do Pró-labore (Apenas para exibir, pois já está dentro de df_mes_val)
-    pro_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'] == 'Pró-Labore')]['valor'].sum())
-    pro_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'] == 'Pró-Labore')]['valor'].sum()) / 3
+    # Nível 4: Despesas Fixas (Códigos 2.3 e 3.1)
+    df_fixas_mes = df_saidas_mes[df_saidas_mes['codigo'].str.startswith(('2.3.', '3.1.'), na=False)]
+    if df_fixas_mes.empty:
+        chaves_cmv = ['Fornecedor', 'Fornecedores', 'Insumos', 'Matéria Prima', 'Matérias Primas', 'Compras', 'Materia Prima']
+        chaves_abaixo_ebitda = ['Depreciação', 'Impostos sobre Lucro', 'IRPJ', 'CSLL', 'Financiamento', 'Empréstimos', 'Juros', 'Despesas Financeiras', 'JCP', 'Juros sobre Capital Próprio', 'Dividendos', 'Distribuição de Lucros', 'Distribuição de Lucro']
+        regex_comercial = 'frete|logística|transporte|comissão|comissoes|venda|degustação|amostra|promotor|contrato|acordo'
+        df_s1 = df_saidas_mes[~df_saidas_mes['categoria'].isin(chaves_cmv + chaves_abaixo_ebitda)]
+        df_fixas_mes = df_s1[~df_s1['categoria'].str.contains(regex_comercial, case=False, na=False)]
+        df_mes_val = float(df_fixas_mes['valor'].sum())
+        
+        df_s90 = df_saidas_90[~df_saidas_90['categoria'].isin(chaves_cmv + chaves_abaixo_ebitda)]
+        df_fixas_90 = df_s90[~df_s90['categoria'].str.contains(regex_comercial, case=False, na=False)]
+        df_90 = float(df_fixas_90['valor'].sum()) / 3
+    else:
+        df_mes_val = float(df_fixas_mes['valor'].sum())
+        df_fixas_90 = df_saidas_90[df_saidas_90['codigo'].str.startswith(('2.3.', '3.1.'), na=False)]
+        df_90 = float(df_fixas_90['valor'].sum()) / 3
+        
+    # Pró-Labore (3.1.4)
+    pro_mes = float(df_saidas_mes[(df_saidas_mes['codigo'] == '3.1.4') | (df_saidas_mes['categoria'] == 'Pró-Labore')]['valor'].sum())
+    pro_90 = float(df_saidas_90[(df_saidas_90['codigo'] == '3.1.4') | (df_saidas_90['categoria'] == 'Pró-Labore')]['valor'].sum()) / 3
 
-    # Nível 5: O Check-Mate Estrutural (EBITDA Operacional)
+    # Nível 5: Resultado Operacional (EBITDA)
     ebitda_mes = mc_mes - df_mes_val
     ebitda_90 = mc_90 - df_90
     ebitda_perc = (ebitda_mes / rl_mes * 100) if rl_mes > 0 else 0.0
     
-    # Nível 6: Além do EBITDA (Depreciação, Impostos, Financiamentos)
-    depr_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'] == 'Depreciação')]['valor'].sum())
-    depr_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'] == 'Depreciação')]['valor'].sum()) / 3
+    # Nível 6: Depreciação, Impostos, Financiamentos
+    depr_mes = float(df_saidas_mes[df_saidas_mes['categoria'] == 'Depreciação']['valor'].sum())
+    depr_90 = float(df_saidas_90[df_saidas_90['categoria'] == 'Depreciação']['valor'].sum()) / 3
     
-    imp_lucro_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'].isin(['Impostos sobre Lucro', 'IRPJ', 'CSLL']))]['valor'].sum())
-    imp_lucro_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'].isin(['Impostos sobre Lucro', 'IRPJ', 'CSLL']))]['valor'].sum()) / 3
+    imp_lucro_mes = float(df_saidas_mes[df_saidas_mes['categoria'].isin(['Impostos sobre Lucro', 'IRPJ', 'CSLL'])]['valor'].sum())
+    imp_lucro_90 = float(df_saidas_90[df_saidas_90['categoria'].isin(['Impostos sobre Lucro', 'IRPJ', 'CSLL'])]['valor'].sum()) / 3
     
-    finan_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'].isin(['Financiamento', 'Empréstimos', 'Juros', 'Despesas Financeiras']))]['valor'].sum())
-    finan_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'].isin(['Financiamento', 'Empréstimos', 'Juros', 'Despesas Financeiras']))]['valor'].sum()) / 3
+    finan_mes = float(df_saidas_mes[(df_saidas_mes['codigo'] == '3.2.1') | (df_saidas_mes['categoria'].isin(['Financiamento', 'Empréstimos', 'Juros', 'Despesas Financeiras']))]['valor'].sum())
+    finan_90 = float(df_saidas_90[(df_saidas_90['codigo'] == '3.2.1') | (df_saidas_90['categoria'].isin(['Financiamento', 'Empréstimos', 'Juros', 'Despesas Financeiras']))]['valor'].sum()) / 3
     
-    jcp_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'].isin(['JCP', 'Juros sobre Capital Próprio']))]['valor'].sum())
-    jcp_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'].isin(['JCP', 'Juros sobre Capital Próprio']))]['valor'].sum()) / 3
+    jcp_mes = float(df_saidas_mes[df_saidas_mes['categoria'].isin(['JCP', 'Juros sobre Capital Próprio'])]['valor'].sum())
+    jcp_90 = float(df_saidas_90[df_saidas_90['categoria'].isin(['JCP', 'Juros sobre Capital Próprio'])]['valor'].sum()) / 3
     
-    # Nível 7: O Dinheiro Total Gerado (Lucro Líquido Real)
+    # Nível 7: Lucro Líquido
     lucro_mes = ebitda_mes - depr_mes - imp_lucro_mes - finan_mes - jcp_mes
     lucro_90 = ebitda_90 - depr_90 - imp_lucro_90 - finan_90 - jcp_90
     lucro_perc = (lucro_mes / rl_mes * 100) if rl_mes > 0 else 0.0
     
     # Nível 8: Divisão Sócio vs Indústria
-    div_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'].isin(['Dividendos', 'Distribuição de Lucros', 'Distribuição de Lucro']))]['valor'].sum())
-    div_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'].isin(['Dividendos', 'Distribuição de Lucros', 'Distribuição de Lucro']))]['valor'].sum()) / 3
+    div_mes = float(df_saidas_mes[df_saidas_mes['categoria'].isin(['Dividendos', 'Distribuição de Lucros', 'Distribuição de Lucro'])]['valor'].sum())
+    div_90 = float(df_saidas_90[df_saidas_90['categoria'].isin(['Dividendos', 'Distribuição de Lucros', 'Distribuição de Lucro'])]['valor'].sum()) / 3
 
     retido_mes = lucro_mes - div_mes
     retido_90 = lucro_90 - div_90
     
-    # Calculadora Break-even usa as Despesas Operacionais Fixas
+    # Ponto de Equilíbrio
     break_even = (df_mes_val / (mc_perc / 100)) if mc_perc > 0 else 0.0
     
     # -------- RENDERIZAÇÃO VISUAL ---------
@@ -159,17 +180,17 @@ if not df_fc.empty:
         st.subheader("II. Motores de Custo Variável (O Chão de Fábrica)")
         
         ca, cb, cc = st.columns([2, 1, 1])
-        ca.markdown("**4. (-) Custos do Produto (CPV/CMV)** *(Compras de Alho)*")
+        ca.markdown("**4. (-) Custo de Mercadorias Vendidas (CMV FIFO Real)**")
         cb.metric("Mês Atual", f_br(cv_mes), delta="Saída", delta_color="inverse")
         cc.metric("Média Trimestral", f_br(cv_90), delta="Base", delta_color="off")
         
         c_c1, c_c2, c_c3 = st.columns([2, 1, 1])
-        c_c1.markdown("**5. (-) Despesas Comerciais** *(Comissões & Logística/Fretes)*")
+        c_c1.markdown("**5. (-) Despesas Comerciais Variáveis** *(Comissões & Logística/Fretes)*")
         c_c2.metric(" ", f_br(frete_mes + comi_mes), label_visibility="collapsed")
         c_c3.metric(" ", f_br(frete_90 + comi_90), label_visibility="collapsed")
         
         c_a1, c_a2, c_a3 = st.columns([2, 1, 1])
-        c_a1.markdown("**5.1 (-) Acordos Comerciais (Rebates de Rede)**")
+        c_a1.markdown("**5.1 (-) Contratos Comerciais & Rebates (Acordos de Rede - 2.2.2)**")
         c_a2.metric(" ", f_br(acordos_mes), label_visibility="collapsed")
         c_a3.metric(" ", f_br(acordos_90), label_visibility="collapsed")
         
@@ -177,6 +198,16 @@ if not df_fc.empty:
         c_d1.markdown("**5.2 (-) Taxas de Descarga (CD/Redes)**")
         c_d2.metric(" ", f_br(descarga_mes), label_visibility="collapsed")
         c_d3.metric(" ", f_br(descarga_90), label_visibility="collapsed")
+        
+        c_deg1, c_deg2, c_deg3 = st.columns([2, 1, 1])
+        c_deg1.markdown("**5.3 (-) Degustações e Amostras (Ações Comerciais - 2.2.1)**")
+        c_deg2.metric(" ", f_br(degust_mes), label_visibility="collapsed")
+        c_deg3.metric(" ", f_br(degust_90), label_visibility="collapsed")
+        
+        c_prm1, c_prm2, c_prm3 = st.columns([2, 1, 1])
+        c_prm1.markdown("**5.4 (-) Custos de Promotores de Vendas (Serviços - 2.2.4)**")
+        c_prm2.metric(" ", f_br(promotores_mes), label_visibility="collapsed")
+        c_prm3.metric(" ", f_br(promotores_90), label_visibility="collapsed")
         
         cd, ce, cf = st.columns([2, 1, 1])
         cd.markdown(f"#### (=) MARGEM DE CONTRIBUIÇÃO LÍQUIDA   🛡️ `{mc_perc:.1f}%`")
