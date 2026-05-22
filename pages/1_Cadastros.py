@@ -41,15 +41,19 @@ with tab_empresa:
         telefone_emp = e_c7.text_input("Telefone", value=emp.get('telefone', '') or '')
         email_emp = e_c8.text_input("E-mail Contato", value=emp.get('email', '') or '')
         
+        e_c9, e_c10 = st.columns(2)
+        web_emp = e_c9.text_input("Website / Link", value=emp.get('website', '') or '')
+        insta_emp = e_c10.text_input("Instagram", value=emp.get('instagram', '') or '')
+        
         end_emp = st.text_input("Endereço Completo (Rua, Número, Bairro, Cidade-UF)", value=emp.get('endereco_completo', ''))
         
         if st.form_submit_button("Salvar Dados da Empresa"):
             run_query("""
                 UPDATE empresa_config 
                 SET razao_social=?, nome_fantasia=?, cnpj=?, endereco_completo=?, telefone=?, email=?,
-                    inscricao_estadual=?, inscricao_municipal=?, cep=?
+                    inscricao_estadual=?, inscricao_municipal=?, cep=?, instagram=?, website=?
                 WHERE id=?
-            """, (r_social, n_fantasia, cnpj_emp, end_emp, telefone_emp, email_emp, ie_emp, im_emp, cep_emp, emp['id']))
+            """, (r_social, n_fantasia, cnpj_emp, end_emp, telefone_emp, email_emp, ie_emp, im_emp, cep_emp, insta_emp, web_emp, emp['id']))
             st.success("Dados da Empresa atualizados! Os PDFs e relatórios já usarão os dados novos.")
             import time; time.sleep(1); st.rerun()
 

@@ -520,7 +520,9 @@ def create_tables():
         email TEXT,
         inscricao_estadual TEXT,
         inscricao_municipal TEXT,
-        cep TEXT
+        cep TEXT,
+        instagram TEXT,
+        website TEXT
     )
     ''')
     
@@ -564,7 +566,9 @@ def create_tables():
         "ALTER TABLE empresa_config ADD COLUMN email TEXT",
         "ALTER TABLE empresa_config ADD COLUMN inscricao_estadual TEXT",
         "ALTER TABLE empresa_config ADD COLUMN inscricao_municipal TEXT",
-        "ALTER TABLE empresa_config ADD COLUMN cep TEXT"
+        "ALTER TABLE empresa_config ADD COLUMN cep TEXT",
+        "ALTER TABLE empresa_config ADD COLUMN instagram TEXT",
+        "ALTER TABLE empresa_config ADD COLUMN website TEXT"
     ]
     
     for q in alter_queries:
