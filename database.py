@@ -556,7 +556,9 @@ def create_tables():
         "ALTER TABLE contas_a_pagar ADD COLUMN cliente_id INTEGER",
         "ALTER TABLE vendas ADD COLUMN is_bonificacao BOOLEAN DEFAULT 0",
         "ALTER TABLE vendas ADD COLUMN custo_cmv_real REAL DEFAULT 0.0",
-        "ALTER TABLE planos_de_contas ADD COLUMN codigo TEXT"
+        "ALTER TABLE planos_de_contas ADD COLUMN codigo TEXT",
+        "ALTER TABLE empresa_config ADD COLUMN telefone TEXT",
+        "ALTER TABLE empresa_config ADD COLUMN email TEXT"
     ]
     
     for q in alter_queries:
