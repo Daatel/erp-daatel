@@ -577,13 +577,17 @@ def create_tables():
         "ALTER TABLE empresa_config ADD COLUMN website TEXT"
     ]
     
-    # Para PostgreSQL: executar DDL com autocommit=True (garante que cada coluna seja criada)
-    pool = init_connection_pool()
-    if pool:
-        import re as _re
-        conn_ddl = pool.getconn()
-        conn_ddl.autocommit = True
-        cur_ddl = conn_ddl.cursor()
+    # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)
+    import re as _re
+    is_pg = init_connection_pool() is not None
+    if is_pg:
+        # Commita qualquer transação pendente antes de trocar para autocommit
+        try:
+            conn.commit()
+        except Exception:
+            pass
+        conn.autocommit = True
+        cur_ddl = conn.cursor()
         for q in alter_queries:
             q_pg = _re.sub(
                 r'(?i)(ALTER\s+TABLE\s+\w+\s+ADD\s+COLUMN\s+)(?!IF\s+NOT\s+EXISTS\s+)',
@@ -596,10 +600,16 @@ def create_tables():
             except Exception:
                 pass
         cur_ddl.close()
-        conn_ddl.autocommit = False
-        pool.putconn(conn_ddl)
+        conn.autocommit = False
+    else:
+        # SQLite: try/except por statement
+        for q in alter_queries:
+            try:
+                conn.execute(q)
+                conn.commit()
+            except Exception:
+                pass
 
-    # Fechar conexao principal
     release_connection(conn)
 
 def run_query(query, params=()):
