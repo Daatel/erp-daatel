@@ -577,15 +577,29 @@ def create_tables():
         "ALTER TABLE empresa_config ADD COLUMN website TEXT"
     ]
     
-    for q in alter_queries:
-        try:
-            cursor.execute(format_pg(q))
-            conn.commit()
-        except:
-            if hasattr(conn, 'rollback'):
-                conn.rollback()
+    # Para PostgreSQL: executar DDL com autocommit=True (garante que cada coluna seja criada)
+    pool = init_connection_pool()
+    if pool:
+        import re as _re
+        conn_ddl = pool.getconn()
+        conn_ddl.autocommit = True
+        cur_ddl = conn_ddl.cursor()
+        for q in alter_queries:
+            q_pg = _re.sub(
+                r'(?i)(ALTER\s+TABLE\s+\w+\s+ADD\s+COLUMN\s+)(?!IF\s+NOT\s+EXISTS\s+)',
+                r'\1IF NOT EXISTS ',
+                q.replace("BOOLEAN DEFAULT 0", "BOOLEAN DEFAULT FALSE")
+                 .replace("BOOLEAN DEFAULT 1", "BOOLEAN DEFAULT TRUE")
+            )
+            try:
+                cur_ddl.execute(q_pg)
+            except Exception:
+                pass
+        cur_ddl.close()
+        conn_ddl.autocommit = False
+        pool.putconn(conn_ddl)
 
-    # Fechar pool se necessário
+    # Fechar conexao principal
     release_connection(conn)
 
 def run_query(query, params=()):
