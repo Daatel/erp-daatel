@@ -613,13 +613,13 @@ with tab4:
     df_regras = fetch_all('''
     SELECT c.id, f.nome as Repr, COALESCE(p.nome, 'TODOS') as Produto, c.rede_clientes as 'Rede', 
            c.percentual as "Comissão (%)", c.gatilho_comissao as 'Tipo', 
-           c.minimo_garantido as 'Tem Min?', c.valor_minimo_garantido as 'Vlr Min R$'
+           c.minimo_garantido as 'Tem Min', c.valor_minimo_garantido as 'Vlr Min R$'
     FROM comissoes_regras c 
     JOIN funcionarios f ON c.vendedor_id = f.id
     LEFT JOIN produtos p ON c.produto_id = p.id
     ''')
     if not df_regras.empty:
-        df_regras['Tem Min?'] = df_regras['Tem Min?'].map({1: 'Sim', 0: 'Não', True: 'Sim', False: 'Não'})
+        df_regras['Tem Min'] = df_regras['Tem Min'].map({1: 'Sim', 0: 'Não', True: 'Sim', False: 'Não'})
         export_btn(df_regras, 'regras_comissao.csv')
         st.dataframe(df_regras, width="stretch", hide_index=True)
         
