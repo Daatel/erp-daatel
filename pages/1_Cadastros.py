@@ -95,7 +95,7 @@ with tab1:
                         marca, peso_volume, referencia, ean, unidades_por_fardo, 
                         tipo_embalagem, embalagem_master, cod_emb_master) 
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", 
-                    (nome_produto, unidade_medida_sintetico, preco_venda_base, 1 if is_materia_prima else 0,
+                    (nome_produto, unidade_medida_sintetico, preco_venda_base, True if is_materia_prima else False,
                      marca, peso_volume, referencia, ean, unidades_por_fardo, tipo_embalagem, embalagem_master, cod_emb_master)
                 )
                 st.success(f"Produto '{nome_produto}' cadastrado com sucesso!")
@@ -106,7 +106,7 @@ with tab1:
     st.subheader("Produtos Cadastrados")
     df_produtos = fetch_all("SELECT id, nome, marca, referencia, ean, peso_volume as 'Peso/Vol', unidade_medida as 'Unidade', embalagem_master as 'Emb. Master', unidades_por_fardo as 'Qtd. Master', custo_unidade as 'Custo Und', custo_fardo as 'Custo Master', preco_venda_base as 'Preço Venda', is_materia_prima FROM produtos")
     if not df_produtos.empty:
-        df_produtos['is_materia_prima'] = df_produtos['is_materia_prima'].map({1: 'Sim', 0: 'Não'})
+        df_produtos['is_materia_prima'] = df_produtos['is_materia_prima'].map({1: 'Sim', 0: 'Não', True: 'Sim', False: 'Não'})
         
         export_btn(df_produtos, 'produtos.csv')
         
@@ -157,7 +157,7 @@ with tab1:
                         
                         if st.form_submit_button("Atualizar Produto"):
                             run_query("UPDATE produtos SET nome=?, marca=?, preco_venda_base=?, unidade_medida=?, unidades_por_fardo=?, peso_volume=?, referencia=?, is_materia_prima=?, estoque_minimo=?, embalagem_master=?, cod_emb_master=? WHERE id=?", 
-                                      (enome, emarca, epreco, eunidade, efator, epeso, eref, 1 if emateria else 0, eestoque_min, eembalagem_master, ecod_master, pid))
+                                      (enome, emarca, epreco, eunidade, efator, epeso, eref, True if emateria else False, eestoque_min, eembalagem_master, ecod_master, pid))
                             st.success("Produto atualizado!")
                             import time; time.sleep(1); st.rerun()
 
@@ -619,7 +619,7 @@ with tab4:
     LEFT JOIN produtos p ON c.produto_id = p.id
     ''')
     if not df_regras.empty:
-        df_regras['Tem Min?'] = df_regras['Tem Min?'].map({1: 'Sim', 0: 'Não'})
+        df_regras['Tem Min?'] = df_regras['Tem Min?'].map({1: 'Sim', 0: 'Não', True: 'Sim', False: 'Não'})
         export_btn(df_regras, 'regras_comissao.csv')
         st.dataframe(df_regras, width="stretch", hide_index=True)
         

@@ -122,7 +122,7 @@ with tab1:
             # Acordos Comerciais Rede
             custo_acordos = v_total * (pct_contrato + pct_auxiliar + pct_logistica) / 100.0
             
-            is_bonif = 1 if tipo_item == "Bonificado (Bonificação)" else 0
+            is_bonif = True if tipo_item == "Bonificado (Bonificação)" else False
             
             run_query("INSERT INTO vendas (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, comissao_valor, custo_acordos_rede, is_bonificacao, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO')",
                       (data_venda, cli['id'], ven['id'], prod['id'], qtd, preco, v_total, com_val, custo_acordos, is_bonif))

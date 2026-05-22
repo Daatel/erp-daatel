@@ -75,7 +75,7 @@ with tab1:
 
     if not df_estoque.empty:
         df_estoque['Em Estoque'] = df_estoque['Total_Entradas'] - df_estoque['Total_Saidas']
-        df_estoque['Matéria Prima'] = df_estoque['Matéria Prima'].map({1: 'Sim', 0: 'Não'})
+        df_estoque['Matéria Prima'] = df_estoque['Matéria Prima'].map({1: 'Sim', 0: 'Não', True: 'Sim', False: 'Não'})
         df_estoque['Valor Financeiro'] = df_estoque['Em Estoque'] * df_estoque['custo_unidade']
         
         # Alertas de Estoque Crítico
