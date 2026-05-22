@@ -517,7 +517,10 @@ def create_tables():
         cnpj TEXT,
         endereco_completo TEXT,
         telefone TEXT,
-        email TEXT
+        email TEXT,
+        inscricao_estadual TEXT,
+        inscricao_municipal TEXT,
+        cep TEXT
     )
     ''')
     
@@ -558,7 +561,10 @@ def create_tables():
         "ALTER TABLE vendas ADD COLUMN custo_cmv_real REAL DEFAULT 0.0",
         "ALTER TABLE planos_de_contas ADD COLUMN codigo TEXT",
         "ALTER TABLE empresa_config ADD COLUMN telefone TEXT",
-        "ALTER TABLE empresa_config ADD COLUMN email TEXT"
+        "ALTER TABLE empresa_config ADD COLUMN email TEXT",
+        "ALTER TABLE empresa_config ADD COLUMN inscricao_estadual TEXT",
+        "ALTER TABLE empresa_config ADD COLUMN inscricao_municipal TEXT",
+        "ALTER TABLE empresa_config ADD COLUMN cep TEXT"
     ]
     
     for q in alter_queries:

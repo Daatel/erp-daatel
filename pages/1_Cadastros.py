@@ -31,19 +31,25 @@ with tab_empresa:
         r_social = e_c1.text_input("Razão Social", value=emp['razao_social'])
         n_fantasia = e_c2.text_input("Nome Fantasia", value=emp.get('nome_fantasia', ''))
         
-        e_c3, e_c4, e_c5 = st.columns([1, 1, 2])
+        e_c3, e_c4, e_c5 = st.columns(3)
         cnpj_emp = e_c3.text_input("CNPJ", value=emp.get('cnpj', ''))
-        telefone_emp = e_c4.text_input("Telefone", value=emp.get('telefone', '') or '')
-        email_emp = e_c5.text_input("E-mail Contato", value=emp.get('email', '') or '')
+        ie_emp = e_c4.text_input("Inscrição Estadual", value=emp.get('inscricao_estadual', '') or '')
+        im_emp = e_c5.text_input("Inscrição Municipal", value=emp.get('inscricao_municipal', '') or '')
         
-        end_emp = st.text_input("Endereço Completo (Rua, Número, Bairro, CEP, Cidade-UF)", value=emp.get('endereco_completo', ''))
+        e_c6, e_c7, e_c8 = st.columns([1, 1, 2])
+        cep_emp = e_c6.text_input("CEP", value=emp.get('cep', '') or '')
+        telefone_emp = e_c7.text_input("Telefone", value=emp.get('telefone', '') or '')
+        email_emp = e_c8.text_input("E-mail Contato", value=emp.get('email', '') or '')
+        
+        end_emp = st.text_input("Endereço Completo (Rua, Número, Bairro, Cidade-UF)", value=emp.get('endereco_completo', ''))
         
         if st.form_submit_button("Salvar Dados da Empresa"):
             run_query("""
                 UPDATE empresa_config 
-                SET razao_social=?, nome_fantasia=?, cnpj=?, endereco_completo=?, telefone=?, email=?
+                SET razao_social=?, nome_fantasia=?, cnpj=?, endereco_completo=?, telefone=?, email=?,
+                    inscricao_estadual=?, inscricao_municipal=?, cep=?
                 WHERE id=?
-            """, (r_social, n_fantasia, cnpj_emp, end_emp, telefone_emp, email_emp, emp['id']))
+            """, (r_social, n_fantasia, cnpj_emp, end_emp, telefone_emp, email_emp, ie_emp, im_emp, cep_emp, emp['id']))
             st.success("Dados da Empresa atualizados! Os PDFs e relatórios já usarão os dados novos.")
             import time; time.sleep(1); st.rerun()
 
