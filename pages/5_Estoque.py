@@ -136,7 +136,7 @@ with tab4:
         SELECT p.id, p.nome, SUM(CASE WHEN m.tipo_movimento = 'Entrada' THEN m.quantidade ELSE -m.quantidade END) as saldo_atual 
         FROM produtos p
         LEFT JOIN estoque_movimentos m ON p.id = m.produto_id
-        WHERE p.is_materia_prima = 0
+        WHERE p.is_materia_prima = FALSE
         GROUP BY p.id
         HAVING saldo_atual > 0
     ''')

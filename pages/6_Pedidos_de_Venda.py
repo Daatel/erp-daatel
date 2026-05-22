@@ -18,7 +18,7 @@ def format_brl(val):
 
 df_clientes = fetch_all("SELECT id, nome, rede_clientes, prazo_pagamento FROM clientes WHERE status='ATIVO'")
 df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%'")
-df_produtos = fetch_all("SELECT id, nome, preco_venda_base FROM produtos WHERE is_materia_prima = 0")
+df_produtos = fetch_all("SELECT id, nome, preco_venda_base FROM produtos WHERE is_materia_prima = FALSE")
 df_regras = fetch_all("SELECT vendedor_id, produto_id, rede_clientes, percentual FROM comissoes_regras")
 
 tab1, tab_deg, tab2, tab5 = st.tabs(["🛒 Lançar Novo Pedido", "🍇 Degustação & Amostras", "📋 Meus Pedidos Abertos", "📊 Tabelas de Preços"])

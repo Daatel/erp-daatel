@@ -864,7 +864,7 @@ with tab_ft:
     )
 
     # Carrega listas de produtos
-    df_pf_ft  = fetch_all("SELECT id, nome, unidade_medida FROM produtos WHERE is_materia_prima=0 ORDER BY nome")
+    df_pf_ft  = fetch_all("SELECT id, nome, unidade_medida FROM produtos WHERE is_materia_prima=FALSE ORDER BY nome")
     df_ins_ft = fetch_all("SELECT id, nome, unidade_medida, is_materia_prima FROM produtos ORDER BY is_materia_prima DESC, nome")
 
     if df_pf_ft.empty:
