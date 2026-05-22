@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import os
-from database import fetch_all, run_query, create_tables
+from database import fetch_all, run_query, initialize_database
 
 os.chdir(Path(__file__).parent)
-create_tables()
+initialize_database()
 
 
 if 'logged_user' not in st.session_state:

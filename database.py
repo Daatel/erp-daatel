@@ -74,6 +74,17 @@ class CursorWrapper:
 
 def create_tables():
     conn = get_connection()
+    try:
+        _create_tables_internal(conn)
+    finally:
+        release_connection(conn)
+
+@st.cache_resource
+def initialize_database():
+    create_tables()
+    return True
+
+def _create_tables_internal(conn):
     cursor = CursorWrapper(conn.cursor())
 
     # 0. Redes de Clientes e Grupos
@@ -621,7 +632,6 @@ def create_tables():
             except Exception:
                 pass
 
-    release_connection(conn)
 
 def run_query(query, params=()):
     with db_connection() as conn:
