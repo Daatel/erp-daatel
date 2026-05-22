@@ -40,7 +40,6 @@ TABELAS_PARA_LIMPAR = [
     "fichas_tecnicas_itens",
     "comodatos",
     "usuarios",
-    "empresa_config",
     "planos_de_contas"
 ]
 
@@ -149,12 +148,8 @@ def limpar_sqlite():
         )
         print("  [SQLite] Usuários de login reinseridos.")
         
-        # 4. Configuração básica da empresa
-        cur.execute(
-            "INSERT INTO empresa_config (razao_social, nome_fantasia, cnpj, endereco_completo) VALUES (?, ?, ?, ?)",
-            ('Empório do Alho LTDA', 'Empório do Alho', '00.000.000/0001-00', 'Rua Principal, 123 - Centro')
-        )
-        print("  [SQLite] Empresa padrão configurada.")
+        # 4. Configuração básica da empresa (preservada para proteger o cadastro personalizado)
+        print("  [SQLite] Cadastro de Empresa preservado.")
         
         conn.commit()
         print("[OK] SQLite limpo e reconfigurado com sucesso!")
@@ -204,12 +199,8 @@ def limpar_postgresql(pg_url):
         )
         print("  [Supabase] Usuários de login reinseridos.")
         
-        # 4. Configuração básica da empresa
-        cur.execute(
-            "INSERT INTO empresa_config (razao_social, nome_fantasia, cnpj, endereco_completo) VALUES (%s, %s, %s, %s)",
-            ('Empório do Alho LTDA', 'Empório do Alho', '00.000.000/0001-00', 'Rua Principal, 123 - Centro')
-        )
-        print("  [Supabase] Empresa padrão configurada.")
+        # 4. Configuração básica da empresa (preservada para proteger o cadastro personalizado)
+        print("  [Supabase] Cadastro de Empresa preservado.")
         
         conn.commit()
         print("[OK] PostgreSQL (Supabase) limpo e reconfigurado com sucesso!")
