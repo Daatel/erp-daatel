@@ -633,13 +633,26 @@ def _create_tables_internal(conn):
                 pass
 
 
+def clean_params(params):
+    if not isinstance(params, (list, tuple)):
+        params = (params,)
+    cleaned = []
+    for p in params:
+        if hasattr(p, 'item') and callable(getattr(p, 'item')):
+            cleaned.append(p.item())
+        else:
+            cleaned.append(p)
+    return tuple(cleaned)
+
 def run_query(query, params=()):
+    params = clean_params(params)
     with db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(format_pg(query), params)
         conn.commit()
 
 def fetch_all(query, params=()):
+    params = clean_params(params)
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
