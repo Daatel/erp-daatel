@@ -37,13 +37,19 @@ def format_pg(sql):
         sql = sql.replace("BOOLEAN DEFAULT 0", "BOOLEAN DEFAULT FALSE")
         sql = sql.replace("BOOLEAN DEFAULT 1", "BOOLEAN DEFAULT TRUE")
         
+        # Tornar ALTER TABLE ADD COLUMN idempotente no PostgreSQL (adiciona IF NOT EXISTS)
+        sql = re.sub(
+            r'(?i)(ALTER\s+TABLE\s+\w+\s+ADD\s+COLUMN\s+)(?!IF\s+NOT\s+EXISTS\s+)',
+            r'\1IF NOT EXISTS ',
+            sql
+        )
+        
         # Remove FOREIGN KEY para evitar erro de ordem (relação não existe)
         linhas = []
         for linha in sql.split('\n'):
             if "FOREIGN KEY" not in linha.upper():
                 linhas.append(linha)
         sql = '\n'.join(linhas)
-        import re
         sql = re.sub(r",\s*\)", "\n    )", sql)
     return sql
 
