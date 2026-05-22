@@ -428,7 +428,7 @@ try:
                                           (d_pgto.strftime("%Y-%m-%d"), conta_id, c_id))
                                 
                                 # Injeta no Caixa com a Fonte Certa e o cliente_id propagado
-                                run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado, cliente_id) VALUES (?, 'Saída', ?, ?, ?, ?, ?, 1, ?)",
+                                run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado, cliente_id) VALUES (?, 'Saída', ?, ?, ?, ?, ?, TRUE, ?)",
                                           (d_pgto.strftime("%Y-%m-%d"), plant, f"PGTO Forn. {forn}: {fat}", v_base, c_id, conta_id, cap_cli_id))
                                           
                             st.success(f"✔️ {len(selecionados)} contas liquidadas e debitadas do banco {conta_saida} com sucesso!")
@@ -676,7 +676,7 @@ try:
                                            (dt_rec.strftime("%Y-%m-%d"), bCid, rr_id))
                                  
                                  desc_final = f"REC. Cliente {cli}: {fat}"
-                                 run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, 1)",
+                                 run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, TRUE)",
                                            (dt_rec.strftime("%Y-%m-%d"), desc_final, v_base, rr_id, bCid))
                                            
                              st.success(f"✔️ {len(selec_rec)} recebimentos injetados no Fluxo do banco {banco_destino}!")
@@ -707,7 +707,7 @@ try:
                     
                     if st.button("💥 Iniciar Mapeamento Mágico de Lotes"):
                         # Heurística Mágica: Vamos achar no ERP o que bate cravado com o Valor ABSOLUTO do CSV
-                        df_b_alvo = fetch_all(f"SELECT id, valor, conciliado FROM fluxo_caixa WHERE conta_bancaria_id={opcoes_bancos[b_alvo]} AND conciliado=0")
+                        df_b_alvo = fetch_all(f"SELECT id, valor, conciliado FROM fluxo_caixa WHERE conta_bancaria_id={opcoes_bancos[b_alvo]} AND conciliado=FALSE")
                         
                         if df_b_alvo.empty:
                             st.warning("Não há nenhuma fatura pendente de conciliação no ERP para este banco. Tudo perfeitamente limpo!")
@@ -733,7 +733,7 @@ try:
                             if sucessos > 0:
                                 if st.button(f"Acato. Conciliar os {sucessos} itens agora!", type="primary"):
                                     for lid in lote_ids_para_conciliar:
-                                        run_query("UPDATE fluxo_caixa SET conciliado=1 WHERE id=?", (lid,))
+                                        run_query("UPDATE fluxo_caixa SET conciliado=TRUE WHERE id=?", (lid,))
                                     st.success("Milagre Financeiro Efetuado. Extrato rebatido!")
                                     import time; time.sleep(1); st.rerun()
                 except Exception as e:
@@ -806,8 +806,8 @@ try:
                 
                 if st.button("Salvar Modificações de Conciliação"):
                     for _, row in edited_df.iterrows():
-                        n_c = 1 if row['Revisado'] else 0
-                        db_c = df_ext[df_ext['id'] == row['id']].iloc[0]['Revisado']
+                        n_c = True if row['Revisado'] else False
+                        db_c = bool(df_ext[df_ext['id'] == row['id']].iloc[0]['Revisado'])
                         if n_c != db_c:
                             run_query("UPDATE fluxo_caixa SET conciliado=? WHERE id=?", (n_c, row['id']))
                     st.success("Extrato Oficializado pela Gerência!")

@@ -189,7 +189,7 @@ with tab_deg:
             run_query(
                 """INSERT INTO fluxo_caixa 
                    (data, tipo, categoria, descricao, valor, conta_bancaria_id, cliente_id, conciliado) 
-                   VALUES (?, 'SAÍDA', '2.2.1', ?, ?, ?, ?, 1)""",
+                   VALUES (?, 'SAÍDA', '2.2.1', ?, ?, ?, ?, TRUE)""",
                 (data_acao.strftime("%Y-%m-%d"), desc_financeira, custo_total, banco_id, int(cli_deg['id']))
             )
             
