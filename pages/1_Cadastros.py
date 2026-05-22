@@ -611,7 +611,7 @@ with tab4:
     st.markdown("---")
     st.subheader("Gerenciar Regras Cadastradas")
     df_regras = fetch_all('''
-    SELECT c.id, f.nome as Repr, COALESCE(p.nome, 'TODOS') as Produto, c.rede_clientes as 'Rede', 
+    SELECT c.id, f.nome as "Repr", COALESCE(p.nome, 'TODOS') as "Produto", c.rede_clientes as 'Rede', 
            c.percentual as "Comissão (%)", c.gatilho_comissao as 'Tipo', 
            c.minimo_garantido as 'Tem Min', c.valor_minimo_garantido as 'Vlr Min R$'
     FROM comissoes_regras c 
