@@ -9,8 +9,8 @@ DB_NAME = "erp_fabrica.db"
 def init_connection_pool():
     if "DATABASE_URL" in st.secrets:
         from psycopg2 import pool
-        # Cria um pool thread-safe com até 10 conexões reaproveitáveis
-        return pool.ThreadedConnectionPool(1, 10, st.secrets["DATABASE_URL"])
+        # Pool thread-safe com até 20 conexões reaproveitáveis
+        return pool.ThreadedConnectionPool(1, 20, st.secrets["DATABASE_URL"])
     return None
 
 def get_connection():
@@ -25,6 +25,17 @@ def release_connection(conn):
         pool.putconn(conn)
     elif not pool:
         conn.close()
+
+from contextlib import contextmanager
+
+@contextmanager
+def db_connection():
+    """Context manager que garante devolução da conexão ao pool mesmo em caso de exceção."""
+    conn = get_connection()
+    try:
+        yield conn
+    finally:
+        release_connection(conn)
 
 def format_pg(sql):
     if "DATABASE_URL" in st.secrets:
@@ -613,33 +624,30 @@ def create_tables():
     release_connection(conn)
 
 def run_query(query, params=()):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(format_pg(query), params)
-    conn.commit()
-    release_connection(conn)
-
-def fetch_all(query, params=()):
-    conn = get_connection()
-    try:
+    with db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(format_pg(query), params)
-        data = cursor.fetchall()
-        
-        # Obter os nomes das colunas
-        if cursor.description:
-            cols = [desc[0] for desc in cursor.description]
-            df = pd.DataFrame(data, columns=cols)
-        else:
-            df = pd.DataFrame()
+        conn.commit()
+
+def fetch_all(query, params=()):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(format_pg(query), params)
+            data = cursor.fetchall()
             
-        cursor.close()
-        return df
+            # Obter os nomes das colunas
+            if cursor.description:
+                cols = [desc[0] for desc in cursor.description]
+                df = pd.DataFrame(data, columns=cols)
+            else:
+                df = pd.DataFrame()
+                
+            cursor.close()
+            return df
     except Exception as e:
         st.error(f"Erro no fetch_all: {e}")
         return pd.DataFrame()
-    finally:
-        release_connection(conn)
 
 def consumir_estoque_fifo(produto_id, quantidade, data_mov, origem, doc_ref):
     """

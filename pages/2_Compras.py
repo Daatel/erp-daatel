@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from database import fetch_all, run_query, get_connection
+from database import fetch_all, run_query, get_connection, db_connection, release_connection
 from estilo import carregar_estilo
 
 st.set_page_config(page_title="Compras e Entradas", page_icon="🛒", layout="wide")
@@ -379,73 +379,72 @@ if st.session_state.itens_nf:
                     st.error("Marque a caixa de confirmação antes de registrar.")
                 else:
                     try:
-                        conn = get_connection()
-                        cursor = conn.cursor()
+                        with db_connection() as conn:
+                            cursor = conn.cursor()
 
-                        fid = int(frn_data['id'])
-                        plano_nome = frn_data['plano_de_contas']
-                        plano_id = None
-                        if plano_nome:
-                            cursor.execute("SELECT id FROM planos_de_contas WHERE nome=?", (plano_nome,))
-                            res = cursor.fetchone()
-                            if res:
-                                plano_id = res[0]
+                            fid = int(frn_data['id'])
+                            plano_nome = frn_data['plano_de_contas']
+                            plano_id = None
+                            if plano_nome:
+                                cursor.execute("SELECT id FROM planos_de_contas WHERE nome=?", (plano_nome,))
+                                res = cursor.fetchone()
+                                if res:
+                                    plano_id = res[0]
 
-                        # 1. Cabeçalho da Compra (Nota Mãe)
-                        destinos_resumo = ", ".join(set(it['destino'] for it in st.session_state.itens_nf))
-                        cursor.execute("""
-                            INSERT INTO compras
-                                (fornecedor_id, data_compra, tipo_insumo, valor_total, tipo_doc, numero_doc, observacoes)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                        """, (fid, data_compra.strftime("%Y-%m-%d"), destinos_resumo,
-                              total_bruto_nf, tipo_doc, numero_doc_final, obs))
-                        compra_id = cursor.lastrowid
-
-                        # 2. Itens da NF
-                        for it in st.session_state.itens_nf:
+                            # 1. Cabeçalho da Compra (Nota Mãe)
+                            destinos_resumo = ", ".join(set(it['destino'] for it in st.session_state.itens_nf))
                             cursor.execute("""
-                                INSERT INTO compras_itens
-                                    (compra_id, produto_id, produto_nome, destino, unidade, quantidade, quantidade_estoque,
-                                     preco_unitario_bruto, icms_valor, ipi_valor,
-                                     custo_unitario_liquido, total_liquido_item)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """, (compra_id, it['produto_id'], it['produto_nome'], it['destino'], 
-                                  it['unidade'], it['quantidade'], it.get('quantidade_estoque', it['quantidade']),
-                                  it['preco_bruto_unit'], it['icms_valor'], it['ipi_valor'],
-                                  it['custo_liq_unit'], it['total_liquido_item']))
+                                INSERT INTO compras
+                                    (fornecedor_id, data_compra, tipo_insumo, valor_total, tipo_doc, numero_doc, observacoes)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """, (fid, data_compra.strftime("%Y-%m-%d"), destinos_resumo,
+                                  total_bruto_nf, tipo_doc, numero_doc_final, obs))
+                            compra_id = cursor.lastrowid
 
-                            # 3. Entrada no Estoque (MP e Revenda)
-                            if it['destino'] in ('PRODUCAO', 'REVENDA'):
-                                qtd_stock = it.get('quantidade_estoque', it['quantidade'])
+                            # 2. Itens da NF
+                            for it in st.session_state.itens_nf:
                                 cursor.execute("""
-                                    INSERT INTO estoque_movimentos
-                                        (data, produto_id, tipo_movimento, quantidade, origem)
-                                    VALUES (?, ?, 'Entrada', ?, ?)
-                                """, (data_compra.strftime("%Y-%m-%d"), it['produto_id'],
-                                      qtd_stock,
-                                      f"Compra NF {tipo_doc} {numero_doc_final} (ID #{compra_id})"))
+                                    INSERT INTO compras_itens
+                                        (compra_id, produto_id, produto_nome, destino, unidade, quantidade, quantidade_estoque,
+                                         preco_unitario_bruto, icms_valor, ipi_valor,
+                                         custo_unitario_liquido, total_liquido_item)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                """, (compra_id, it['produto_id'], it['produto_nome'], it['destino'],
+                                      it['unidade'], it['quantidade'], it.get('quantidade_estoque', it['quantidade']),
+                                      it['preco_bruto_unit'], it['icms_valor'], it['ipi_valor'],
+                                      it['custo_liq_unit'], it['total_liquido_item']))
 
-                                # 4. Atualiza custo unitário do produto (último preço)
-                                cursor.execute(
-                                    "UPDATE produtos SET custo_unidade=? WHERE id=?",
-                                    (it['custo_liq_unit'], it['produto_id'])
-                                )
+                                # 3. Entrada no Estoque (MP e Revenda)
+                                if it['destino'] in ('PRODUCAO', 'REVENDA'):
+                                    qtd_stock = it.get('quantidade_estoque', it['quantidade'])
+                                    cursor.execute("""
+                                        INSERT INTO estoque_movimentos
+                                            (data, produto_id, tipo_movimento, quantidade, origem)
+                                        VALUES (?, ?, 'Entrada', ?, ?)
+                                    """, (data_compra.strftime("%Y-%m-%d"), it['produto_id'],
+                                          qtd_stock,
+                                          f"Compra NF {tipo_doc} {numero_doc_final} (ID #{compra_id})"))
 
-                        # 5. Duplicatas (Contas a Pagar)
-                        for parc in st.session_state.parcelas_temp:
-                            p_val = float(parc['Valor (R$)'])
-                            p_venc = parc['Vencimento']
-                            p_num = parc['ID Parcela']
-                            d_str = p_venc.strftime("%Y-%m-%d") if hasattr(p_venc, 'strftime') else str(p_venc)
-                            desc = f"{tipo_doc} {p_num} | {fornecedor_sel}"
-                            cursor.execute("""
-                                INSERT INTO contas_a_pagar
-                                    (compra_id, fornecedor_id, plano_conta_id, descricao, valor, data_vencimento, status)
-                                VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')
-                            """, (compra_id, fid, plano_id, desc, p_val, d_str))
+                                    # 4. Atualiza custo unitário do produto (último preço)
+                                    cursor.execute(
+                                        "UPDATE produtos SET custo_unidade=? WHERE id=?",
+                                        (it['custo_liq_unit'], it['produto_id'])
+                                    )
 
-                        conn.commit()
-                        conn.close()
+                            # 5. Duplicatas (Contas a Pagar)
+                            for parc in st.session_state.parcelas_temp:
+                                p_val = float(parc['Valor (R$)'])
+                                p_venc = parc['Vencimento']
+                                p_num = parc['ID Parcela']
+                                d_str = p_venc.strftime("%Y-%m-%d") if hasattr(p_venc, 'strftime') else str(p_venc)
+                                desc = f"{tipo_doc} {p_num} | {fornecedor_sel}"
+                                cursor.execute("""
+                                    INSERT INTO contas_a_pagar
+                                        (compra_id, fornecedor_id, plano_conta_id, descricao, valor, data_vencimento, status)
+                                    VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')
+                                """, (compra_id, fid, plano_id, desc, p_val, d_str))
+
+                            conn.commit()
 
                         # Limpa sessão
                         st.session_state.itens_nf = []
@@ -561,32 +560,32 @@ if not df_compras.empty:
                     st.error("Marque a caixa de confirmação.")
                 else:
                     try:
-                        conn = get_connection()
-                        cursor = conn.cursor()
+                        with db_connection() as conn:
+                            cursor = conn.cursor()
 
-                        # 1. Estornar movimentos de estoque (registrar saída de estorno)
-                        itens_nf_cancel = cursor.execute(
-                            "SELECT produto_id, quantidade_estoque, quantidade, destino FROM compras_itens WHERE compra_id=?",
-                            (cid_cancel,)).fetchall()
-                        for prod_id, qtd_est, qtd_orig, dest in itens_nf_cancel:
-                            if dest in ('PRODUCAO', 'REVENDA') and prod_id is not None:
-                                qtd_reversa = qtd_est if qtd_est else qtd_orig
-                                cursor.execute(
-                                    "INSERT INTO estoque_movimentos (data, produto_id, tipo_movimento, quantidade, origem) VALUES (date('now'), ?, 'Saída', ?, ?)",
-                                    (prod_id, qtd_reversa, f"ESTORNO - Cancelamento NF #{cid_cancel}"))
+                            # 1. Estornar movimentos de estoque (registrar saída de estorno)
+                            itens_nf_cancel = cursor.execute(
+                                "SELECT produto_id, quantidade_estoque, quantidade, destino FROM compras_itens WHERE compra_id=?",
+                                (cid_cancel,)).fetchall()
+                            for prod_id, qtd_est, qtd_orig, dest in itens_nf_cancel:
+                                if dest in ('PRODUCAO', 'REVENDA') and prod_id is not None:
+                                    qtd_reversa = qtd_est if qtd_est else qtd_orig
+                                    cursor.execute(
+                                        "INSERT INTO estoque_movimentos (data, produto_id, tipo_movimento, quantidade, origem) VALUES (date('now'), ?, 'Saída', ?, ?)",
+                                        (prod_id, qtd_reversa, f"ESTORNO - Cancelamento NF #{cid_cancel}"))
 
-                        # 2. Cancelar duplicatas no financeiro
-                        cursor.execute(
-                            "UPDATE contas_a_pagar SET status='CANCELADO' WHERE compra_id=?",
-                            (cid_cancel,))
+                            # 2. Cancelar duplicatas no financeiro
+                            cursor.execute(
+                                "UPDATE contas_a_pagar SET status='CANCELADO' WHERE compra_id=?",
+                                (cid_cancel,))
 
-                        # 3. Marcar NF como cancelada
-                        cursor.execute(
-                            "UPDATE compras SET observacoes = COALESCE(observacoes,'') || ' [❌ CANCELADA]' WHERE id=?",
-                            (cid_cancel,))
+                            # 3. Marcar NF como cancelada
+                            cursor.execute(
+                                "UPDATE compras SET observacoes = COALESCE(observacoes,'') || ' [❌ CANCELADA]' WHERE id=?",
+                                (cid_cancel,))
 
-                        conn.commit()
-                        conn.close()
+                            conn.commit()
+
                         st.success(f"NF #{cid_cancel} cancelada! Estoque estornado e duplicatas canceladas.")
                         import time; time.sleep(2); st.rerun()
                     except Exception as e:
