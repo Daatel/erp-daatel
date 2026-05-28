@@ -71,7 +71,7 @@ def gerar_pdf_financeiro(df_pdf, dt_ini, dt_fim, t_ent, t_sai, s_liq, banco_filt
     pdf.set_font("Helvetica", "I", 9)
     pdf.cell(0, 6, "Relatorio oficial gerado eletronicamente pelo ERP Fabrica de Alho.", new_x="LMARGIN", new_y="NEXT", align="C")
     
-    return pdf.output(dest="S")
+    return bytes(pdf.output())
 
 st.set_page_config(page_title="Tesouraria Oficial", page_icon="💸", layout="wide")
 carregar_estilo()
@@ -305,10 +305,16 @@ try:
         bancos_det_opts = ["TODOS"] + list(opcoes_bancos.keys())
         banco_filtro = col_f3.selectbox("Filtrar por Conta/Banco", bancos_det_opts, key="det_banco")
         
-        # Categorias de Lançamento
-        df_todas_cats = fetch_all("SELECT DISTINCT categoria FROM fluxo_caixa")
-        cats_opts = ["TODAS"] + (df_todas_cats['categoria'].tolist() if not df_todas_cats.empty else [])
-        cat_filtro = col_f4.selectbox("Filtrar por Categoria", cats_opts, key="det_cat")
+        # Categorias de Lançamento (Filtrando vazios e Nulos)
+        df_todas_cats = fetch_all("SELECT DISTINCT categoria FROM fluxo_caixa WHERE categoria IS NOT NULL AND categoria != ''")
+        cats_list = sorted([str(c) for c in df_todas_cats['categoria'].tolist()]) if not df_todas_cats.empty else []
+        cats_opts = ["TODAS"] + cats_list
+        cat_filtro = col_f4.selectbox(
+            "Filtrar por Categoria", 
+            cats_opts, 
+            key="det_cat",
+            help="Selecione uma classificação contábil (Ex: Receita Com Vendas, Comissões, etc.) para isolar esses lançamentos no período."
+        )
         
         # Query de lançamentos no período
         query_detalhe = """
