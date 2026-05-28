@@ -541,9 +541,10 @@ with tab2:
         df_pedidos['Situação do Pedido'] = df_pedidos.apply(format_status_badge, axis=1)
         
         def highlight_status(row):
-            if row['Status do Pedido'] == 'APROVADO':
+            status = df_pedidos.loc[row.name, 'Status do Pedido']
+            if status == 'APROVADO':
                 return ['background-color: #fff9e6; color: #856404'] * len(row) # Amarelo escuro elegante
-            elif row['Status do Pedido'] == 'FATURADO':
+            elif status == 'FATURADO':
                 return ['background-color: #ebfaf0; color: #155724'] * len(row) # Verde elegante
             return [''] * len(row)
             
