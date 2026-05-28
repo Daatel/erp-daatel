@@ -48,33 +48,35 @@ if not st.session_state['logged_user']:
     st.stop()
 
 # --- ROTEAMENTO COM ST.NAVIGATION (SINGLE TASK) ---
-p_dash = st.Page("pages/0_Dashboard.py", title="Dashboard", icon="📊", default=True)
+p_dash = st.Page("pages/0_Dashboard.py", title="Painel Executivo", icon="📊", default=True)
 p_cadastros = st.Page("pages/1_Cadastros.py", title="Cadastros Básicos", icon="📝")
 p_compras = st.Page("pages/2_Compras.py", title="Compras & XML", icon="🛒")
 p_pessoas = st.Page("pages/3_Pessoas.py", title="Pessoas", icon="👥")
-p_producao = st.Page("pages/4_Producao.py", title="Chão de Fábrica", icon="🏭")
+p_producao = st.Page("pages/4_Producao.py", title="Produção", icon="🏭")
 p_estoque = st.Page("pages/5_Estoque.py", title="Controle de Estoque", icon="📦")
 p_vendas = st.Page("pages/6_Pedidos_de_Venda.py", title="Pedidos de Venda", icon="🛒")
-p_fat = st.Page("pages/7_Faturamento.py", title="Faturamento e Logística", icon="🧾")
-p_log = st.Page("pages/8_Logistica.py", title="Logística (Opcional)", icon="🚚")
+p_fat = st.Page("pages/7_Faturamento.py", title="Faturamento", icon="🧾")
+p_log = st.Page("pages/8_Logistica.py", title="Logística", icon="🚚")
 p_fin = st.Page("pages/9_Financeiro.py", title="Financeiro e Tesouraria", icon="💰")
 p_dre = st.Page("pages/10_DRE.py", title="DRE e Lucratividade", icon="🏛️")
 p_ativos = st.Page("pages/11_Ativos_Comodatos.py", title="Ativos e Comodatos", icon="❄️")
 p_rentabilidade = st.Page("pages/12_Rentabilidade_Cliente.py", title="Rentabilidade por Cliente", icon="📈")
+p_pdv = st.Page("pages/13_PDV_Express.py", title="PDV Express", icon="⚡")
+p_tabelas = st.Page("pages/14_Tabelas_Preco.py", title="Tabelas de Preço", icon="🏷️")
 
 role = st.session_state['user_role']
 pages_dict = {}
 
 if role == 'ADMIN':
     pages_dict = {
-        "Menu Executivo": [p_dash, p_dre, p_rentabilidade],
-        "Comercial": [p_vendas, p_fat, p_ativos],
-        "Operação": [p_producao, p_estoque, p_compras],
-        "Backoffice": [p_fin, p_cadastros, p_pessoas, p_log]
+        "GERENCIAL": [p_dash, p_dre, p_rentabilidade],
+        "COMERCIAL": [p_vendas, p_pdv, p_fat, p_ativos, p_tabelas],
+        "OPERAÇÃO": [p_producao, p_estoque, p_log],
+        "CONTROLE": [p_fin, p_pessoas, p_compras, p_cadastros]
     }
 elif role == 'VENDAS':
     pages_dict = {
-        "Minhas Vendas": [p_dash, p_vendas, p_ativos],
+        "Minhas Vendas": [p_dash, p_vendas, p_pdv, p_ativos],
         "Consultas": [p_pessoas, p_estoque]
     }
 elif role == 'PRODUCAO':
@@ -90,6 +92,7 @@ elif role == 'COMPRAS':
 elif role == 'FINANCEIRO':
     pages_dict = {
         "Financeiro": [p_dash, p_fin, p_fat, p_dre, p_rentabilidade],
+        "Comercial": [p_tabelas],
         "Consultas": [p_cadastros, p_pessoas]
     }
 else:
