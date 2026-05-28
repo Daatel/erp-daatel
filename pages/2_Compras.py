@@ -479,24 +479,28 @@ if 'compras_dt_fim' not in st.session_state:
     st.session_state['compras_dt_fim'] = date.today()
 
 st.markdown("##### 📅 Filtro por Período de Emissão")
-col_b1, col_b2, col_b3, _ = st.columns([1, 1.3, 1.3, 4.4])
-if col_b1.button("📅 Hoje", use_container_width=True, key="btn_compras_hoje"):
+col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns([1, 1.3, 1.3, 2, 2])
+
+col_f1.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+if col_f1.button("📅 Hoje", use_container_width=True, key="btn_compras_hoje"):
     st.session_state['compras_dt_inicio'] = date.today()
     st.session_state['compras_dt_fim'] = date.today()
     st.rerun()
-if col_b2.button("📅 Últimos 7 Dias", use_container_width=True, key="btn_compras_7d"):
+    
+col_f2.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+if col_f2.button("📅 Últimos 7 Dias", use_container_width=True, key="btn_compras_7d"):
     st.session_state['compras_dt_inicio'] = date.today() - timedelta(days=7)
     st.session_state['compras_dt_fim'] = date.today()
     st.rerun()
-if col_b3.button("📅 Últimos 30 Dias", use_container_width=True, key="btn_compras_30d"):
+    
+col_f3.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+if col_f3.button("📅 Últimos 30 Dias", use_container_width=True, key="btn_compras_30d"):
     st.session_state['compras_dt_inicio'] = date.today() - timedelta(days=30)
     st.session_state['compras_dt_fim'] = date.today()
     st.rerun()
-
-# Filtros interativos
-col_f1, col_f2 = st.columns(2)
-dt_inicio = col_f1.date_input("Data de Início", value=st.session_state['compras_dt_inicio'], key="compras_dt_inicio_input")
-dt_fim = col_f2.date_input("Data de Fim", value=st.session_state['compras_dt_fim'], key="compras_dt_fim_input")
+    
+dt_inicio = col_f4.date_input("Data de Início", value=st.session_state['compras_dt_inicio'], key="compras_dt_inicio_input")
+dt_fim = col_f5.date_input("Data de Fim", value=st.session_state['compras_dt_fim'], key="compras_dt_fim_input")
 
 # Sincronizar de volta
 st.session_state['compras_dt_inicio'] = dt_inicio
