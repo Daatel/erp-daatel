@@ -92,9 +92,10 @@ def registrar_compra(
                   it['qtd_estoque'],
                   f"Compra {tipo_doc} {numero_doc} (ID #{compra_id})"))
 
-            # 4. Atualiza custo unitario no cadastro
+            # 4. Atualiza custo unitario no cadastro (preço unitário de estoque)
+            custo_medio_unidade = total_liq / it['qtd_estoque'] if it['qtd_estoque'] > 0 else custo_liq
             cur.execute("UPDATE produtos SET custo_unidade=? WHERE id=?",
-                        (custo_liq, it['produto_id']))
+                        (custo_medio_unidade, it['produto_id']))
 
     # 5. Duplicatas (Contas a Pagar)
     prazo_str = get_prazo(cur, fornecedor_id)

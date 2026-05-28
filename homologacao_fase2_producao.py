@@ -122,7 +122,7 @@ def registrar_lote(
         cur.execute("""
             INSERT INTO estoque_movimentos
                 (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia)
-            VALUES (?,?,'Saida',?,?,?)
+            VALUES (?,?,'Saída',?,?,?)
         """, (data.strftime("%Y-%m-%d"), pid, qt_p, "Producao_Requisicao", ref))
 
         # Devolucao da sobra

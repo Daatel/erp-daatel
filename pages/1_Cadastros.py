@@ -672,7 +672,7 @@ with tab5:
 # ======= CONTAS BANCÁRIAS =======
 with tab6:
     st.subheader("Cadastro de Contas Bancárias")
-    with st.form("form_contas_bancarias"):
+    with st.form("form_contas_bancarias", clear_on_submit=True):
         c1, c2, c3 = st.columns(3)
         nome = c1.text_input("Apelido da Conta")
         banco = c2.text_input("Nome do Banco")
@@ -790,7 +790,7 @@ with tab9:
 # ======= COLABORADORES =======
 with tab10:
     st.subheader("Cadastro de Novo Colaborador")
-    with st.form("form_func", clear_on_submit=False):
+    with st.form("form_func", clear_on_submit=True):
         col1, col2, col3 = st.columns(3)
         nome = col1.text_input("Nome Completo")
         cargo = col2.selectbox("Cargo", ["Operário", "Vendedor", "Gerente", "Administrativo", "Representante Comercial"])

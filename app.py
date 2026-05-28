@@ -56,13 +56,14 @@ p_log = st.Page("pages/8_Logistica.py", title="Logística (Opcional)", icon="�
 p_fin = st.Page("pages/9_Financeiro.py", title="Financeiro e Tesouraria", icon="💰")
 p_dre = st.Page("pages/10_DRE.py", title="DRE e Lucratividade", icon="🏛️")
 p_ativos = st.Page("pages/11_Ativos_Comodatos.py", title="Ativos e Comodatos", icon="❄️")
+p_rentabilidade = st.Page("pages/12_Rentabilidade_Cliente.py", title="Rentabilidade por Cliente", icon="📈")
 
 role = st.session_state['user_role']
 pages_dict = {}
 
 if role == 'ADMIN':
     pages_dict = {
-        "Menu Executivo": [p_dash, p_dre],
+        "Menu Executivo": [p_dash, p_dre, p_rentabilidade],
         "Comercial": [p_vendas, p_fat, p_ativos],
         "Operação": [p_producao, p_estoque, p_compras],
         "Backoffice": [p_fin, p_cadastros, p_pessoas, p_log]
@@ -84,7 +85,7 @@ elif role == 'COMPRAS':
     }
 elif role == 'FINANCEIRO':
     pages_dict = {
-        "Financeiro": [p_dash, p_fin, p_fat, p_dre],
+        "Financeiro": [p_dash, p_fin, p_fat, p_dre, p_rentabilidade],
         "Consultas": [p_cadastros, p_pessoas]
     }
 else:

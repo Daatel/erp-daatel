@@ -16,7 +16,7 @@ def format_brl(val):
         return "R$ 0,00"
     return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-df_clientes = fetch_all("SELECT id, nome, rede_clientes, prazo_pagamento FROM clientes WHERE status='ATIVO'")
+df_clientes = fetch_all("SELECT id, nome, rede_clientes, prazo_pagamento, representante_id FROM clientes WHERE status='ATIVO'")
 df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%'")
 df_produtos = fetch_all("SELECT id, nome, preco_venda_base FROM produtos WHERE is_materia_prima = FALSE")
 df_regras = fetch_all("SELECT vendedor_id, produto_id, rede_clientes, percentual FROM comissoes_regras")
@@ -25,17 +25,45 @@ tab1, tab_deg, tab2, tab5 = st.tabs(["🛒 Lançar Novo Pedido", "🍇 Degustaç
 
 # ======= 1. CAPTAÇÃO DE PEDIDO =======
 with tab1:
+    if 'carrinho_venda' not in st.session_state:
+        st.session_state['carrinho_venda'] = []
+    if 'carrinho_cliente_nome' not in st.session_state:
+        st.session_state['carrinho_cliente_nome'] = None
+    if 'carrinho_vendedor_nome' not in st.session_state:
+        st.session_state['carrinho_vendedor_nome'] = None
+    if 'carrinho_data' not in st.session_state:
+        st.session_state['carrinho_data'] = None
+
     if df_clientes.empty or df_vendedores.empty or df_produtos.empty:
         st.warning("Cadastre Clientes, Vendedores e Produtos antes de iniciar as vendas!")
     else:
-        col1, col2 = st.columns([1, 2])
-        data_venda = col1.date_input("Data do Pedido", value=date.today())
-        
+        carrinho_ativo = len(st.session_state['carrinho_venda']) > 0
         c_opts = {f"{r['nome']}": r for _, r in df_clientes.iterrows()}
-        cliente_sel = col2.selectbox("Cliente Destino (Ativos)", list(c_opts.keys()))
-        
         v_opts = {f"{r['nome']}": r for _, r in df_vendedores.iterrows()}
-        vendedor_sel = st.selectbox("Vendedor / Representante", list(v_opts.keys()))
+        
+        col1, col2 = st.columns([1, 2])
+        
+        if carrinho_ativo:
+            data_venda = col1.date_input("Data do Pedido", value=st.session_state['carrinho_data'], disabled=True)
+            cliente_sel = col2.selectbox("Cliente Destino (Ativos)", list(c_opts.keys()), index=list(c_opts.keys()).index(st.session_state['carrinho_cliente_nome']), disabled=True)
+            vendedor_sel = st.selectbox("Vendedor / Representante", list(v_opts.keys()), index=list(v_opts.keys()).index(st.session_state['carrinho_vendedor_nome']), disabled=True)
+            st.info("💡 **Informação:** Para alterar o cliente, vendedor ou data do pedido, limpe o carrinho atual abaixo.")
+        else:
+            data_venda = col1.date_input("Data do Pedido", value=date.today())
+            cliente_sel = col2.selectbox("Cliente Destino (Ativos)", list(c_opts.keys()))
+            
+            cli_selecionado = c_opts[cliente_sel]
+            rep_id = cli_selecionado['representante_id']
+            
+            default_index = 0
+            if pd.notna(rep_id) and not df_vendedores.empty:
+                df_rep = df_vendedores[df_vendedores['id'] == int(rep_id)]
+                if not df_rep.empty:
+                    rep_nome = df_rep.iloc[0]['nome']
+                    if rep_nome in v_opts:
+                        default_index = list(v_opts.keys()).index(rep_nome)
+                        
+            vendedor_sel = st.selectbox("Vendedor / Representante", list(v_opts.keys()), index=default_index)
         
         st.markdown("##### Informações do Produto")
         col3, col4, col_tipo, col5 = st.columns([2, 1, 1.2, 1.2])
@@ -95,7 +123,7 @@ with tab1:
             st.info(f"💡 Origem do Preço Aplicado: **{origem_preco}**")
             preco = col5.number_input("Preço Unitário Fechado (R$)", min_value=0.0, value=preco_tabela, step=0.1, key="preco_venda")
         
-        if st.button("Aprovar Pedido (Mandar para a Expedição)", type="primary", use_container_width=True):
+        if st.button("➕ Adicionar ao Pedido", type="secondary", use_container_width=True):
             cli = c_opts[cliente_sel]
             ven = v_opts[vendedor_sel]
             prod = p_opts[produto_sel]
@@ -124,13 +152,121 @@ with tab1:
             
             is_bonif = True if tipo_item == "Bonificado (Bonificação)" else False
             
-            run_query("INSERT INTO vendas (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, comissao_valor, custo_acordos_rede, is_bonificacao, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO')",
-                      (data_venda, cli['id'], ven['id'], prod['id'], qtd, preco, v_total, com_val, custo_acordos, is_bonif))
-                      
-            v_id = fetch_all("SELECT MAX(id) as lg FROM vendas").iloc[0]['lg']
+            st.session_state['carrinho_venda'].append({
+                "produto_id": int(prod['id']),
+                "produto_nome": produto_sel,
+                "quantidade": float(qtd),
+                "valor_unitario": float(preco),
+                "valor_total": float(v_total),
+                "tipo_item": tipo_item,
+                "is_bonificacao": is_bonif,
+                "comissao_valor": float(com_val),
+                "custo_acordos_rede": float(custo_acordos)
+            })
             
-            st.toast(f"✔️ Pedido #{v_id} lançado com sucesso!", icon="✅")
-            st.success(f"✔️ Pedido #{v_id} lançado com sucesso! Ele já está na Fila do módulo de Faturamento aguardando expedição física.")
+            st.session_state['carrinho_cliente_nome'] = cliente_sel
+            st.session_state['carrinho_vendedor_nome'] = vendedor_sel
+            st.session_state['carrinho_data'] = data_venda
+            
+            st.toast(f"✔️ {produto_sel} adicionado!", icon="🛒")
+            st.rerun()
+
+        # === EXIBIÇÃO DO CARRINHO ===
+        if carrinho_ativo:
+            st.markdown("---")
+            st.markdown("### 🛒 Itens no Pedido Atual")
+            
+            col_h_prod, col_h_tipo, col_h_qtd, col_h_unit, col_h_tot, col_h_del = st.columns([3, 1.5, 1, 1.2, 1.2, 0.6])
+            col_h_prod.markdown("**Produto**")
+            col_h_tipo.markdown("**Tipo**")
+            col_h_qtd.markdown("**Qtd**")
+            col_h_unit.markdown("**Unitário**")
+            col_h_tot.markdown("**Total**")
+            col_h_del.markdown("**Ação**")
+            
+            para_remover = None
+            for idx, item in enumerate(st.session_state['carrinho_venda']):
+                c_prod, c_tipo, c_qtd, c_unit, c_tot, c_del = st.columns([3, 1.5, 1, 1.2, 1.2, 0.6])
+                c_prod.write(item['produto_nome'])
+                
+                if item['is_bonificacao']:
+                    c_tipo.markdown("<span style='background-color:#ffe6e6;color:#cc0000;padding:2px 6px;border-radius:4px;font-size:12px;'>🎁 Bonificação</span>", unsafe_allow_html=True)
+                else:
+                    c_tipo.markdown("<span style='background-color:#e6f7ff;color:#0050b3;padding:2px 6px;border-radius:4px;font-size:12px;'>🛒 Venda</span>", unsafe_allow_html=True)
+                    
+                c_qtd.write(f"{item['quantidade']:.0f} UN")
+                c_unit.write(format_brl(item['valor_unitario']))
+                c_tot.write(f"**{format_brl(item['valor_total'])}**")
+                
+                if c_del.button("🗑️", key=f"del_item_{idx}", help="Remover este item"):
+                    para_remover = idx
+                    
+            if para_remover is not None:
+                st.session_state['carrinho_venda'].pop(para_remover)
+                if len(st.session_state['carrinho_venda']) == 0:
+                    st.session_state['carrinho_cliente_nome'] = None
+                    st.session_state['carrinho_vendedor_nome'] = None
+                    st.session_state['carrinho_data'] = None
+                st.toast("Item removido!", icon="🗑️")
+                st.rerun()
+                
+            total_volumes = sum(item['quantidade'] for item in st.session_state['carrinho_venda'])
+            total_pedido = sum(item['valor_total'] for item in st.session_state['carrinho_venda'])
+            
+            st.markdown("---")
+            col_sum1, col_sum2 = st.columns([2, 1])
+            with col_sum1:
+                st.markdown("##### Resumo do Pedido de Venda")
+                st.markdown(f"👤 **Cliente:** {st.session_state['carrinho_cliente_nome']}")
+                st.markdown(f"💼 **Vendedor:** {st.session_state['carrinho_vendedor_nome']}")
+                st.markdown(f"📅 **Data de Captação:** {st.session_state['carrinho_data'].strftime('%d/%m/%Y')}")
+            with col_sum2:
+                st.markdown(f"""
+                <div style='background-color:#f9f9f9;padding:12px;border-radius:8px;border:1px solid #eee;text-align:right;'>
+                    <span style='font-size:13px;color:#666;'>VALOR TOTAL DO PEDIDO</span><br>
+                    <span style='font-size:22px;font-weight:bold;color:#292d77;'>{format_brl(total_pedido)}</span><br>
+                    <span style='font-size:12px;color:#888;'>Volumes totais: {total_volumes:.0f} UN</span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_action1, col_action2 = st.columns(2)
+            
+            if col_action1.button("🗑️ Esvaziar Pedido", type="secondary", use_container_width=True):
+                st.session_state['carrinho_venda'] = []
+                st.session_state['carrinho_cliente_nome'] = None
+                st.session_state['carrinho_vendedor_nome'] = None
+                st.session_state['carrinho_data'] = None
+                st.toast("Carrinho esvaziado!", icon="🗑️")
+                st.rerun()
+                
+            if col_action2.button("🏁 Aprovar e Enviar Pedido Completo", type="primary", use_container_width=True):
+                cli = c_opts[st.session_state['carrinho_cliente_nome']]
+                ven = v_opts[st.session_state['carrinho_vendedor_nome']]
+                data_v = st.session_state['carrinho_data']
+                
+                vids_criados = []
+                for item in st.session_state['carrinho_venda']:
+                    run_query(
+                        """INSERT INTO vendas 
+                           (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, comissao_valor, custo_acordos_rede, is_bonificacao, status) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO')""",
+                        (data_v.strftime("%Y-%m-%d"), cli['id'], ven['id'], item['produto_id'], item['quantidade'], item['valor_unitario'], item['valor_total'], item['comissao_valor'], item['custo_acordos_rede'], item['is_bonificacao'])
+                    )
+                    v_id_df = fetch_all("SELECT MAX(id) as lg FROM vendas")
+                    vids_criados.append(str(int(v_id_df.iloc[0]['lg'])))
+                
+                st.balloons()
+                st.success(f"✔️ Pedido gravado com sucesso! Lançamentos de item (#{', #'.join(vids_criados)}) já estão na Fila do módulo de Faturamento aguardando expedição física.")
+                
+                st.session_state['carrinho_venda'] = []
+                st.session_state['carrinho_cliente_nome'] = None
+                st.session_state['carrinho_vendedor_nome'] = None
+                st.session_state['carrinho_data'] = None
+                
+                import time
+                time.sleep(2)
+                st.rerun()
 
 # ======= 1.2. REMESSA DE DEGUSTAÇÃO & AMOSTRAS =======
 with tab_deg:
@@ -189,7 +325,7 @@ with tab_deg:
             run_query(
                 """INSERT INTO fluxo_caixa 
                    (data, tipo, categoria, descricao, valor, conta_bancaria_id, cliente_id, conciliado) 
-                   VALUES (?, 'SAÍDA', '2.2.1', ?, ?, ?, ?, TRUE)""",
+                   VALUES (?, 'Saída', '2.2.1', ?, ?, ?, ?, TRUE)""",
                 (data_acao.strftime("%Y-%m-%d"), desc_financeira, custo_total, banco_id, int(cli_deg['id']))
             )
             

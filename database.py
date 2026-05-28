@@ -62,6 +62,9 @@ def format_pg(sql):
                 linhas.append(linha)
         sql = '\n'.join(linhas)
         sql = re.sub(r",\s*\)", "\n    )", sql)
+    else:
+        # SQLite: traduz string_agg do PostgreSQL para group_concat do SQLite
+        sql = sql.replace("string_agg", "group_concat")
     return sql
 
 class CursorWrapper:

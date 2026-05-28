@@ -425,11 +425,12 @@ if st.session_state.itens_nf:
                                           qtd_stock,
                                           f"Compra NF {tipo_doc} {numero_doc_final} (ID #{compra_id})"))
 
-                                    # 4. Atualiza custo unitário do produto (último preço)
-                                    cursor.execute(
-                                        "UPDATE produtos SET custo_unidade=? WHERE id=?",
-                                        (it['custo_liq_unit'], it['produto_id'])
-                                    )
+                                     # 4. Atualiza custo unitário do produto (último preço real estocado)
+                                     custo_medio_unidade = it['total_liquido_item'] / it['quantidade_estoque'] if it['quantidade_estoque'] > 0 else it['custo_liq_unit']
+                                     cursor.execute(
+                                         "UPDATE produtos SET custo_unidade=? WHERE id=?",
+                                         (custo_medio_unidade, it['produto_id'])
+                                     )
 
                             # 5. Duplicatas (Contas a Pagar)
                             for parc in st.session_state.parcelas_temp:
