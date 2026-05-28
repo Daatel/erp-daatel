@@ -680,27 +680,68 @@ with tab5:
         
         tipo_entidade = col_t2.selectbox("2. Nível da Regra (Hierarquia)", ["CLIENTE", "GRUPO", "REDE"], key="tab_tipo")
         
-        col_t3, col_t4 = st.columns(2)
+        lista_entidades = []
         
         if tipo_entidade == "CLIENTE":
+            col_v1, col_v2 = st.columns(2)
             lista_entidades = df_clientes['nome'].tolist() if not df_clientes.empty else []
             nome_aba_cadastro = "🏭 Cadastro de Clientes"
-        elif tipo_entidade == "GRUPO":
-            df_g = fetch_all("SELECT nome FROM grupos_clientes")
-            lista_entidades = df_g['nome'].tolist() if not df_g.empty else []
-            nome_aba_cadastro = "🏢 Redes e Grupos"
-        else:
+            
+            if not lista_entidades:
+                entidade_nome = col_v1.selectbox("3. Vínculo (Selecione o Cliente)", ["(Nenhum registrado)"], key="tab_ent", disabled=True)
+                st.warning(f"⚠️ **Nenhum cliente** cadastrado no sistema! Acesse o menu **Cadastros** e use a aba **{nome_aba_cadastro}** para registrá-los primeiro.")
+            else:
+                entidade_nome = col_v1.selectbox("3. Vínculo (Selecione o Cliente)", ["(Selecione)"] + lista_entidades, key="tab_ent")
+            
+            preco_tabela = col_v2.number_input("4. Preço Acordado (R$)", min_value=0.01, step=0.1, key="tab_preco")
+            
+        elif tipo_entidade == "REDE":
+            col_v1, col_v2 = st.columns(2)
             df_r = fetch_all("SELECT nome FROM redes_clientes")
             lista_entidades = df_r['nome'].tolist() if not df_r.empty else []
             nome_aba_cadastro = "🏢 Redes e Grupos"
             
-        if not lista_entidades:
-            entidade_nome = col_t3.selectbox("3. Vínculo (Selecione o Cliente/Grupo/Rede)", ["(Nenhum registrado)"], key="tab_ent", disabled=True)
-            st.warning(f"⚠️ **Nenhum {tipo_entidade.lower()}** cadastrado no sistema! Acesse o menu **Cadastros** e use a aba **{nome_aba_cadastro}** para registrá-los primeiro.")
-        else:
-            entidade_nome = col_t3.selectbox("3. Vínculo (Selecione o Cliente/Grupo/Rede)", ["(Selecione)"] + lista_entidades, key="tab_ent")
-        
-        preco_tabela = col_t4.number_input("4. Preço Acordado (R$)", min_value=0.01, step=0.1, key="tab_preco")
+            if not lista_entidades:
+                entidade_nome = col_v1.selectbox("3. Vínculo (Selecione a Rede)", ["(Nenhum registrado)"], key="tab_ent", disabled=True)
+                st.warning(f"⚠️ **Nenhuma rede** cadastrada no sistema! Acesse o menu **Cadastros** e use a aba **{nome_aba_cadastro}** para registrá-las primeiro.")
+            else:
+                entidade_nome = col_v1.selectbox("3. Vínculo (Selecione a Rede)", ["(Selecione)"] + lista_entidades, key="tab_ent")
+                
+            preco_tabela = col_v2.number_input("4. Preço Acordado (R$)", min_value=0.01, step=0.1, key="tab_preco")
+            
+        elif tipo_entidade == "GRUPO":
+            col_v1, col_v2, col_v3 = st.columns(3)
+            df_r = fetch_all("SELECT nome FROM redes_clientes")
+            redes_list = df_r['nome'].tolist() if not df_r.empty else []
+            
+            if not redes_list:
+                st.warning("⚠️ **Nenhuma rede** cadastrada no sistema! Para cadastrar grupos, você precisa cadastrar redes primeiro na aba **🏢 Redes e Grupos** de **Cadastros**.")
+                rede_selecionada = col_v1.selectbox("3. Rede do Grupo", ["(Nenhuma cadastrada)"], key="tab_rede_grupo", disabled=True)
+                entidade_nome = col_v2.selectbox("4. Vínculo (Selecione o Grupo)", ["(Nenhuma rede)"], key="tab_ent", disabled=True)
+                preco_tabela = col_v3.number_input("5. Preço Acordado (R$)", min_value=0.01, step=0.1, key="tab_preco", disabled=True)
+            else:
+                rede_selecionada = col_v1.selectbox("3. Selecione a Rede Matriz:", ["(Selecione)"] + redes_list, key="tab_rede_grupo")
+                
+                if rede_selecionada == "(Selecione)":
+                    entidade_nome = col_v2.selectbox("4. Vínculo (Selecione o Grupo)", ["(Selecione a Rede)"], key="tab_ent", disabled=True)
+                    preco_tabela = col_v3.number_input("5. Preço Acordado (R$)", min_value=0.01, step=0.1, key="tab_preco", disabled=True)
+                    st.info("💡 Por favor, **selecione a Rede Matriz** para carregar os grupos associados.")
+                else:
+                    df_g = fetch_all("""
+                        SELECT g.nome 
+                        FROM grupos_clientes g
+                        JOIN redes_clientes r ON g.rede_id = r.id
+                        WHERE r.nome = ?
+                    """, (rede_selecionada,))
+                    lista_entidades = df_g['nome'].tolist() if not df_g.empty else []
+                    
+                    if not lista_entidades:
+                        st.warning(f"⚠️ **Nenhum grupo** cadastrado sob a rede **'{rede_selecionada}'**! Acesse o menu **Cadastros** e use a aba **🏢 Redes e Grupos** para criar sub-grupos.")
+                        entidade_nome = col_v2.selectbox("4. Vínculo (Selecione o Grupo)", ["(Nenhum grupo cadastrado)"], key="tab_ent", disabled=True)
+                        preco_tabela = col_v3.number_input("5. Preço Acordado (R$)", min_value=0.01, step=0.1, key="tab_preco", disabled=True)
+                    else:
+                        entidade_nome = col_v2.selectbox("4. Vínculo (Selecione o Grupo)", ["(Selecione)"] + lista_entidades, key="tab_ent")
+                        preco_tabela = col_v3.number_input("5. Preço Acordado (R$)", min_value=0.01, step=0.1, key="tab_preco")
         
         st.markdown("##### Acordos e Rebates (%)")
         col_r1, col_r2, col_r3 = st.columns(3)
