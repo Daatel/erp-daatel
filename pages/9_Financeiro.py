@@ -272,11 +272,35 @@ try:
         st.subheader("🔍 Detalhamento e Auditoria de Lançamentos por Período")
         st.markdown("Filtre o fluxo de caixa histórico por período e contas para conciliação ou exportação oficial em Excel ou PDF.")
         
+        # Inicializar datas no session state se não existirem
+        if 'det_dt_inicio' not in st.session_state:
+            st.session_state['det_dt_inicio'] = date.today() - timedelta(days=7)
+        if 'det_dt_fim' not in st.session_state:
+            st.session_state['det_dt_fim'] = date.today()
+
+        col_b1, col_b2, col_b3, _ = st.columns([1, 1.3, 1.3, 4.4])
+        if col_b1.button("📅 Hoje", use_container_width=True, key="btn_shortcut_hoje"):
+            st.session_state['det_dt_inicio'] = date.today()
+            st.session_state['det_dt_fim'] = date.today()
+            st.rerun()
+        if col_b2.button("📅 Últimos 7 Dias", use_container_width=True, key="btn_shortcut_7d"):
+            st.session_state['det_dt_inicio'] = date.today() - timedelta(days=7)
+            st.session_state['det_dt_fim'] = date.today()
+            st.rerun()
+        if col_b3.button("📅 Últimos 30 Dias", use_container_width=True, key="btn_shortcut_30d"):
+            st.session_state['det_dt_inicio'] = date.today() - timedelta(days=30)
+            st.session_state['det_dt_fim'] = date.today()
+            st.rerun()
+
         # Filtros interativos
         col_f1, col_f2, col_f3, col_f4 = st.columns(4)
         
-        dt_inicio = col_f1.date_input("Data de Início", date.today() - timedelta(days=7))
-        dt_fim = col_f2.date_input("Data de Fim", date.today())
+        dt_inicio = col_f1.date_input("Data de Início", value=st.session_state['det_dt_inicio'])
+        dt_fim = col_f2.date_input("Data de Fim", value=st.session_state['det_dt_fim'])
+        
+        # Sincronizar alterações manuais de volta ao session_state
+        st.session_state['det_dt_inicio'] = dt_inicio
+        st.session_state['det_dt_fim'] = dt_fim
         
         bancos_det_opts = ["TODOS"] + list(opcoes_bancos.keys())
         banco_filtro = col_f3.selectbox("Filtrar por Conta/Banco", bancos_det_opts, key="det_banco")
