@@ -21,7 +21,7 @@ with tab1:
     
     # Busca vendas sem embarque no momento (Sem vinculo a viagem e estritamente faturadas)
     df_orfãs = fetch_all('''
-       SELECT v.id, v.data, c.nome as Cliente, c.taxa_descarga, c.regras_descarga, p.nome as Carga, v.valor_total,
+       SELECT v.id, v.data, c.nome as cliente, c.taxa_descarga, c.regras_descarga, p.nome as carga, v.valor_total,
               v.tipo_documento, v.numero_documento
        FROM vendas v 
        JOIN clientes c ON v.cliente_id=c.id 
@@ -69,7 +69,7 @@ with tab1:
                 else:
                     doc_label = f"NF-e #{num}" if (num and str(num).strip() != "") else "⚠️ [NF PENDENTE DE NÚMERO]"
                 
-                label = f"Venda #{row['id']} ({doc_label}) | {dt_f} - {row['Cliente']} ({row['Carga']}) -> {format_brl(row['valor_total'])}"
+                label = f"Venda #{row['id']} ({doc_label}) | {dt_f} - {row['cliente']} ({row['carga']}) -> {format_brl(row['valor_total'])}"
                 options.append(label)
                 options_map[label] = row
                 
@@ -92,7 +92,7 @@ with tab1:
                     taxa_val = float(alerta_row['taxa_descarga'] or 0.0)
                     regra_val = alerta_row['regras_descarga'] or "Sem regra cadastrada"
                     taxa_fmt = format_brl(taxa_val) if taxa_val > 0 else "Sem taxa"
-                    st.warning(f"🚨 **{alerta_row['Cliente']}** (NF #{alerta_row['id']}) — Taxa de Descarga: **{taxa_fmt}** | Regra: _{regra_val}_")
+                    st.warning(f"🚨 **{alerta_row['cliente']}** (NF #{alerta_row['id']}) — Taxa de Descarga: **{taxa_fmt}** | Regra: _{regra_val}_")
             
         st.info("⚙️ **Como funciona o Rateio Sagrado:** O sistema somará o valor comercial em Reais de tudo que subir no caminhão. Se a Nota do Supermercado A for 80% do valor do caminhão, ela sofrerá a dedução de 80% do Custo do Frete que você preencheu lá em cima para seu DRE não ser mentiroso.")
         
@@ -107,7 +107,7 @@ with tab1:
                     tipo = row['tipo_documento'] or "Nota Fiscal (NF)"
                     num = row['numero_documento']
                     if "Nota Fiscal" in tipo and (not num or str(num).strip() == ""):
-                        nfs_sem_numero.append(f"Venda #{v_id} ({row['Cliente']})")
+                        nfs_sem_numero.append(f"Venda #{v_id} ({row['cliente']})")
             
             if not notas_selecionadas:
                 st.error("Selecione no mínimo 1 faturamento para viajar!")
@@ -172,7 +172,7 @@ with tab2:
             
             # Busca vendas da rota com dados do cliente (taxa de descarga)
             df_v_man = fetch_all("""
-                SELECT v.id, c.nome as 'Cliente', c.taxa_descarga, p.nome as 'Produto', v.comprovante_url 
+                SELECT v.id, c.nome as cliente, c.taxa_descarga, p.nome as produto, v.comprovante_url 
                 FROM vendas v 
                 JOIN clientes c ON v.cliente_id=c.id 
                 JOIN produtos p ON v.produto_id=p.id 
@@ -190,7 +190,7 @@ with tab2:
                 
                 for _, r in df_v_man.iterrows():
                     venda_id = r['id']
-                    cliente = r['Cliente']
+                    cliente = r['cliente']
                     taxa_desc = float(r['taxa_descarga'] or 0.0)
                     url_canhoto = r['comprovante_url']
                     
@@ -278,7 +278,7 @@ with tab2:
     st.subheader("Bordero de Manifestos e Histórico Operacional")
     
     df_man = fetch_all('''
-       SELECT m.id as '# Doc', m.data_saida as 'Data Oficial', m.motorista_nome as 'Condutor', m.placa_veiculo as 'Placa', m.tipo_frete as 'Identidade', m.status as 'Status Operacional', m.valor_total_frete as 'Custeio Consolidado R$'
+       SELECT m.id as "# Doc", m.data_saida as "Data Oficial", m.motorista_nome as "Condutor", m.placa_veiculo as "Placa", m.tipo_frete as "Identidade", m.status as "Status Operacional", m.valor_total_frete as "Custeio Consolidado R$"
        FROM manifestos_carga m
        ORDER BY m.id DESC LIMIT 30
     ''')
@@ -297,10 +297,10 @@ with tab2:
             
             # Buscar Vendas dessa viagem com taxa e regra de descarga
             df_m_ven = fetch_all("""
-                SELECT v.id as 'NF', c.nome as 'K-Account', c.cidade as 'Cidade', c.endereco as 'Logradouro', 
-                       p.nome as 'Pallet/Pacote', v.quantidade as 'Vol.', v.valor_total as 'Valor Transacionado', 
-                       v.custo_frete_rateado as 'Custo Tributado',
-                       c.taxa_descarga as 'Taxa Descarga (R$)', c.regras_descarga as 'Regras de Descarga'
+                SELECT v.id as "NF", c.nome as "K-Account", c.cidade as "Cidade", c.endereco as "Logradouro", 
+                       p.nome as "Pallet/Pacote", v.quantidade as "Vol.", v.valor_total as "Valor Transacionado", 
+                       v.custo_frete_rateado as "Custo Tributado",
+                       c.taxa_descarga as "Taxa Descarga (R$)", c.regras_descarga as "Regras de Descarga"
                 FROM vendas v 
                 JOIN clientes c ON v.cliente_id=c.id 
                 JOIN produtos p ON v.produto_id=p.id 
