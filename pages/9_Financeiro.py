@@ -48,11 +48,12 @@ try:
     saldo_total_empresa = sum(saldo_por_banco.values())
 
     # ================== GUIAS ==================
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Dashboard 30 Dias", 
         "🔻 Contas a Pagar (Saída)", 
         "🟢 Contas a Receber (Entrada)", 
-        "🏦 Conciliação Bancária"
+        "🏦 Conciliação Bancária",
+        "🔄 Transferência entre Contas"
     ])
 
     # ------------------ ABA 1: DASHBOARD E PROJEÇÃO 30D ------------------
@@ -819,7 +820,63 @@ try:
                             run_query("UPDATE fluxo_caixa SET conciliado=? WHERE id=?", (n_c, row['id']))
                     st.success("Extrato Oficializado pela Gerência!")
                     import time; time.sleep(1); st.rerun()
-                    
+
+    # ------------------ ABA 5: TRANSFERÊNCIA ENTRE CONTAS ------------------
+    with tab5:
+        st.subheader("🔄 Transferência de Recursos entre Contas e Tesouraria")
+        st.markdown("""
+        Utilize este formulário para registrar a transferência de fundos entre suas contas bancárias e o caixa físico (Tesouraria).
+        Isso registrará automaticamente um lançamento de saída na conta de origem e um lançamento de entrada na conta de destino.
+        """)
+        
+        with st.form("form_transferencia_contas"):
+            col_t1, col_t2 = st.columns(2)
+            
+            # Conta Origem
+            opcoes_origem = {f"{r['nome']}": r['id'] for _, r in df_bancos.iterrows()}
+            conta_origem_lbl = col_t1.selectbox("Conta de Origem (De onde sai o dinheiro)", list(opcoes_origem.keys()))
+            
+            # Conta Destino
+            opcoes_destino = {f"{r['nome']}": r['id'] for _, r in df_bancos.iterrows() if f"{r['nome']}" != conta_origem_lbl}
+            if opcoes_destino:
+                conta_destino_lbl = col_t2.selectbox("Conta de Destino (Para onde vai o dinheiro)", list(opcoes_destino.keys()))
+            else:
+                conta_destino_lbl = col_t2.selectbox("Conta de Destino (Para onde vai o dinheiro)", ["Cadastre outra conta ativa para realizar transferências"])
+                
+            col_t3, col_t4 = st.columns([1, 2])
+            valor_transf = col_t3.number_input("Valor da Transferência (R$)", min_value=0.01, step=50.0, format="%.2f")
+            data_transf = col_t4.date_input("Data da Transferência", date.today())
+            
+            obs_transf = st.text_input("Observação / Histórico", value="Transferência Interna de Recursos")
+            
+            btn_transf = st.form_submit_button("🔄 Confirmar Transferência", type="primary", use_container_width=True)
+            
+        if btn_transf:
+            if not opcoes_destino or conta_destino_lbl == "Cadastre outra conta ativa para realizar transferências":
+                st.error("Erro: Você precisa de pelo menos duas contas ativas para realizar uma transferência.")
+            elif conta_origem_lbl == conta_destino_lbl:
+                st.error("Erro: A conta de origem e destino devem ser diferentes.")
+            else:
+                id_origem = opcoes_origem[conta_origem_lbl]
+                id_destino = opcoes_destino[conta_destino_lbl]
+                
+                # 1. Registrar Saída na Conta de Origem
+                desc_saida = f"Transf. p/ {conta_destino_lbl} | {obs_transf}"
+                run_query(
+                    "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, conta_bancaria_id, conciliado) VALUES (?, 'Saída', 'Transferência', ?, ?, ?, TRUE)",
+                    (data_transf.strftime("%Y-%m-%d"), desc_saida, valor_transf, id_origem)
+                )
+                
+                # 2. Registrar Entrada na Conta de Destino
+                desc_entrada = f"Transf. de {conta_origem_lbl} | {obs_transf}"
+                run_query(
+                    "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Transferência', ?, ?, ?, TRUE)",
+                    (data_transf.strftime("%Y-%m-%d"), desc_entrada, valor_transf, id_destino)
+                )
+                
+                st.success(f"✔️ Transferência de R$ {valor_transf:,.2f} realizada com sucesso de '{conta_origem_lbl}' para '{conta_destino_lbl}'!")
+                import time; time.sleep(1.5); st.rerun()
+
 except Exception as e:
     st.error(f"Erro Crítico de Tela Bancária: {e}")
     st.code(traceback.format_exc())
