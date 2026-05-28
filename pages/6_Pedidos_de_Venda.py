@@ -70,7 +70,11 @@ with tab1:
         p_opts = {f"{r['nome']}": r for _, r in df_produtos.iterrows()}
         produto_sel = col3.selectbox("Produto Final Solicitado", list(p_opts.keys()))
         qtd = col4.number_input("Quantidade Negociada (Volumes/Kg)", min_value=1.0, step=1.0)
-        tipo_item = col_tipo.selectbox("Tipo de Lançamento", ["Comercial (Venda)", "Bonificado (Bonificação)"])
+        if carrinho_ativo:
+            carrinho_tipo = st.session_state['carrinho_venda'][0]['tipo_item']
+            tipo_item = col_tipo.selectbox("Tipo de Lançamento", ["Comercial (Venda)", "Bonificado (Bonificação)"], index=["Comercial (Venda)", "Bonificado (Bonificação)"].index(carrinho_tipo), disabled=True)
+        else:
+            tipo_item = col_tipo.selectbox("Tipo de Lançamento", ["Comercial (Venda)", "Bonificado (Bonificação)"])
         
         # --- LÓGICA DE PRECIFICAÇÃO DINÂMICA ---
         cli_selecionado = c_opts[cliente_sel]
@@ -256,7 +260,6 @@ with tab1:
                     v_id_df = fetch_all("SELECT MAX(id) as lg FROM vendas")
                     vids_criados.append(str(int(v_id_df.iloc[0]['lg'])))
                 
-                st.balloons()
                 st.success(f"✔️ Pedido gravado com sucesso! Lançamentos de item (#{', #'.join(vids_criados)}) já estão na Fila do módulo de Faturamento aguardando expedição física.")
                 
                 st.session_state['carrinho_venda'] = []
@@ -329,7 +332,6 @@ with tab_deg:
                 (data_acao.strftime("%Y-%m-%d"), desc_financeira, custo_total, banco_id, int(cli_deg['id']))
             )
             
-            st.balloons()
             st.success(f"✔️ Remessa registrada com sucesso! Saída física executada via FIFO.")
             st.info(f"📊 **Custo Real FIFO apurado:** R$ {custo_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             
