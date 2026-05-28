@@ -492,7 +492,38 @@ with tab2:
     st.subheader("📋 Gestão e Acompanhamento de Pedidos")
     st.markdown("Acompanhe o andamento dos seus pedidos. Utilize os filtros para separar rapidamente os pendentes de faturamento.")
     
-    filtro_status = st.radio(
+    # Inicializar datas no session state se não existirem
+    if 'vendas_dt_inicio' not in st.session_state:
+        st.session_state['vendas_dt_inicio'] = date.today() - timedelta(days=30)
+    if 'vendas_dt_fim' not in st.session_state:
+        st.session_state['vendas_dt_fim'] = date.today()
+
+    st.markdown("##### 📅 Filtro por Período de Captação")
+    col_b1, col_b2, col_b3, _ = st.columns([1, 1.3, 1.3, 4.4])
+    if col_b1.button("📅 Hoje", use_container_width=True, key="btn_vendas_hoje"):
+        st.session_state['vendas_dt_inicio'] = date.today()
+        st.session_state['vendas_dt_fim'] = date.today()
+        st.rerun()
+    if col_b2.button("📅 Últimos 7 Dias", use_container_width=True, key="btn_vendas_7d"):
+        st.session_state['vendas_dt_inicio'] = date.today() - timedelta(days=7)
+        st.session_state['vendas_dt_fim'] = date.today()
+        st.rerun()
+    if col_b3.button("📅 Últimos 30 Dias", use_container_width=True, key="btn_vendas_30d"):
+        st.session_state['vendas_dt_inicio'] = date.today() - timedelta(days=30)
+        st.session_state['vendas_dt_fim'] = date.today()
+        st.rerun()
+
+    # Filtros interativos
+    col_f1, col_f2, col_f3 = st.columns([1, 1, 2])
+    
+    dt_inicio = col_f1.date_input("Data de Início", value=st.session_state['vendas_dt_inicio'], key="vendas_dt_inicio_input")
+    dt_fim = col_f2.date_input("Data de Fim", value=st.session_state['vendas_dt_fim'], key="vendas_dt_fim_input")
+    
+    # Sincronizar de volta
+    st.session_state['vendas_dt_inicio'] = dt_inicio
+    st.session_state['vendas_dt_fim'] = dt_fim
+
+    filtro_status = col_f3.radio(
         "Filtrar por Situação:",
         ["Todos", "🟡 Pendentes de Faturamento", "🟢 Faturados"],
         horizontal=True,
@@ -508,16 +539,17 @@ with tab2:
         JOIN clientes c ON v.cliente_id=c.id
         JOIN funcionarios vn ON v.vendedor_id=vn.id
         JOIN produtos p ON v.produto_id=p.id
+        WHERE v.data BETWEEN ? AND ?
     '''
     
     if filtro_status == "🟡 Pendentes de Faturamento":
-        query_pedidos += " WHERE v.status = 'APROVADO'"
+        query_pedidos += " AND v.status = 'APROVADO'"
     elif filtro_status == "🟢 Faturados":
-        query_pedidos += " WHERE v.status = 'FATURADO'"
+        query_pedidos += " AND v.status = 'FATURADO'"
         
-    query_pedidos += " ORDER BY v.id DESC LIMIT 150"
+    query_pedidos += " ORDER BY v.id DESC"
     
-    df_pedidos = fetch_all(query_pedidos)
+    df_pedidos = fetch_all(query_pedidos, (dt_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")))
     
     if not df_pedidos.empty:
         df_pedidos['Data Captação'] = pd.to_datetime(df_pedidos['Data Captação'], errors='coerce').dt.strftime('%d/%m/%Y')
