@@ -844,7 +844,7 @@ try:
                 conta_destino_lbl = col_t2.selectbox("Conta de Destino (Para onde vai o dinheiro)", ["Cadastre outra conta ativa para realizar transferências"])
                 
             col_t3, col_t4 = st.columns([1, 2])
-            valor_transf = col_t3.number_input("Valor da Transferência (R$)", min_value=0.01, step=50.0, format="%.2f")
+            valor_transf = col_t3.number_input("Valor da Transferência (R$)", min_value=0.00, value=0.00, step=50.0, format="%.2f")
             data_transf = col_t4.date_input("Data da Transferência", date.today())
             
             obs_transf = st.text_input("Observação / Histórico", value="Transferência Interna de Recursos")
@@ -856,6 +856,8 @@ try:
                 st.error("Erro: Você precisa de pelo menos duas contas ativas para realizar uma transferência.")
             elif conta_origem_lbl == conta_destino_lbl:
                 st.error("Erro: A conta de origem e destino devem ser diferentes.")
+            elif valor_transf <= 0.0:
+                st.error("Erro: O valor da transferência deve ser maior que zero (R$ 0,00).")
             else:
                 id_origem = opcoes_origem[conta_origem_lbl]
                 id_destino = opcoes_destino[conta_destino_lbl]
