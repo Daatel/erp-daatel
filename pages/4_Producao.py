@@ -226,7 +226,6 @@ with tab1:
             run_query("UPDATE produtos SET custo_unidade = ? WHERE id = ?", (custo_unit_pf, pf_id))
             
             # --- FEEDBACK VISUAL ---
-            st.balloons()
             st.success(f"✔️ Lote Físico #{lote_id} gravado e Estoques atualizados!")
             
             st.markdown("### 📊 Raio-X de Produção deste Lote")

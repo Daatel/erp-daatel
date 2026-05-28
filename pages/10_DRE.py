@@ -58,7 +58,7 @@ if not df_fluxo_gerencial.empty:
         cv_90 = 0.0
     
     # Nível 2.5: Despesas Comerciais Variáveis (Comissões, Logística, Acordos, Descargas, Degustações e Promotores)
-    df_vd = fetch_all("SELECT data, custo_frete_rateado, comissao_valor, custo_acordos_rede, custo_descarga FROM vendas")
+    df_vd = fetch_all("SELECT data, custo_frete_rateado, comissao_valor, custo_acordos_rede, custo_descarga FROM vendas WHERE status='FATURADO'")
     df_vd['data'] = pd.to_datetime(df_vd['data'], errors='coerce')
     df_vd_mes = df_vd[df_vd['data'] >= (hoje - timedelta(days=30))]
     df_vd_90 = df_vd[df_vd['data'] >= (hoje - timedelta(days=90))]

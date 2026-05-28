@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
-from database import run_query, fetch_all
+from database import run_query, fetch_all, gerar_comissao_se_necessario
 from estilo import carregar_estilo
 
 st.set_page_config(page_title="Faturamento & Expedição", page_icon="📦", layout="wide")
@@ -182,8 +182,10 @@ with tab1:
                                       (pc_desc_id, cli_id, desc_taxa, taxa_desc, date.today().strftime("%Y-%m-%d")))
                             # Grava na venda para o DRE classificar como custo comercial variável
                             run_query("UPDATE vendas SET custo_descarga=? WHERE id=?", (taxa_desc, pid))
+                             
+                    # 6. Geração de Passivo (Contas a Pagar) para a Comissão do Vendedor (se for no FATURAMENTO)
+                    gerar_comissao_se_necessario(pid, 'FATURAMENTO', cli_nome)
 
-                st.balloons()
                 st.success(f"✅ {len(pedidos_selecionados)} Pedido(s) Faturados com Sucesso! Estoque e Financeiro atualizados.")
                 import time; time.sleep(2); st.rerun()
                 
@@ -195,6 +197,64 @@ with tab1:
                 v_sel = st.selectbox("Selecione o pedido faturado para visualizar/imprimir:", ["-- SELECIONE --"] + list(opcoes_fat.keys()))
                 if v_sel != "-- SELECIONE --":
                     vid = opcoes_fat[v_sel]
+                    
+                    # --- ÁREA DE SEGURANÇA E ESTORNO DE FATURAMENTO ---
+                    with st.container():
+                        st.markdown("#### 🔄 Central de Segurança: Estornar/Desfazer Faturamento")
+                        df_venda_manifesto = fetch_all("SELECT manifesto_id FROM vendas WHERE id = ?", (vid,))
+                        manifesto_id = df_venda_manifesto.iloc[0]['manifesto_id'] if not df_venda_manifesto.empty else None
+                        
+                        if manifesto_id is not None:
+                            st.error(f"🛑 **Estorno Bloqueado:** Este pedido já está vinculado ao **Manifesto de Logística #{manifesto_id}**! Remova o pedido do caminhão no módulo de Logística antes de tentar estornar o faturamento.")
+                        else:
+                            st.warning("⚠️ **Atenção:** Desfazer o faturamento irá excluir a conta a receber, estornar o saldo JIT dos lotes originais no estoque e retornar o pedido para a fila comercial de Pendentes.")
+                            
+                            if st.button("🔄 Executar Estorno de Faturamento", type="primary", key=f"btn_estorno_venda_{vid}"):
+                                # 1. Buscar movimentações originais de saída para reverter
+                                df_movs = fetch_all('''
+                                    SELECT produto_id, quantidade, lote_origem_id 
+                                    FROM estoque_movimentos 
+                                    WHERE documento_referencia = ? AND tipo_movimento = 'Saída'
+                                ''', (f"Venda Lote #{vid}",))
+                                
+                                # 2. Inserir entradas reversoras
+                                for _, mov in df_movs.iterrows():
+                                    p_id = int(mov['produto_id'])
+                                    qtd = float(mov['quantidade'])
+                                    lote_origem = int(mov['lote_origem_id']) if pd.notnull(mov['lote_origem_id']) else None
+                                    
+                                    run_query(
+                                        """INSERT INTO estoque_movimentos 
+                                           (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+                                           VALUES (?, ?, 'Entrada', ?, ?, ?, ?)""",
+                                        (date.today().strftime("%Y-%m-%d"), p_id, qtd, 'Estorno de Faturamento', f"Estorno Venda Lote #{vid}", lote_origem)
+                                    )
+                                    
+                                # 3. Deletar Contas a Receber associada
+                                run_query("DELETE FROM contas_a_receber WHERE venda_id = ?", (vid,))
+                                
+                                # 4. Deletar Contas a Pagar associadas (descarga e acordos de rede)
+                                desc_descarga = f"%Venda #{vid}%"
+                                run_query("DELETE FROM contas_a_pagar WHERE descricao LIKE ? AND status = 'PENDENTE'", (desc_descarga,))
+                                
+                                # 5. Resetar registro da venda de volta para APROVADO (Pendente)
+                                run_query('''
+                                    UPDATE vendas 
+                                    SET status = 'APROVADO', 
+                                        tipo_documento = NULL, 
+                                        numero_documento = NULL, 
+                                        custo_cmv_real = 0.0, 
+                                        custo_descarga = 0.0, 
+                                        lote_impresso = NULL, 
+                                        validade_impressa = NULL
+                                    WHERE id = ?
+                                ''', (vid,))
+                                
+                                st.success(f"✅ Faturamento do Pedido #{vid} estornado com sucesso! Estoque e financeiro reestabelecidos.")
+                                import time; time.sleep(1.5); st.rerun()
+                                
+                    st.markdown("---")
+                    
                     import streamlit.components.v1 as components
                     from utils_dav import buscar_dados_venda, gerar_html_dav
                     
@@ -253,6 +313,59 @@ with tab2:
                 mime="text/csv",
                 type="primary"
             )
+
+    st.markdown("---")
+    st.subheader("✍️ Atualizar Números de Notas Fiscais Autorizadas (Retorno SEFAZ)")
+    st.markdown("Digite os números oficiais das notas geradas no SEFAZ para atualizar o ERP e liberar o embarque seguro na Logística.")
+    
+    # Busca vendas faturadas como 'Nota Fiscal (NF)' sem número de documento
+    df_nfs_pendentes = fetch_all('''
+        SELECT v.id as 'Venda ID', v.data as 'Data', c.nome as 'Cliente', p.nome as 'Produto', 
+               v.quantidade as 'Qtd', v.valor_total as 'Valor Total', v.numero_documento as 'Número da NF-e'
+        FROM vendas v
+        JOIN clientes c ON v.cliente_id = c.id
+        JOIN produtos p ON v.produto_id = p.id
+        WHERE v.status = 'FATURADO'
+          AND v.tipo_documento = 'Nota Fiscal (NF)'
+          AND (v.numero_documento IS NULL OR v.numero_documento = '')
+        ORDER BY v.id ASC
+    ''')
+    
+    if df_nfs_pendentes.empty:
+        st.success("🎉 Nenhuma Nota Fiscal faturada pendente de número oficial!")
+    else:
+        df_nfs_pendentes['Data'] = pd.to_datetime(df_nfs_pendentes['Data']).dt.strftime('%d/%m/%Y')
+        df_nfs_pendentes['Valor Total'] = df_nfs_pendentes['Valor Total'].apply(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        
+        # Garante que Número da NF-e seja string
+        df_nfs_pendentes['Número da NF-e'] = df_nfs_pendentes['Número da NF-e'].fillna("").astype(str)
+        
+        st.info("💡 **Dica:** Digite as numerações diretamente na coluna **'Número da NF-e'** abaixo e clique no botão para salvar tudo de uma vez.")
+        
+        edited_nfs = st.data_editor(
+            df_nfs_pendentes,
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "Número da NF-e": st.column_config.TextColumn("📝 Número da NF-e (Digitar)", help="Insira o número oficial da nota emitida pelo SEFAZ"),
+            },
+            disabled=["Venda ID", "Data", "Cliente", "Produto", "Qtd", "Valor Total"]
+        )
+        
+        if st.button("💾 Salvar Números de NF-e", type="primary", use_container_width=True):
+            saved_count = 0
+            for idx, row in edited_nfs.iterrows():
+                v_id = int(row['Venda ID'])
+                nfe_num = str(row['Número da NF-e']).strip()
+                if nfe_num != "":
+                    run_query("UPDATE vendas SET numero_documento = ? WHERE id = ?", (nfe_num, v_id))
+                    saved_count += 1
+            
+            if saved_count > 0:
+                st.success(f"✅ {saved_count} Notas Fiscais atualizadas com sucesso! Embarque liberado na Logística.")
+                import time; time.sleep(1.5); st.rerun()
+            else:
+                st.warning("Nenhum número de nota foi inserido.")
 
 # ======= 3. LOGISTICA REVERSA =======
 with tab3:

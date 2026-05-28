@@ -19,13 +19,14 @@ tab1, tab2 = st.tabs(["🛣️ Criar Novo Manifesto (Embarque)", "🗂️ Histó
 with tab1:
     st.subheader("Montagem do Centro de Custo da Rota")
     
-    # Busca vendas sem embarque no momento (Sem vinculo a viagem)
+    # Busca vendas sem embarque no momento (Sem vinculo a viagem e estritamente faturadas)
     df_orfãs = fetch_all('''
-       SELECT v.id, v.data, c.nome as Cliente, c.taxa_descarga, c.regras_descarga, p.nome as Carga, v.valor_total 
+       SELECT v.id, v.data, c.nome as Cliente, c.taxa_descarga, c.regras_descarga, p.nome as Carga, v.valor_total,
+              v.tipo_documento, v.numero_documento
        FROM vendas v 
        JOIN clientes c ON v.cliente_id=c.id 
        JOIN produtos p ON v.produto_id=p.id 
-       WHERE v.manifesto_id IS NULL 
+       WHERE v.manifesto_id IS NULL AND v.status = 'FATURADO'
        ORDER BY v.data DESC
     ''')
     
@@ -53,13 +54,24 @@ with tab1:
         st.markdown("### Seleção de Carga no Pátio (Notas sem Rota)")
         
         notas_selecionadas = []
+        options_map = {}
         if df_orfãs.empty:
             st.info("📦 Não existem faturamentos aguardando embarque. Todas as notas despachadas já estão em caminhões.")
         else:
             options = []
             for _, row in df_orfãs.iterrows():
                 dt_f = pd.to_datetime(row['data']).strftime('%d/%m')
-                options.append(f"NF #{row['id']} | {dt_f} - {row['Cliente']} ({row['Carga']}) -> {format_brl(row['valor_total'])}")
+                tipo = row['tipo_documento'] or "Nota Fiscal (NF)"
+                num = row['numero_documento']
+                
+                if "DAV" in tipo:
+                    doc_label = f"DAV #{str(num).zfill(10)}" if num else f"DAV #{row['id']}"
+                else:
+                    doc_label = f"NF-e #{num}" if (num and str(num).strip() != "") else "⚠️ [NF PENDENTE DE NÚMERO]"
+                
+                label = f"Venda #{row['id']} ({doc_label}) | {dt_f} - {row['Cliente']} ({row['Carga']}) -> {format_brl(row['valor_total'])}"
+                options.append(label)
+                options_map[label] = row
                 
             notas_selecionadas = st.multiselect("Marque quais Faturamentos irão neste caminhão:", options)
         
@@ -67,8 +79,8 @@ with tab1:
         if notas_selecionadas:
             ids_sel = []
             for ns in notas_selecionadas:
-                nf_num = ns.split("|")[0].replace("NF #", "").strip()
-                ids_sel.append(int(nf_num))
+                if ns in options_map:
+                    ids_sel.append(int(options_map[ns]['id']))
             df_alertas = df_orfãs[df_orfãs['id'].isin(ids_sel)]
             
             # Filtra somente clientes com taxa ou regra preenchida
@@ -85,19 +97,26 @@ with tab1:
         st.info("⚙️ **Como funciona o Rateio Sagrado:** O sistema somará o valor comercial em Reais de tudo que subir no caminhão. Se a Nota do Supermercado A for 80% do valor do caminhão, ela sofrerá a dedução de 80% do Custo do Frete que você preencheu lá em cima para seu DRE não ser mentiroso.")
         
         if st.form_submit_button("Liberar Caminhão (Gerar Manifesto)", type="primary"):
+            id_lista = []
+            nfs_sem_numero = []
+            for ns in notas_selecionadas:
+                if ns in options_map:
+                    row = options_map[ns]
+                    v_id = int(row['id'])
+                    id_lista.append(v_id)
+                    tipo = row['tipo_documento'] or "Nota Fiscal (NF)"
+                    num = row['numero_documento']
+                    if "Nota Fiscal" in tipo and (not num or str(num).strip() == ""):
+                        nfs_sem_numero.append(f"Venda #{v_id} ({row['Cliente']})")
+            
             if not notas_selecionadas:
                 st.error("Selecione no mínimo 1 faturamento para viajar!")
+            elif nfs_sem_numero:
+                st.error(f"🛑 **Erro de Expedição:** O caminhão não pode ser liberado! As seguintes Notas Fiscais estão pendentes do número oficial do SEFAZ: {', '.join(nfs_sem_numero)}. Favor registrar as numerações no módulo de Faturamento primeiro.")
             elif custo_frete == 0.0:
                 st.warning("Tem certeza que este frete será grátis (0 R$)? O custo para calcular a margem precisa ser real.")
-                # We can still proceed if they really want
             else:
                 # Se passou
-                id_lista = []
-                for ns in notas_selecionadas:
-                    # Extracts the ID from the string "NF #12 | ..."
-                    nf_num = ns.split("|")[0].replace("NF #", "").strip()
-                    id_lista.append(int(nf_num))
-                
                 # Vamos puxar os valores brutos exatos do Banco
                 s_orfas = df_orfãs[df_orfãs['id'].isin(id_lista)]
                 total_da_carga = s_orfas['valor_total'].sum()

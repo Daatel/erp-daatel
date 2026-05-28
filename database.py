@@ -752,6 +752,72 @@ def consumir_estoque_fifo(produto_id, quantidade, data_mov, origem, doc_ref):
         
     return custo_acumulado, is_estimado
 
+def gerar_comissao_se_necessario(venda_id, momento_gatilho, cliente_nome=None):
+    """
+    Gera o comissao_valor do vendedor se o momento do gatilho corresponder
+    (momento_gatilho pode ser 'FATURAMENTO' ou 'LIQUIDAÇÃO DE TITULO').
+    Salva o valor calculado diretamente no registro da venda para conferência posterior.
+    """
+    from datetime import date
+    import calendar
+    import pandas as pd
+    
+    # 1. Puxa vendedor, valor de comissão e cliente da venda
+    df_venda = fetch_all('''
+        SELECT v.vendedor_id, v.comissao_valor, v.cliente_id, v.produto_id, v.valor_total,
+               c.nome as cliente_nome, COALESCE(c.rede_clientes, '') as rede_clientes
+        FROM vendas v
+        JOIN clientes c ON v.cliente_id = c.id
+        WHERE v.id = ?
+    ''', (venda_id,))
+    
+    if df_venda.empty:
+        return
+        
+    vendedor_id = int(df_venda.iloc[0]['vendedor_id'])
+    comissao_val = float(df_venda.iloc[0]['comissao_valor'] or 0.0)
+    cliente_id = int(df_venda.iloc[0]['cliente_id'])
+    produto_id = int(df_venda.iloc[0]['produto_id']) if pd.notna(df_venda.iloc[0]['produto_id']) else None
+    valor_total = float(df_venda.iloc[0]['valor_total'] or 0.0)
+    cli_nome = cliente_nome if cliente_nome else df_venda.iloc[0]['cliente_nome']
+    rede_c = df_venda.iloc[0]['rede_clientes']
+    if not rede_c:
+        rede_c = "TODOS"
+        
+    # 2. Busca regra do vendedor
+    df_vend = fetch_all("SELECT gatilho_comissao, dia_vencimento_comissao, nome FROM funcionarios WHERE id = ?", (vendedor_id,))
+    if df_vend.empty:
+        return
+        
+    gatilho = str(df_vend.iloc[0]['gatilho_comissao'] or 'FATURAMENTO').upper()
+    
+    # Se o gatilho da regra não corresponder ao momento solicitado, ignora
+    if momento_gatilho == 'FATURAMENTO' and "LIQUIDAÇÃO" in gatilho:
+        return
+    if momento_gatilho == 'LIQUIDAÇÃO' and "LIQUIDAÇÃO" not in gatilho:
+        return
+        
+    # Se comissao_val for zero, tenta recalcular dinamicamente se existir uma regra cadastrada
+    if comissao_val <= 0.0:
+        df_regra = fetch_all('''
+            SELECT percentual 
+            FROM comissoes_regras 
+            WHERE vendedor_id = ? 
+              AND (produto_id = ? OR produto_id IS NULL)
+              AND (rede_clientes = ? OR rede_clientes = 'TODOS')
+            ORDER BY (CASE WHEN produto_id = ? THEN 2 ELSE 1 END) DESC,
+                     (CASE WHEN rede_clientes = ? THEN 2 ELSE 1 END) DESC
+            LIMIT 1
+        ''', (vendedor_id, produto_id, rede_c, produto_id, rede_c))
+        
+        if not df_regra.empty:
+            percentual = float(df_regra.iloc[0]['percentual'])
+            comissao_val = valor_total * (percentual / 100.0)
+            
+    if comissao_val > 0.0:
+        # Atualiza o valor na venda no banco para fins de DRE, auditoria e fechamento
+        run_query("UPDATE vendas SET comissao_valor = ? WHERE id = ?", (comissao_val, venda_id))
+
 if __name__ == "__main__":
     create_tables()
     print("Banco de dados configurado com sucesso!")

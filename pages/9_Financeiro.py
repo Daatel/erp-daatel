@@ -3,7 +3,8 @@ import pandas as pd
 from datetime import datetime, date, timedelta
 import plotly.graph_objects as go
 import traceback
-from database import fetch_all, run_query
+import calendar
+from database import fetch_all, run_query, gerar_comissao_se_necessario
 from estilo import carregar_estilo
 
 st.set_page_config(page_title="Tesouraria Oficial", page_icon="💸", layout="wide")
@@ -674,6 +675,12 @@ try:
                                  
                                  run_query("UPDATE contas_a_receber SET status='RECEBIDO', data_recebimento=?, conta_bancaria_id=? WHERE id=?",
                                            (dt_rec.strftime("%Y-%m-%d"), bCid, rr_id))
+                                 
+                                 # Gatilho de repasse de comissão se for no momento de LIQUIDAÇÃO DE TITULO
+                                 df_v = fetch_all("SELECT venda_id FROM contas_a_receber WHERE id = ?", (rr_id,))
+                                 if not df_v.empty and pd.notna(df_v.iloc[0]['venda_id']):
+                                     vid = int(df_v.iloc[0]['venda_id'])
+                                     gerar_comissao_se_necessario(vid, 'LIQUIDAÇÃO', cli)
                                  
                                  desc_final = f"REC. Cliente {cli}: {fat}"
                                  run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, TRUE)",

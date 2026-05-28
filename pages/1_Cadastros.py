@@ -808,13 +808,18 @@ with tab10:
         outros_desc = col8.text_input("Outros (Descrição)")
         outros_valor = col9.number_input("Outros (Valor R$)", min_value=0.0, step=50.0)
         
+        st.markdown("💼 **Repasse Comercial (Comissões)**")
+        col_g1, col_g2 = st.columns(2)
+        gatilho_com = col_g1.selectbox("Gatilho de Comissão Padrão", ["FATURAMENTO", "LIQUIDAÇÃO DE TITULO"])
+        dia_venc_com = col_g2.number_input("Dia do Repasse Acordado (Mês Seguinte)", min_value=1, max_value=31, value=31, step=1, help="Dia do mês seguinte para consolidação e repasse")
+        
         if st.form_submit_button("Cadastrar Colaborador"):
             if nome and salario >= 0:
                 run_query(
                     """INSERT INTO funcionarios 
-                       (nome, cargo, salario_base, regime_contratacao, data_admissao, data_nascimento, ajuda_custo, outros_descricao, outros_valor, status, data_termino) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ATIVO', ?)""",
-                    (nome, cargo, salario, regime, admissao, nascimento, ajuda_custo, outros_desc, outros_valor, termino)
+                       (nome, cargo, salario_base, regime_contratacao, data_admissao, data_nascimento, ajuda_custo, outros_descricao, outros_valor, status, data_termino, gatilho_comissao, dia_vencimento_comissao) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ATIVO', ?, ?, ?)""",
+                    (nome, cargo, salario, regime, admissao, nascimento, ajuda_custo, outros_desc, outros_valor, termino, gatilho_com, dia_venc_com)
                 )
                 st.success(f"Colaborador {nome} cadastrado com sucesso!")
                 import time; time.sleep(1); st.rerun()
@@ -850,9 +855,17 @@ with tab10:
                 ef_odesc = e_col5.text_input("Outros (Descrição)", f_data['outros_descricao'] if f_data['outros_descricao'] else "")
                 ef_ovalor = e_col6.number_input("Outros (Valor R$)", value=float(f_data['outros_valor'] or 0.0))
                 
+                st.markdown("💼 **Repasse Comercial (Comissões)**")
+                ec_g1, ec_g2 = st.columns(2)
+                gatilho_opts = ["FATURAMENTO", "LIQUIDAÇÃO DE TITULO"]
+                d_gatilho = f_data.get('gatilho_comissao', 'FATURAMENTO')
+                if d_gatilho not in gatilho_opts: d_gatilho = "FATURAMENTO"
+                ef_gatilho = ec_g1.selectbox("Gatilho de Comissão", gatilho_opts, index=gatilho_opts.index(d_gatilho))
+                ef_dia_venc = ec_g2.number_input("Dia do Repasse Acordado", min_value=1, max_value=31, value=int(f_data.get('dia_vencimento_comissao', 31) or 31), step=1)
+                
                 if st.form_submit_button("Salvar Modificações"):
-                    run_query("UPDATE funcionarios SET nome=?, cargo=?, salario_base=?, ajuda_custo=?, outros_descricao=?, outros_valor=?, status=?, data_termino=? WHERE id=?", 
-                              (ef_nome, ef_c, ef_sal, ef_ajuda, ef_odesc, ef_ovalor, ef_status, ef_termino, f_id))
+                    run_query("UPDATE funcionarios SET nome=?, cargo=?, salario_base=?, ajuda_custo=?, outros_descricao=?, outros_valor=?, status=?, data_termino=?, gatilho_comissao=?, dia_vencimento_comissao=? WHERE id=?", 
+                              (ef_nome, ef_c, ef_sal, ef_ajuda, ef_odesc, ef_ovalor, ef_status, ef_termino, ef_gatilho, ef_dia_venc, f_id))
                     import time; time.sleep(1); st.rerun()
 
 # ======= FICHAS TÉCNICAS (BOM) =======

@@ -136,61 +136,220 @@ with tab2:
 # ======= 3. COMISSÕES =======
 with tab3:
     st.subheader("Malha Contábil: Repasse de Comissões e Representantes")
-    st.markdown("> **Aviso do RH:** O repasse só é calculado sobre **Pedidos já Faturados** ou Liquidados.")
+    st.markdown("""
+    > **Políticas de Governança Comercial:** 
+    > As comissões são provisionadas dinamicamente à medida que as vendas são faturadas ou liquidadas. 
+    > No entanto, para evitar dispersão de caixa, elas **não são pagas individualmente**. 
+    > Utilize esta Central de Fechamento para auditar os lançamentos mensais, conferir as travas de recebimento, **abater devoluções/sangrias comerciais** e **autorizar um repasse consolidado único** para a conta de cada representante na data de vencimento acordada.
+    """)
     
     hoje = date.today()
     
-    mes_filtro = st.selectbox("Apontamento Cíclico (Mês Base)", [hoje.strftime('%Y-%m'), (hoje - timedelta(days=30)).strftime('%Y-%m')])
+    col_f1, col_f2 = st.columns(2)
+    mes_filtro = col_f1.selectbox("Apontamento Cíclico (Mês Base)", [hoje.strftime('%Y-%m'), (hoje - timedelta(days=30)).strftime('%Y-%m')], key="com_mes_filtro")
     
-    q_com = '''
-        SELECT v.id as 'Doc', vn.nome as 'Rota', vn.gatilho_comissao as 'Gatilho do Repasse Comercial', c.nome as 'K-Account', v.data as 'Data Lançada', cr.status as 'Tít. Receb.', v.valor_total as 'Vendido Bruto R$', v.comissao_valor as 'Retenção'
-        FROM vendas v
-        JOIN funcionarios vn ON v.vendedor_id=vn.id
-        JOIN clientes c ON v.cliente_id=c.id
-        LEFT JOIN contas_a_receber cr ON cr.venda_id=v.id
-        WHERE strftime('%Y-%m', v.data) = ? AND v.status = 'FATURADO'
-    '''
-    df_com = fetch_all(q_com, (mes_filtro,))
-    
-    if not df_com.empty:
-        df_com['Comissão Bloqueada'] = "🚫 Pendente Base/Recebimento"
-        for i, row in df_com.iterrows():
-            g_r = row['Gatilho do Repasse Comercial']
-            stat = str(row['Tít. Receb.']).upper()
-            if g_r == "LIQUIDAÇÃO DE TITULO" and "PENDENTE" in stat:
-                df_com.at[i, 'Comissão Bloqueada'] = "🚫 Aguardando Boleto Sócio"
-            else:
-                df_com.at[i, 'Comissão Bloqueada'] = "✔️ Módulo Liberado"
+    df_vends_list = fetch_all("SELECT id, nome, gatilho_comissao, dia_vencimento_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%' ORDER BY nome")
+    if df_vends_list.empty:
+        st.warning("Cadastre representantes comerciais no RH primeiro.")
+    else:
+        vendedor_opts = {r['nome']: r for _, r in df_vends_list.iterrows()}
+        vendedor_sel = col_f2.selectbox("Selecione o Vendedor / Rota para Auditoria", list(vendedor_opts.keys()))
+        
+        vendedor_obj = vendedor_opts[vendedor_sel]
+        v_id = vendedor_obj['id']
+        vendedor_nome = vendedor_obj['nome']
+        v_gatilho = str(vendedor_obj['gatilho_comissao'] or 'FATURAMENTO').upper()
+        v_dia_venc = int(vendedor_obj['dia_vencimento_comissao'] or 31)
+        
+        # Query detalhada de vendas e comissões daquele vendedor no mês selecionado
+        q_com = '''
+            SELECT v.id as 'Doc', c.nome as 'K-Account', v.data as 'Data Lançada', 
+                   COALESCE(cr.status, 'N/A') as 'Tit_Receb', v.valor_total as 'Vendido Bruto R$', 
+                   v.comissao_valor as 'Retencao'
+            FROM vendas v
+            JOIN clientes c ON v.cliente_id=c.id
+            LEFT JOIN contas_a_receber cr ON cr.venda_id=v.id
+            WHERE v.vendedor_id = ? AND strftime('%Y-%m', v.data) = ? AND v.status = 'FATURADO'
+            ORDER BY v.id DESC
+        '''
+        df_com = fetch_all(q_com, (v_id, mes_filtro))
+        
+        # --- CÁLCULO DE ESTORNOS POR DEVOLUÇÕES / DESCONTOS ---
+        estornos_list = []
+        total_estorno_comissao = 0.0
+        
+        df_devs = fetch_all('''
+            SELECT d.id, d.data, c.nome as cliente_nome, p.nome as produto_nome, 
+                   d.valor_financeiro_abatido, COALESCE(c.rede_clientes, '') as rede_clientes, 
+                   d.produto_id, d.motivo
+            FROM devolucoes d
+            JOIN clientes c ON d.cliente_id = c.id
+            JOIN produtos p ON d.produto_id = p.id
+            WHERE c.representante_id = ? AND strftime('%Y-%m', d.data) = ?
+        ''', (v_id, mes_filtro))
+        
+        for idx, r in df_devs.iterrows():
+            val_dev = float(r['valor_financeiro_abatido'] or 0.0)
+            prod_id = int(r['produto_id'])
+            rede_c = r['rede_clientes']
+            if not rede_c: rede_c = "TODOS"
+            
+            # Fetch rule
+            df_regra = fetch_all('''
+                SELECT percentual 
+                FROM comissoes_regras 
+                WHERE vendedor_id = ? 
+                  AND (produto_id = ? OR produto_id IS NULL)
+                  AND (rede_clientes = ? OR rede_clientes = 'TODOS')
+                ORDER BY (CASE WHEN produto_id = ? THEN 2 ELSE 1 END) DESC,
+                         (CASE WHEN rede_clientes = ? THEN 2 ELSE 1 END) DESC
+                LIMIT 1
+            ''', (v_id, prod_id, rede_c, prod_id, rede_c))
+            
+            perc = float(df_regra.iloc[0]['percentual']) if not df_regra.empty else 0.0
+            if perc <= 0.0:
+                perc = 5.0 # Fallback padrão de segurança
                 
-        df_view = df_com.drop('Gatilho do Repasse Comercial', axis=1)
-        df_view['Data Lançada'] = pd.to_datetime(df_view['Data Lançada'], errors='coerce').dt.strftime('%d/%m/%Y')
-        df_view['Vendido Bruto R$'] = df_view['Vendido Bruto R$'].apply(format_brl)
-        df_view['Retenção'] = df_view['Retenção'].apply(format_brl)
-        st.dataframe(df_view, hide_index=True, width="stretch")
-        
-        st.markdown("### 🧮 Auditoria de Obrigações Comerciais")
-        df_liberadas = df_com[df_com['Comissão Bloqueada'].str.contains('✔️')].copy()
-        
-        if not df_liberadas.empty:
-            df_liberadas['Retenção Float'] = df_liberadas['Retenção'].astype(float)
-            grp = df_liberadas.groupby('Rota', as_index=False).agg({
-                'Vendido Bruto R$': 'sum',
-                'Retenção Float': 'sum'
+            estorno_val = val_dev * (perc / 100.0)
+            total_estorno_comissao += estorno_val
+            
+            estornos_list.append({
+                "ID": int(r['id']),
+                "Data": pd.to_datetime(r['data']).strftime('%d/%m/%Y'),
+                "Cliente": r['cliente_nome'],
+                "Produto": r['produto_nome'],
+                "Motivo": r['motivo'],
+                "Valor Avariado": val_dev,
+                "Comissão Estornada": estorno_val
             })
             
-            m_c1, m_c2 = st.columns(2)
-            m_c1.metric("Volume Geral Faturado (Limpo)", format_brl(grp['Vendido Bruto R$'].sum()))
-            m_c2.metric("Passivo RH Gerado (Livre de Travas)", format_brl(grp['Retenção Float'].sum()))
-            
-            grp['Vendido Bruto R$'] = grp['Vendido Bruto R$'].apply(format_brl)
-            grp['Passivo Retido R$'] = grp['Retenção Float'].apply(format_brl)
-            grp.drop('Retenção Float', axis=1, inplace=True)
-            
-            st.dataframe(grp, hide_index=True, width="stretch")
+        if df_com.empty and len(estornos_list) == 0:
+            st.info(f"Nenhuma atividade comercial (vendas ou devoluções) registrada para **{vendedor_nome}** na competência **{mes_filtro}**.")
         else:
-            st.warning("Nenhuma comissão destravou no mês escolhido.")
-    else:
-        st.write("Sem faturamento rastreado no período.")
+            # Determina o status da comissão para cada item
+            total_vendido = 0.0
+            total_comissao = 0.0
+            total_liberado = 0.0
+            
+            if not df_com.empty:
+                df_com['Status Comissão'] = ""
+                df_com['Liberada_Float'] = 0.0
+                
+                for idx, r in df_com.iterrows():
+                    val_com = float(r['Retencao'] or 0.0)
+                    status_tit = str(r['Tit_Receb']).upper()
+                    
+                    # Se gatilho for faturamento, libera direto
+                    if "LIQUIDAÇÃO" not in v_gatilho:
+                        df_com.at[idx, 'Status Comissão'] = "✔️ Liberada (Faturamento)"
+                        df_com.at[idx, 'Liberada_Float'] = val_com
+                    else:
+                        # Se for liquidação de título, depende se o título está RECEBIDO
+                        if status_tit == "RECEBIDO":
+                            df_com.at[idx, 'Status Comissão'] = "✔️ Liberada (Pago pelo Cliente)"
+                            df_com.at[idx, 'Liberada_Float'] = val_com
+                        else:
+                            df_com.at[idx, 'Status Comissão'] = "🚫 Travada (Aguardando Recebimento)"
+                            df_com.at[idx, 'Liberada_Float'] = 0.0
+                
+                total_vendido = df_com['Vendido Bruto R$'].sum()
+                total_comissao = df_com['Retencao'].sum()
+                total_liberado = df_com['Liberada_Float'].sum()
+            
+            total_bloqueado = total_comissao - total_liberado
+            repasse_liquido = max(0.0, total_liberado - total_estorno_comissao)
+            
+            # Exibir resumo em Cards de KPI
+            st.markdown("### 🧮 Saldo Consolidado e Auditoria")
+            
+            kpi_c1, kpi_c2, kpi_c3, kpi_c4 = st.columns(4)
+            kpi_c1.metric("Vendido Bruto Total", format_brl(total_vendido))
+            kpi_c2.metric("Comissão Gross Provisão", format_brl(total_comissao))
+            kpi_c3.metric("(-) Estornos p/ Devoluções", f"- {format_brl(total_estorno_comissao)}", delta_color="inverse")
+            kpi_c4.metric("SALDO LÍQUIDO LIBERADO", format_brl(repasse_liquido), help="Pronto para repasse (Comissão Liberada menos Estornos de Devoluções)")
+            
+            # Detalhamento de Comissão Travada (Aguardando Recebimento)
+            if total_bloqueado > 0.0:
+                st.info(f"💡 **Nota de Caixa:** Além do saldo liberado, o vendedor possui **{format_brl(total_bloqueado)}** em comissões travadas aguardando a liquidação dos boletos pelos clientes.")
+            
+            # Tabela principal de conferência (Se houver vendas)
+            if not df_com.empty:
+                st.markdown("#### 🔍 Extrato Detalhado de Títulos e Repasses (Vendas)")
+                df_view = df_com.copy()
+                df_view['Data Lançada'] = pd.to_datetime(df_view['Data Lançada'], errors='coerce').dt.strftime('%d/%m/%Y')
+                df_view['Vendido Bruto R$'] = df_view['Vendido Bruto R$'].apply(format_brl)
+                df_view['Comissão R$'] = df_view['Retencao'].apply(format_brl)
+                df_view['Tit. Receb.'] = df_view['Tit_Receb'].map({'RECEBIDO': '🟢 PAGO', 'PENDENTE': '🔴 EM ABERTO', 'N/A': '⚪ N/A'})
+                
+                df_view_final = df_view[['Doc', 'K-Account', 'Data Lançada', 'Tit. Receb.', 'Vendido Bruto R$', 'Comissão R$', 'Status Comissão']]
+                st.dataframe(df_view_final, hide_index=True, width="stretch")
+            
+            # Tabela de Estornos de Devolução (Se houver)
+            if len(estornos_list) > 0:
+                st.markdown("#### 📉 Extrato Detalhado de Devoluções e Reversões (Deduções)")
+                df_view_dev = pd.DataFrame(estornos_list)
+                df_view_dev_fmt = df_view_dev.copy()
+                df_view_dev_fmt['Valor Avariado'] = df_view_dev_fmt['Valor Avariado'].apply(format_brl)
+                df_view_dev_fmt['Comissão Estornada'] = df_view_dev_fmt['Comissão Estornada'].apply(format_brl)
+                st.dataframe(df_view_dev_fmt, hide_index=True, width="stretch")
+            
+            # Painel de Fechamento e Envio para Contas a Pagar
+            st.markdown("---")
+            st.markdown("### 🔒 Autorização e Repasse Consolidado")
+            
+            if repasse_liquido <= 0.0:
+                st.info("Não há saldo líquido positivo de comissão liberado para fechamento comercial nesta competência.")
+            else:
+                # 1. Verifica se já existe repasse consolidado no Contas a Pagar
+                desc_consolidada_prefix = f"Repasse de Comissão Consolidada - {vendedor_nome} - Ref. {mes_filtro}"
+                df_rep_existe = fetch_all("SELECT id, valor, status, data_vencimento FROM contas_a_pagar WHERE descricao LIKE ?", (f"%{desc_consolidada_prefix}%",))
+                
+                if not df_rep_existe.empty:
+                    rep_id = df_rep_existe.iloc[0]['id']
+                    rep_val = float(df_rep_existe.iloc[0]['valor'])
+                    rep_status = df_rep_existe.iloc[0]['status']
+                    rep_venc = df_rep_existe.iloc[0]['data_vencimento']
+                    rep_venc_dt = pd.to_datetime(rep_venc).strftime('%d/%m/%Y')
+                    
+                    st.success(f"✅ **Folha de Comissões Já Autorizada:** Esta competência foi fechada anteriormente. "
+                               f"Foi gerada a Obrigação ID #{rep_id} no valor líquido de **{format_brl(rep_val)}**, "
+                               f"com status **'{rep_status}'** e vencimento acordado para **{rep_venc_dt}**.")
+                else:
+                    # Calcula data de vencimento acordada (dia do mês seguinte)
+                    import calendar
+                    partes = mes_filtro.split('-')
+                    ano = int(partes[0])
+                    mes = int(partes[1])
+                    mes_seg = mes + 1
+                    ano_seg = ano
+                    if mes_seg > 12:
+                        mes_seg = 1
+                        ano_seg += 1
+                    ultimo_dia = calendar.monthrange(ano_seg, mes_seg)[1]
+                    dia_final = min(v_dia_venc, ultimo_dia)
+                    venc_consolidado = date(ano_seg, mes_seg, dia_final)
+                    
+                    st.warning(f"⚠️ **Folha de Comissões Pendente:** O repasse líquido acumulado de **{format_brl(repasse_liquido)}** "
+                               f"referente a competência **{mes_filtro}** (já descontados os estornos de devoluções) ainda não foi enviado para o Contas a Pagar.")
+                    st.markdown(f"- **Total Bruto Liberado:** {format_brl(total_liberado)}")
+                    st.markdown(f"- **Total de Abatimentos/Devoluções:** - {format_brl(total_estorno_comissao)}")
+                    st.markdown(f"- **Data acordada de pagamento:** `{venc_consolidado.strftime('%d/%m/%Y')}` (Dia {v_dia_venc} do mês seguinte)")
+                    st.markdown(f"- **Regra de Repasse do Representante:** `{v_gatilho}`")
+                    
+                    if st.button("🔒 Fechar Competência & Autorizar Payout Único", type="primary", use_container_width=True):
+                        # Pega plano de conta para repasse de comissão
+                        p_c_comissao = fetch_all("SELECT id FROM planos_de_contas WHERE codigo = '2.2.3' OR nome LIKE '%Comiss%' LIMIT 1")
+                        pc_com_id = int(p_c_comissao.iloc[0]['id']) if not p_c_comissao.empty else None
+                        
+                        desc_comissao_final = f"{desc_consolidada_prefix} | Venc. acordado: dia {v_dia_venc}/mês seg. | (Bruto: {format_brl(total_liberado)} - Estornos: {format_brl(total_estorno_comissao)})"
+                        
+                        run_query('''
+                            INSERT INTO contas_a_pagar (plano_conta_id, descricao, valor, data_vencimento, status)
+                            VALUES (?, ?, ?, ?, 'PENDENTE')
+                        ''', (pc_com_id, desc_comissao_final, repasse_liquido, venc_consolidado.strftime("%Y-%m-%d")))
+                        
+                        st.success(f"Folha consolidada fechada e autorizada para repasse. Obrigação comercial líquida de {format_brl(repasse_liquido)} enviada ao Contas a Pagar com vencimento em {venc_consolidado.strftime('%d/%m/%Y')}.")
+                        import time; time.sleep(2.0); st.rerun()
 
 # ======= 4. EXTRATO DO VENDEDOR =======
 with tab4:
