@@ -6,6 +6,72 @@ import traceback
 import calendar
 from database import fetch_all, run_query, gerar_comissao_se_necessario
 from estilo import carregar_estilo
+from fpdf import FPDF
+
+def gerar_pdf_financeiro(df_pdf, dt_ini, dt_fim, t_ent, t_sai, s_liq, banco_filtro, cat_filtro):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Cabeçalho da Empresa
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "EMPORIO DO ALHO - RELATORIO FINANCEIRO", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, f"Periodo Analisado: {dt_ini.strftime('%d/%m/%Y')} ate {dt_fim.strftime('%d/%m/%Y')}", new_x="LMARGIN", new_y="NEXT", align="C")
+    
+    # Filtros Aplicados
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(0, 6, "Filtros Aplicados:", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, f"- Banco: {banco_filtro}  |  - Categoria: {cat_filtro}", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+    
+    # Resumo Financeiro do Período
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(0, 6, "RESUMO FINANCEIRO:", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 6, f"Total de Entradas: R$ {t_ent:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."), new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, f"Total de Saidas:  R$ {t_sai:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."), new_x="LMARGIN", new_y="NEXT")
+    
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(0, 6, f"Saldo Liquido:      R$ {s_liq:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."), new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(8)
+    
+    # Tabela de Lançamentos
+    pdf.set_font("Helvetica", "B", 9)
+    w_data = 20
+    w_tipo = 22
+    w_banco = 25
+    w_desc = 85
+    w_val = 32
+    
+    pdf.cell(w_data, 7, "Data", border=1, align="C")
+    pdf.cell(w_tipo, 7, "Movimento", border=1, align="C")
+    pdf.cell(w_banco, 7, "Banco", border=1, align="C")
+    pdf.cell(w_desc, 7, "Historico/Descricao", border=1, align="L")
+    pdf.cell(w_val, 7, "Valor", border=1, align="R", new_x="LMARGIN", new_y="NEXT")
+    
+    pdf.set_font("Helvetica", "", 8.5)
+    for _, r in df_pdf.iterrows():
+        hist = str(r['Histórico'])[:45]
+        # Remove non-ascii or accent characters for FPDF standard helvetica compatibility
+        import unicodedata
+        hist = "".join(ch for ch in unicodedata.normalize('NFKD', hist) if unicodedata.category(ch) != 'Mn')
+        mov = str(r['Movimentação'])
+        banco = "".join(ch for ch in unicodedata.normalize('NFKD', str(r['Banco'])) if unicodedata.category(ch) != 'Mn')
+        val_str = f"R$ {float(r['Valor']):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        
+        pdf.cell(w_data, 6, str(r['Data']), border=1, align="C")
+        pdf.cell(w_tipo, 6, mov, border=1, align="C")
+        pdf.cell(w_banco, 6, banco[:13], border=1, align="C")
+        pdf.cell(w_desc, 6, hist, border=1, align="L")
+        pdf.cell(w_val, 6, val_str, border=1, align="R", new_x="LMARGIN", new_y="NEXT")
+        
+    pdf.ln(15)
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.cell(0, 6, "Relatorio oficial gerado eletronicamente pelo ERP Fabrica de Alho.", new_x="LMARGIN", new_y="NEXT", align="C")
+    
+    return pdf.output(dest="S")
 
 st.set_page_config(page_title="Tesouraria Oficial", page_icon="💸", layout="wide")
 carregar_estilo()
@@ -201,6 +267,99 @@ try:
         )
         fig.update_yaxes(gridcolor='rgba(128,128,128,0.2)', zerolinecolor='rgba(128,128,128,0.5)', zerolinewidth=2)
         st.plotly_chart(fig, width="stretch")
+
+        st.markdown("---")
+        st.subheader("🔍 Detalhamento e Auditoria de Lançamentos por Período")
+        st.markdown("Filtre o fluxo de caixa histórico por período e contas para conciliação ou exportação oficial em Excel ou PDF.")
+        
+        # Filtros interativos
+        col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+        
+        dt_inicio = col_f1.date_input("Data de Início", date.today() - timedelta(days=7))
+        dt_fim = col_f2.date_input("Data de Fim", date.today())
+        
+        bancos_det_opts = ["TODOS"] + list(opcoes_bancos.keys())
+        banco_filtro = col_f3.selectbox("Filtrar por Conta/Banco", bancos_det_opts, key="det_banco")
+        
+        # Categorias de Lançamento
+        df_todas_cats = fetch_all("SELECT DISTINCT categoria FROM fluxo_caixa")
+        cats_opts = ["TODAS"] + (df_todas_cats['categoria'].tolist() if not df_todas_cats.empty else [])
+        cat_filtro = col_f4.selectbox("Filtrar por Categoria", cats_opts, key="det_cat")
+        
+        # Query de lançamentos no período
+        query_detalhe = """
+            SELECT fc.data as 'Data', fc.tipo as 'Movimentação', 
+                   fc.categoria as 'Categoria', fc.descricao as 'Histórico', fc.valor as 'Valor', 
+                   cb.nome as 'Banco'
+            FROM fluxo_caixa fc
+            LEFT JOIN contas_bancarias cb ON fc.conta_bancaria_id = cb.id
+            WHERE fc.data BETWEEN ? AND ?
+            ORDER BY fc.data DESC, fc.id DESC
+        """
+        
+        df_det = fetch_all(query_detalhe, (dt_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")))
+        
+        if not df_det.empty:
+            # Aplicar filtros adicionais em pandas
+            if banco_filtro != "TODOS":
+                df_det = df_det[df_det['Banco'] == banco_filtro]
+            if cat_filtro != "TODAS":
+                df_det = df_det[df_det['Categoria'] == cat_filtro]
+                
+            if df_det.empty:
+                st.warning("Nenhum lançamento encontrado para os filtros selecionados.")
+            else:
+                # Sumarização
+                entradas = df_det[df_det['Movimentação'] == 'Entrada']['Valor'].sum()
+                saidas = df_det[df_det['Movimentação'] == 'Saída']['Valor'].sum()
+                saldo_liq = entradas - saidas
+                
+                c_det1, c_det2, c_det3 = st.columns(3)
+                c_det1.metric("🟢 Total de Entradas", f"R$ {entradas:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                c_det2.metric("🔴 Total de Saídas", f"R$ {saidas:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                
+                # Cor do Saldo Líquido
+                if saldo_liq >= 0:
+                    c_det3.success(f"💎 Saldo Líquido: R$ {saldo_liq:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                else:
+                    c_det3.error(f"💎 Saldo Líquido: R$ {saldo_liq:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                
+                # Formatação para visualização
+                df_det_view = df_det.copy()
+                df_det_view['Data'] = pd.to_datetime(df_det_view['Data']).dt.strftime('%d/%m/%Y')
+                df_det_view['Valor (R$)'] = df_det_view['Valor'].apply(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                
+                st.dataframe(df_det_view[['Data', 'Movimentação', 'Banco', 'Categoria', 'Histórico', 'Valor (R$)']], hide_index=True, width="stretch")
+                
+                # Ações de Exportação
+                col_exp1, col_exp2 = st.columns(2)
+                
+                # 1. Export Excel (CSV)
+                csv_data = df_det.to_csv(index=False, sep=";").encode('utf-8-sig')
+                col_exp1.download_button(
+                    label="📥 Exportar Planilha (Excel/CSV)",
+                    data=csv_data,
+                    file_name=f"extrato_financeiro_{dt_inicio.strftime('%d-%m-%Y')}_a_{dt_fim.strftime('%d-%m-%Y')}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key="btn_det_csv"
+                )
+                
+                # 2. Export PDF
+                try:
+                    pdf_data = gerar_pdf_financeiro(df_det_view, dt_inicio, dt_fim, entradas, saidas, saldo_liq, banco_filtro, cat_filtro)
+                    col_exp2.download_button(
+                        label="📄 Exportar Relatório Oficial (PDF)",
+                        data=pdf_data,
+                        file_name=f"relatorio_financeiro_{dt_inicio.strftime('%d-%m-%Y')}_a_{dt_fim.strftime('%d-%m-%Y')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key="btn_det_pdf"
+                    )
+                except Exception as pdf_err:
+                    col_exp2.error(f"Erro ao gerar PDF: {pdf_err}")
+        else:
+            st.info("Nenhum lançamento no período selecionado.")
 
     # ------------------ ABA 2: CONTAS A PAGAR ------------------
     with tab2:
