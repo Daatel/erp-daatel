@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from database import fetch_all, run_query, get_connection, db_connection, release_connection
 from estilo import carregar_estilo
 
@@ -472,14 +472,45 @@ else:
 st.markdown("---")
 st.subheader("📦 Histórico de Notas Fiscais de Entrada")
 
+# Inicializar datas no session state se não existirem
+if 'compras_dt_inicio' not in st.session_state:
+    st.session_state['compras_dt_inicio'] = date.today() - timedelta(days=30)
+if 'compras_dt_fim' not in st.session_state:
+    st.session_state['compras_dt_fim'] = date.today()
+
+st.markdown("##### 📅 Filtro por Período de Emissão")
+col_b1, col_b2, col_b3, _ = st.columns([1, 1.3, 1.3, 4.4])
+if col_b1.button("📅 Hoje", use_container_width=True, key="btn_compras_hoje"):
+    st.session_state['compras_dt_inicio'] = date.today()
+    st.session_state['compras_dt_fim'] = date.today()
+    st.rerun()
+if col_b2.button("📅 Últimos 7 Dias", use_container_width=True, key="btn_compras_7d"):
+    st.session_state['compras_dt_inicio'] = date.today() - timedelta(days=7)
+    st.session_state['compras_dt_fim'] = date.today()
+    st.rerun()
+if col_b3.button("📅 Últimos 30 Dias", use_container_width=True, key="btn_compras_30d"):
+    st.session_state['compras_dt_inicio'] = date.today() - timedelta(days=30)
+    st.session_state['compras_dt_fim'] = date.today()
+    st.rerun()
+
+# Filtros interativos
+col_f1, col_f2 = st.columns(2)
+dt_inicio = col_f1.date_input("Data de Início", value=st.session_state['compras_dt_inicio'], key="compras_dt_inicio_input")
+dt_fim = col_f2.date_input("Data de Fim", value=st.session_state['compras_dt_fim'], key="compras_dt_fim_input")
+
+# Sincronizar de volta
+st.session_state['compras_dt_inicio'] = dt_inicio
+st.session_state['compras_dt_fim'] = dt_fim
+
 df_compras = fetch_all("""
     SELECT c.id, c.data_compra as 'Data', f.nome_fantasia as 'Fornecedor',
            c.numero_doc as 'Nº Doc', c.tipo_doc as 'Tipo',
            c.valor_total as 'Total Bruto (R$)', c.observacoes as 'Obs'
     FROM compras c
     JOIN fornecedores f ON c.fornecedor_id = f.id
-    ORDER BY c.id DESC LIMIT 100
-""")
+    WHERE c.data_compra BETWEEN ? AND ?
+    ORDER BY c.id DESC
+""", (dt_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")))
 
 if not df_compras.empty:
     df_view = df_compras.copy()
