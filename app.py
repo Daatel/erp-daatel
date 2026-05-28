@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import os
+import sys
+import importlib
+import database
+importlib.reload(database)
 from database import fetch_all, run_query, initialize_database
 
 os.chdir(Path(__file__).parent)
