@@ -57,6 +57,29 @@ def carregar_estilo():
             border-radius: 6px !important;
             font-weight: 600 !important;
         }
+        /* Sobrescrita de componentes da página principal para manter o tema claro e elegante */
+        div[data-testid="stExpander"] {
+            background-color: #f8fafc !important; /* Slate 50 */
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+        }
+        div[data-testid="stExpander"] label p, div[data-testid="stExpander"] p, div[data-testid="stExpander"] span {
+            color: #1e293b !important; /* Slate 800 */
+        }
+        div[data-testid="stExpander"] svg {
+            fill: #64748b !important;
+        }
+        .stTabs [role="tablist"] {
+            border-bottom: 2px solid #e2e8f0 !important;
+        }
+        .stTabs [role="tab"] p {
+            color: #64748b !important;
+            font-weight: 500 !important;
+        }
+        .stTabs [role="tab"][aria-selected="true"] p {
+            color: #01743d !important;
+            font-weight: 700 !important;
+        }
         .daatel-footer {
             position: fixed;
             bottom: 10px;
