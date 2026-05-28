@@ -684,14 +684,21 @@ with tab5:
         
         if tipo_entidade == "CLIENTE":
             lista_entidades = df_clientes['nome'].tolist() if not df_clientes.empty else []
+            nome_aba_cadastro = "🏭 Cadastro de Clientes"
         elif tipo_entidade == "GRUPO":
             df_g = fetch_all("SELECT nome FROM grupos_clientes")
             lista_entidades = df_g['nome'].tolist() if not df_g.empty else []
+            nome_aba_cadastro = "🏢 Redes e Grupos"
         else:
             df_r = fetch_all("SELECT nome FROM redes_clientes")
             lista_entidades = df_r['nome'].tolist() if not df_r.empty else []
+            nome_aba_cadastro = "🏢 Redes e Grupos"
             
-        entidade_nome = col_t3.selectbox("3. Vínculo (Selecione o Cliente/Grupo/Rede)", ["(Selecione)"] + lista_entidades, key="tab_ent")
+        if not lista_entidades:
+            entidade_nome = col_t3.selectbox("3. Vínculo (Selecione o Cliente/Grupo/Rede)", ["(Nenhum registrado)"], key="tab_ent", disabled=True)
+            st.warning(f"⚠️ **Nenhum {tipo_entidade.lower()}** cadastrado no sistema! Acesse o menu **Cadastros** e use a aba **{nome_aba_cadastro}** para registrá-los primeiro.")
+        else:
+            entidade_nome = col_t3.selectbox("3. Vínculo (Selecione o Cliente/Grupo/Rede)", ["(Selecione)"] + lista_entidades, key="tab_ent")
         
         preco_tabela = col_t4.number_input("4. Preço Acordado (R$)", min_value=0.01, step=0.1, key="tab_preco")
         
