@@ -7,8 +7,41 @@ def carregar_estilo():
             color: #01743d !important;
             font-weight: 600 !important;
         }
-        div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {
+        /* --- CORREÇÃO GERAL DE ENTRADAS DE DADOS (INPUTS CLAROS E LEGÍVEIS) --- */
+        div[data-baseweb="input"] {
+            background-color: #ffffff !important;
+            border-radius: 6px !important;
+        }
+        div[data-baseweb="input"] > div {
             border-color: #01743d40 !important;
+            background-color: #ffffff !important;
+        }
+        div[data-baseweb="input"] input {
+            background-color: #ffffff !important;
+            color: #0f172a !important; /* Slate 900 */
+            -webkit-text-fill-color: #0f172a !important;
+        }
+        /* Caixas de Seleção (Selectbox / Dropdown) */
+        div[data-baseweb="select"] > div {
+            border-color: #01743d40 !important;
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+        }
+        div[data-baseweb="select"] * {
+            color: #0f172a !important;
+        }
+        /* Textareas (Áreas de texto longo) */
+        div[data-baseweb="textarea"] textarea {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+        }
+        /* Botões de incremento/decremento nos inputs numéricos */
+        div[data-testid="stNumberInputStepDown"], div[data-testid="stNumberInputStepUp"] {
+            background-color: #f1f5f9 !important; /* Slate 100 */
+            border-color: #cbd5e1 !important;
+        }
+        div[data-testid="stNumberInputStepDown"] svg, div[data-testid="stNumberInputStepUp"] svg {
+            fill: #475569 !important; /* Slate 600 */
         }
         h1, h2, h3 {
             color: #292d77 !important;
