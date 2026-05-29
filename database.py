@@ -953,11 +953,23 @@ def enviar_relatorio_resumo_executivo() -> tuple[bool, str]:
         df_saldos = fetch_all("SELECT SUM(saldo_inicial) as total FROM contas_bancarias WHERE status='ATIVO'")
         saldo_caixa_total = float(df_saldos.iloc[0]['total'] or 0.0) if not df_saldos.empty else 0.0
         
-        # 2. COMERCIAL (Vendas de hoje)
+        # 2. COMERCIAL (Pedidos do Dia, Faturamento Bruto, e Pedidos Pendentes)
+        # 2.1 Pedidos de Venda Criados Hoje
         query_vendas = "SELECT SUM(valor_total) as total, COUNT(*) as qtd FROM vendas WHERE data = ?"
         df_vendas = fetch_all(query_vendas, (hoje,))
-        faturamento_hoje = float(df_vendas.iloc[0]['total'] or 0.0) if not df_vendas.empty else 0.0
-        qtd_pedidos_hoje = int(df_vendas.iloc[0]['qtd'] or 0) if not df_vendas.empty else 0
+        pedidos_valor = float(df_vendas.iloc[0]['total'] or 0.0) if not df_vendas.empty else 0.0
+        pedidos_qtd = int(df_vendas.iloc[0]['qtd'] or 0) if not df_vendas.empty else 0
+        
+        # 2.2 Faturamento Bruto de Hoje (Status 'FATURADO')
+        query_fat = "SELECT SUM(valor_total) as total FROM vendas WHERE data = ? AND status = 'FATURADO'"
+        df_fat = fetch_all(query_fat, (hoje,))
+        faturamento_hoje = float(df_fat.iloc[0]['total'] or 0.0) if not df_fat.empty else 0.0
+        
+        # 2.3 Pedidos Pendentes (Aguardando Faturamento - Status 'APROVADO')
+        query_pend = "SELECT SUM(valor_total) as total, COUNT(*) as qtd FROM vendas WHERE status = 'APROVADO'"
+        df_pend = fetch_all(query_pend)
+        pendentes_valor = float(df_pend.iloc[0]['total'] or 0.0) if not df_pend.empty else 0.0
+        pendentes_qtd = int(df_pend.iloc[0]['qtd'] or 0) if not df_pend.empty else 0
         
         # 3. PRODUÇÃO (Produção de hoje)
         query_prod = "SELECT SUM(produto_final_kg) as total FROM producao_diaria WHERE data = ?"
@@ -997,8 +1009,9 @@ def enviar_relatorio_resumo_executivo() -> tuple[bool, str]:
         msg += f"• Saldo Total de Contas Bancárias: <b>R$ {saldo_caixa_total:,.2f}</b>\n\n"
         
         msg += "🛒 <b>COMERCIAL</b>\n"
-        msg += f"• Faturamento de Hoje: <b>R$ {faturamento_hoje:,.2f}</b>\n"
-        msg += f"• Pedidos Faturados: <i>{qtd_pedidos_hoje} pedidos</i>\n\n"
+        msg += f"• Pedidos de Venda Criados Hoje: <b>R$ {pedidos_valor:,.2f}</b> <i>({pedidos_qtd} pedidos)</i>\n"
+        msg += f"• Faturamento Bruto de Hoje: <b>R$ {faturamento_hoje:,.2f}</b> <i>(Pedidos Billed)</i>\n"
+        msg += f"• Pedidos Pendentes (Aguard. Fat): <b>R$ {pendentes_valor:,.2f}</b> <i>({pendentes_qtd} em carteira)</i>\n\n"
         
         msg += "🏭 <b>PRODUÇÃO</b>\n"
         msg += f"• Total Fabricado Hoje: <b>{produzido_hoje:,.2f} Kg</b> de produto acabado\n\n"
