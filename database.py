@@ -860,11 +860,12 @@ def enviar_mensagem_telegram(mensagem: str) -> tuple[bool, str]:
     import urllib.error
     import json
     try:
-        conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT telegram_token, telegram_chat_id FROM empresa_config LIMIT 1")
         row = cursor.fetchone()
-        conn.close()
+        cursor.close()
+        release_connection(conn)
         
         if not row or not row[0] or not row[1]:
             return False, "Credenciais ausentes no banco de dados (Token ou Chat ID vazios)."
