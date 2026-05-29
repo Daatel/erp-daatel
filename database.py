@@ -854,9 +854,10 @@ def gerar_comissao_se_necessario(venda_id, momento_gatilho, cliente_nome=None):
         # Atualiza o valor na venda no banco para fins de DRE, auditoria e fechamento
         run_query("UPDATE vendas SET comissao_valor = ? WHERE id = ?", (comissao_val, venda_id))
 
-def enviar_mensagem_telegram(mensagem: str) -> bool:
+def enviar_mensagem_telegram(mensagem: str) -> tuple[bool, str]:
     import urllib.request
     import urllib.parse
+    import urllib.error
     import json
     try:
         conn = sqlite3.connect(DB_NAME, check_same_thread=False)
@@ -866,9 +867,9 @@ def enviar_mensagem_telegram(mensagem: str) -> bool:
         conn.close()
         
         if not row or not row[0] or not row[1]:
-            return False
+            return False, "Credenciais ausentes no banco de dados (Token ou Chat ID vazios)."
             
-        token, chat_id = row[0], row[1]
+        token, chat_id = str(row[0]).strip(), str(row[1]).strip()
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         
         # Codifica e envia
@@ -880,12 +881,19 @@ def enviar_mensagem_telegram(mensagem: str) -> bool:
         
         req = urllib.request.Request(url, data=data, method="POST")
         with urllib.request.urlopen(req, timeout=10) as response:
-            return response.status == 200
+            if response.status == 200:
+                return True, "Enviado com sucesso!"
+            return False, f"Erro de Conexão - HTTP Status: {response.status}"
+    except urllib.error.HTTPError as he:
+        try:
+            err_body = he.read().decode("utf-8")
+            return False, f"Telegram API Error: {he.code} - {err_body}"
+        except Exception:
+            return False, f"HTTP Error {he.code}: {he.reason}"
     except Exception as e:
-        print(f"Erro ao enviar Telegram: {e}")
-        return False
+        return False, f"Erro interno de conexao: {str(e)}"
 
-def enviar_relatorio_financeiro_diario() -> bool:
+def enviar_relatorio_financeiro_diario() -> tuple[bool, str]:
     def escape_html(text: str) -> str:
         return str(text or "").replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         
@@ -945,8 +953,7 @@ def enviar_relatorio_financeiro_diario() -> bool:
             
         return enviar_mensagem_telegram(msg)
     except Exception as e:
-        print(f"Erro ao gerar relatório diário: {e}")
-        return False
+        return False, f"Erro ao gerar relatorio: {str(e)}"
 
 if __name__ == "__main__":
     create_tables()

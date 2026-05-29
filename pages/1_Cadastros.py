@@ -71,11 +71,11 @@ with tab_empresa:
         if st.button("📲 Testar Envio do Relatório Diário no Telegram", use_container_width=True):
             from database import enviar_relatorio_financeiro_diario
             with st.spinner("Gerando relatório e disparando mensagem..."):
-                res = enviar_relatorio_financeiro_diario()
+                res, err_msg = enviar_relatorio_financeiro_diario()
             if res:
                 st.success("✅ Sucesso! O relatório de movimentações financeiras e vendas do dia foi enviado para o seu Telegram.")
             else:
-                st.error("❌ Falha no envio. Verifique as credenciais digitadas e certifique-se de que enviou um /start para o seu Bot no Telegram antes de testar.")
+                st.error(f"❌ Falha no envio. Detalhes do erro retornado pelo Telegram:\n\n`{err_msg}`")
 
 def export_btn(df, filename, label="📥 Exportar Lista (CSV)"):
     if not df.empty:
