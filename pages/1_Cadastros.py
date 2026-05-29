@@ -737,14 +737,16 @@ with tab8:
         "Operador Máquina": "PRODUCAO",
         "Engenharia P&D": "PRODUCAO",
         "Tesouraria": "FINANCEIRO",
-        "Suprimentos / Compras": "COMPRAS"
+        "Suprimentos / Compras": "COMPRAS",
+        "Logística / Expedição": "LOGISTICA"
     }
     ROLE_LABELS = {
         "ADMIN": "Administrador Geral",
         "VENDAS": "Comercial / Rotas",
         "PRODUCAO": "Operador Máquina",
         "FINANCEIRO": "Tesouraria",
-        "COMPRAS": "Suprimentos / Compras"
+        "COMPRAS": "Suprimentos / Compras",
+        "LOGISTICA": "Logística / Expedição"
     }
 
     # Carrega funcionários ativos para vinculação

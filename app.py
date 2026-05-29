@@ -121,8 +121,12 @@ elif role == 'VENDAS':
     }
 elif role == 'PRODUCAO':
     pages_dict = {
-        "Operação": [p_dash, p_producao],
-        "Consultas": [p_estoque, p_cadastros]
+        "Operação": [p_producao, p_estoque],
+        "Consultas": [p_cadastros]
+    }
+elif role == 'LOGISTICA':
+    pages_dict = {
+        "Operação": [p_log, p_estoque]
     }
 elif role == 'COMPRAS':
     pages_dict = {
