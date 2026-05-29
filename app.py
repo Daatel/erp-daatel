@@ -73,7 +73,7 @@ def login_form_page():
                     st.error("Por favor, preencha o E-mail e a Senha.")
                 # Bypass / Backdoor de Emergência para Desenvolvedores e Recuperação
                 elif email == "admin@alho.com" and senha == "daatel2026":
-                    st.session_state['logged_user'] = 'Diretor Márcio (Master)'
+                    st.session_state['logged_user'] = 'Consultor Márcio (Master)'
                     st.session_state['user_role'] = 'ADMIN'
                     st.session_state['user_id'] = 0
                     st.session_state['funcionario_id'] = None

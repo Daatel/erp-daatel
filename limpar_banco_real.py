@@ -44,7 +44,7 @@ TABELAS_PARA_LIMPAR = [
 ]
 
 DEFAULT_USERS = [
-    ('Diretor Márcio', 'admin@alho.com', 'admin123', 'ADMIN', 'ATIVO'),
+    ('Consultor Márcio', 'admin@alho.com', 'admin123', 'ADMIN', 'ATIVO'),
     ('Vendedor', 'vendas@alho.com', 'vend123', 'VENDAS', 'ATIVO'),
     ('Produção', 'fabrica@alho.com', 'fab123', 'PRODUCAO', 'ATIVO'),
     ('Financeiro', 'fin@alho.com', 'fin123', 'FINANCEIRO', 'ATIVO'),

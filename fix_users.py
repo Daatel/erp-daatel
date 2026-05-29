@@ -5,7 +5,7 @@ def fix_users():
     cur = conn.cursor()
     
     users_to_add = [
-        ('Diretor Márcio', 'admin@alho.com', 'admin123', 'ADMIN', 'ATIVO'),
+        ('Consultor Márcio', 'admin@alho.com', 'admin123', 'ADMIN', 'ATIVO'),
         ('Vendedor Silva', 'vendas@alho.com', 'vend123', 'VENDAS', 'ATIVO'),
         ('Operador Fábrica', 'fabrica@alho.com', 'fab123', 'PRODUCAO', 'ATIVO'),
         ('Financeiro', 'fin@alho.com', 'fin123', 'FINANCEIRO', 'ATIVO')
