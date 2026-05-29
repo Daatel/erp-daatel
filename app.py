@@ -8,8 +8,39 @@ import database
 importlib.reload(database)
 from database import fetch_all, run_query, initialize_database, verify_password
 
+_migration_checked = False
+
+def check_and_migrate_once():
+    global _migration_checked
+    if _migration_checked:
+        return
+    conn = None
+    try:
+        from database import get_connection, release_connection, create_tables
+        conn = get_connection()
+        cursor = conn.cursor()
+        # Testa se as colunas do Telegram existem
+        cursor.execute("SELECT telegram_token, telegram_chat_id FROM empresa_config LIMIT 1")
+        cursor.close()
+        release_connection(conn)
+        _migration_checked = True
+    except Exception:
+        try:
+            from database import release_connection
+            if conn:
+                release_connection(conn)
+        except Exception:
+            pass
+        try:
+            from database import create_tables
+            create_tables()
+        except Exception:
+            pass
+        _migration_checked = True
+
 os.chdir(Path(__file__).parent)
 initialize_database()
+check_and_migrate_once()
 
 
 if 'logged_user' not in st.session_state:
