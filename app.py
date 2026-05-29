@@ -117,8 +117,7 @@ if role == 'ADMIN':
     }
 elif role == 'VENDAS':
     pages_dict = {
-        "Minhas Vendas": [p_dash, p_vendas, p_pdv, p_ativos],
-        "Consultas": [p_pessoas, p_estoque]
+        "Minhas Vendas": [p_vendas, p_pdv]
     }
 elif role == 'PRODUCAO':
     pages_dict = {
