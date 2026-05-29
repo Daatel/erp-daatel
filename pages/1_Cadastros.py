@@ -47,15 +47,35 @@ with tab_empresa:
         
         end_emp = st.text_input("Endereço Completo (Rua, Número, Bairro, Cidade-UF)", value=emp.get('endereco_completo', ''))
         
+        st.markdown("### 🤖 Configuração do Robô de Relatórios (Telegram)")
+        st.caption("Crie um Bot com o @BotFather no Telegram para receber o resumo diário de fechamento financeiro e de vendas.")
+        e_tel1, e_tel2 = st.columns(2)
+        telegram_token = e_tel1.text_input("Token do Bot Telegram", value=emp.get('telegram_token', '') or '', type="password", help="Ex: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ")
+        telegram_chat_id = e_tel2.text_input("ID do Chat Telegram (Seu Chat ID)", value=emp.get('telegram_chat_id', '') or '', help="Ex: 987654321. Você pode obter seu ID conversando com o @userinfobot no Telegram.")
+        
         if st.form_submit_button("Salvar Dados da Empresa"):
             run_query("""
                 UPDATE empresa_config 
                 SET razao_social=?, nome_fantasia=?, cnpj=?, endereco_completo=?, telefone=?, email=?,
-                    inscricao_estadual=?, inscricao_municipal=?, cep=?, instagram=?, website=?
+                    inscricao_estadual=?, inscricao_municipal=?, cep=?, instagram=?, website=?,
+                    telegram_token=?, telegram_chat_id=?
                 WHERE id=?
-            """, (r_social, n_fantasia, cnpj_emp, end_emp, telefone_emp, email_emp, ie_emp, im_emp, cep_emp, insta_emp, web_emp, emp['id']))
-            st.success("Dados da Empresa atualizados! Os PDFs e relatórios já usarão os dados novos.")
+            """, (r_social, n_fantasia, cnpj_emp, end_emp, telefone_emp, email_emp, ie_emp, im_emp, cep_emp, insta_emp, web_emp, telegram_token, telegram_chat_id, emp['id']))
+            st.success("Dados da Empresa e credenciais de Telegram atualizados!")
             import time; time.sleep(1); st.rerun()
+
+    # Botão de Teste de Disparo do Relatório
+    if emp.get('telegram_token') and emp.get('telegram_chat_id'):
+        st.markdown("---")
+        st.markdown("#### 🧪 Teste de Conectividade")
+        if st.button("📲 Testar Envio do Relatório Diário no Telegram", use_container_width=True):
+            from database import enviar_relatorio_financeiro_diario
+            with st.spinner("Gerando relatório e disparando mensagem..."):
+                res = enviar_relatorio_financeiro_diario()
+            if res:
+                st.success("✅ Sucesso! O relatório de movimentações financeiras e vendas do dia foi enviado para o seu Telegram.")
+            else:
+                st.error("❌ Falha no envio. Verifique as credenciais digitadas e certifique-se de que enviou um /start para o seu Bot no Telegram antes de testar.")
 
 def export_btn(df, filename, label="📥 Exportar Lista (CSV)"):
     if not df.empty:

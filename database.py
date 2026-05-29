@@ -581,7 +581,9 @@ def _create_tables_internal(conn):
         inscricao_municipal TEXT,
         cep TEXT,
         instagram TEXT,
-        website TEXT
+        website TEXT,
+        telegram_token TEXT,
+        telegram_chat_id TEXT
     )
     ''')
     
@@ -628,7 +630,9 @@ def _create_tables_internal(conn):
         "ALTER TABLE empresa_config ADD COLUMN cep TEXT",
         "ALTER TABLE empresa_config ADD COLUMN instagram TEXT",
         "ALTER TABLE empresa_config ADD COLUMN website TEXT",
-        "ALTER TABLE usuarios ADD COLUMN funcionario_id INTEGER"
+        "ALTER TABLE usuarios ADD COLUMN funcionario_id INTEGER",
+        "ALTER TABLE empresa_config ADD COLUMN telegram_token TEXT",
+        "ALTER TABLE empresa_config ADD COLUMN telegram_chat_id TEXT"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)
@@ -846,6 +850,97 @@ def gerar_comissao_se_necessario(venda_id, momento_gatilho, cliente_nome=None):
     if comissao_val > 0.0:
         # Atualiza o valor na venda no banco para fins de DRE, auditoria e fechamento
         run_query("UPDATE vendas SET comissao_valor = ? WHERE id = ?", (comissao_val, venda_id))
+
+def enviar_mensagem_telegram(mensagem: str) -> bool:
+    import urllib.request
+    import urllib.parse
+    import json
+    try:
+        conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+        cursor = conn.cursor()
+        cursor.execute("SELECT telegram_token, telegram_chat_id FROM empresa_config LIMIT 1")
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row or not row[0] or not row[1]:
+            return False
+            
+        token, chat_id = row[0], row[1]
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        
+        # Codifica e envia
+        data = urllib.parse.urlencode({
+            "chat_id": chat_id,
+            "text": mensagem,
+            "parse_mode": "Markdown"
+        }).encode("utf-8")
+        
+        req = urllib.request.Request(url, data=data, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return response.status == 200
+    except Exception as e:
+        print(f"Erro ao enviar Telegram: {e}")
+        return False
+
+def enviar_relatorio_financeiro_diario() -> bool:
+    try:
+        from datetime import date
+        hoje = date.today().strftime('%Y-%m-%d')
+        
+        # 1. Busca lançamentos do dia no fluxo de caixa
+        query_fc = """
+            SELECT fc.tipo, fc.categoria, fc.descricao, fc.valor
+            FROM fluxo_caixa fc
+            WHERE fc.data = ?
+        """
+        df_fc = fetch_all(query_fc, (hoje,))
+        
+        # 2. Busca vendas do dia no módulo comercial
+        query_vd = """
+            SELECT v.valor_total, p.nome as produto, f.nome as vendedor, c.nome as cliente
+            FROM vendas v
+            JOIN produtos p ON v.produto_id = p.id
+            JOIN funcionarios f ON v.vendedor_id = f.id
+            JOIN clientes c ON v.cliente_id = c.id
+            WHERE v.data = ?
+        """
+        df_vendas = fetch_all(query_vd, (hoje,))
+        
+        # Montar a mensagem em Markdown
+        msg = f"📊 *ERP Alho - Relatório Diário ({date.today().strftime('%d/%m/%Y')})*\n\n"
+        
+        msg += "💰 *Fluxo de Caixa (Lançamentos de Hoje):*\n"
+        if df_fc.empty:
+            msg += "_Nenhum lançamento financeiro hoje._\n"
+        else:
+            total_entrada = 0.0
+            total_saida = 0.0
+            for _, r in df_fc.iterrows():
+                valor = float(r['valor'] or 0.0)
+                tipo = str(r['tipo']).upper()
+                emoji = "🟢" if "RECEITA" in tipo or "ENTRADA" in tipo or "RECEB" in tipo else "🔴"
+                if emoji == "🟢":
+                    total_entrada += valor
+                else:
+                    total_saida += valor
+                msg += f"{emoji} *{r['categoria']}*: {r['descricao']} - _R$ {valor:,.2f}_\n"
+            msg += f"\n*Resumo do Caixa:* Entrada R$ {total_entrada:,.2f} | Saída R$ {total_saida:,.2f}\n"
+            
+        msg += "\n🛒 *Pedidos de Venda de Hoje:*\n"
+        if df_vendas.empty:
+            msg += "_Nenhuma venda realizada hoje._\n"
+        else:
+            total_vendas = 0.0
+            for _, r in df_vendas.iterrows():
+                vlr = float(r['valor_total'] or 0.0)
+                total_vendas += vlr
+                msg += f"📦 *{r['produto']}*: {r['cliente']} (Vend: {r['vendedor']}) - _R$ {vlr:,.2f}_\n"
+            msg += f"\n*Total Vendido:* _R$ {total_vendas:,.2f}_\n"
+            
+        return enviar_mensagem_telegram(msg)
+    except Exception as e:
+        print(f"Erro ao gerar relatório diário: {e}")
+        return False
 
 if __name__ == "__main__":
     create_tables()
