@@ -29,3 +29,13 @@ Este documento registra as ideias, necessidades e módulos planejados para futur
   * Agregar os dados consolidados de todas as áreas (DRE, Rentabilidade Geral, EBITDA, Margem de Contribuição, Evolução de Estoque Ativo, Lucratividade Líquida e Comissões a Pagar).
   * Exclusividade de acesso: Apenas o perfil `ADMIN` terá acesso a este painel altamente sensível e estratégico.
 * **Público-alvo:** Perfil de acesso `ADMIN` (Diretoria / Gestão Geral).
+
+---
+
+## 🤖 4. Agente Cognitivo via Telegram (Assistente Administrativo Autônomo)
+* **Objetivo:** Transformar o Bot do Telegram em uma interface bidirecional e ativa, capaz de receber comandos, fotos e áudios para operar o ERP de forma automática e inteligente.
+* **Escopo:**
+  * **Input por Imagem (OCR/LLM):** Upload de fotos de notas fiscais, boletos, comprovantes de pagamento ou fichas de cadastro de clientes. O Agente extrai os dados estruturados e realiza a inserção/cadastro automático no banco de dados.
+  * **Input por Áudio (Speech-to-Text/LLM):** Envio de notas de voz de representantes e operadores na estrada (ex: lançando pedidos de venda ou apontamentos de fábrica por áudio). A IA transcreve, interpreta a intenção e executa a transação.
+  * **Feedback Interativo:** Confirmações detalhadas de lançamentos e alertas educativos diretos no chat privado do usuário.
+* **Público-alvo:** Diretoria, Equipe Administrativa, Representantes de Venda (Comercial) e Operadores de Fábrica.
