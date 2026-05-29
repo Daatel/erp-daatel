@@ -11,3 +11,21 @@ Este documento registra as ideias, necessidades e módulos planejados para futur
   * Gráficos dinâmicos de faturamento por representante, evolução mensal de metas, ranking de produtos mais vendidos e clientes inativos.
   * Indicadores de positivação de carteira de clientes.
 * **Público-alvo:** Perfil de acesso `VENDAS` (Comercial / Rotas).
+
+---
+
+## 💰 2. Painel Financeiro (BI Financeiro Operacional)
+* **Objetivo:** Criar um ambiente de Business Intelligence (BI) focado na operação financeira diária e fluxo de caixa.
+* **Escopo:**
+  * Substituir a visualização de abas estratégicas (como DRE, Lucratividade e Rentabilidade por Cliente) por um cockpit focado na saúde financeira e fluxo de caixa operacional.
+  * Indicadores visuais de contas a pagar e receber, taxa de inadimplência de boletos, conciliação bancária simplificada e previsibilidade de saldo de caixa.
+* **Público-alvo:** Perfil de acesso `FINANCEIRO` (Tesouraria).
+
+---
+
+## 👑 3. Reforma do Painel Executivo (CEO Cockpit)
+* **Objetivo:** Transformar o atual Dashboard em uma central de inteligência estratégica para o gestor geral / CEO.
+* **Escopo:**
+  * Agregar os dados consolidados de todas as áreas (DRE, Rentabilidade Geral, EBITDA, Margem de Contribuição, Evolução de Estoque Ativo, Lucratividade Líquida e Comissões a Pagar).
+  * Exclusividade de acesso: Apenas o perfil `ADMIN` terá acesso a este painel altamente sensível e estratégico.
+* **Público-alvo:** Perfil de acesso `ADMIN` (Diretoria / Gestão Geral).

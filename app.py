@@ -131,7 +131,7 @@ elif role == 'COMPRAS':
     }
 elif role == 'FINANCEIRO':
     pages_dict = {
-        "Financeiro": [p_dash, p_fin, p_fat, p_dre, p_rentabilidade],
+        "Financeiro": [p_fin, p_fat],
         "Comercial": [p_tabelas],
         "Consultas": [p_cadastros, p_pessoas]
     }
