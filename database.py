@@ -639,9 +639,9 @@ def _create_tables_internal(conn):
     import re as _re
     is_pg = init_connection_pool() is not None
     if is_pg:
-        # Commita qualquer transação pendente antes de trocar para autocommit
+        # Garante a limpeza de qualquer transação pendente ou abortada
         try:
-            conn.commit()
+            conn.rollback()
         except Exception:
             pass
         conn.autocommit = True
@@ -656,7 +656,10 @@ def _create_tables_internal(conn):
             try:
                 cur_ddl.execute(q_pg)
             except Exception:
-                pass
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
         cur_ddl.close()
         conn.autocommit = False
     else:
