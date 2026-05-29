@@ -2,8 +2,34 @@ import sqlite3
 import pandas as pd
 import os
 import streamlit as st
+import hashlib
+import secrets
 
 DB_NAME = "erp_fabrica.db"
+
+def hash_password(password: str) -> str:
+    if not password:
+        return ""
+    salt = secrets.token_hex(8)
+    hash_val = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
+    return f"sha256${salt}${hash_val}"
+
+def verify_password(stored_password: str, provided_password: str) -> bool:
+    if not stored_password or not provided_password:
+        return False
+    if not stored_password.startswith("sha256$"):
+        # Retrocompatibilidade com senhas antigas em texto plano
+        return stored_password == provided_password
+    try:
+        parts = stored_password.split("$")
+        if len(parts) != 3:
+            return False
+        algo, salt, hash_val = parts
+        calc_hash = hashlib.sha256((provided_password + salt).encode('utf-8')).hexdigest()
+        return secrets.compare_digest(hash_val, calc_hash)
+    except Exception:
+        return False
+
 
 @st.cache_resource
 def init_connection_pool():
@@ -425,11 +451,13 @@ def _create_tables_internal(conn):
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS usuarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        funcionario_id INTEGER UNIQUE,
         nome TEXT NOT NULL,
         email TEXT UNIQUE,
         senha TEXT NOT NULL,
         nivel_permissao TEXT NOT NULL,
-        status TEXT DEFAULT 'ATIVO'
+        status TEXT DEFAULT 'ATIVO',
+        FOREIGN KEY(funcionario_id) REFERENCES funcionarios(id)
     )
     ''')
     
@@ -599,7 +627,8 @@ def _create_tables_internal(conn):
         "ALTER TABLE empresa_config ADD COLUMN inscricao_municipal TEXT",
         "ALTER TABLE empresa_config ADD COLUMN cep TEXT",
         "ALTER TABLE empresa_config ADD COLUMN instagram TEXT",
-        "ALTER TABLE empresa_config ADD COLUMN website TEXT"
+        "ALTER TABLE empresa_config ADD COLUMN website TEXT",
+        "ALTER TABLE usuarios ADD COLUMN funcionario_id INTEGER"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)

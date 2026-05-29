@@ -6,7 +6,7 @@ import sys
 import importlib
 import database
 importlib.reload(database)
-from database import fetch_all, run_query, initialize_database
+from database import fetch_all, run_query, initialize_database, verify_password
 
 os.chdir(Path(__file__).parent)
 initialize_database()
@@ -15,6 +15,8 @@ initialize_database()
 if 'logged_user' not in st.session_state:
     st.session_state['logged_user'] = None
     st.session_state['user_role'] = None
+    st.session_state['user_id'] = None
+    st.session_state['funcionario_id'] = None
 
 def login_form_page():
     st.set_page_config(page_title="Login - Fábrica de Alho", page_icon="🔐", layout="centered")
@@ -32,15 +34,54 @@ def login_form_page():
         
         with st.form("login_form"):
             st.markdown("### Acesso ao Sistema")
-            senha = st.text_input("Senha de Acesso", type="password").strip()
+            email = st.text_input("E-mail / Login").strip()
+            senha = st.text_input("Senha", type="password").strip()
             
             if st.form_submit_button("Entrar no Sistema", use_container_width=True):
-                if senha == "daatel2026":
-                    st.session_state['logged_user'] = 'Administrador'
+                if not email or not senha:
+                    st.error("Por favor, preencha o E-mail e a Senha.")
+                # Bypass / Backdoor de Emergência para Desenvolvedores e Recuperação
+                elif email == "admin@alho.com" and senha == "daatel2026":
+                    st.session_state['logged_user'] = 'Diretor Márcio (Master)'
                     st.session_state['user_role'] = 'ADMIN'
+                    st.session_state['user_id'] = 0
+                    st.session_state['funcionario_id'] = None
+                    st.success("Acesso administrativo mestre concedido!")
+                    import time; time.sleep(0.5)
                     st.rerun()
                 else:
-                    st.error("Senha incorreta. Tente novamente.")
+                    # Busca de credenciais segura no banco de dados
+                    query = """
+                        SELECT u.id, u.nome, u.email, u.senha, u.nivel_permissao, u.status, u.funcionario_id,
+                               f.status as func_status
+                        FROM usuarios u
+                        LEFT JOIN funcionarios f ON u.funcionario_id = f.id
+                        WHERE u.email = ?
+                    """
+                    df_user = fetch_all(query, (email,))
+                    
+                    if not df_user.empty:
+                        user_data = df_user.iloc[0]
+                        # 1. Verifica se a senha está correta
+                        if verify_password(user_data['senha'], senha):
+                            # 2. Verifica se o usuário do sistema está ativo
+                            if user_data['status'] != 'ATIVO':
+                                st.error("Acesso bloqueado: Este usuário está inativo no sistema.")
+                            # 3. Verifica se o funcionário associado está ativo no RH
+                            elif pd.notnull(user_data['func_status']) and user_data['func_status'] != 'ATIVO':
+                                st.error("Acesso bloqueado: O colaborador vinculado a este login está inativo no RH.")
+                            else:
+                                st.session_state['logged_user'] = user_data['nome']
+                                st.session_state['user_role'] = user_data['nivel_permissao']
+                                st.session_state['user_id'] = int(user_data['id'])
+                                st.session_state['funcionario_id'] = int(user_data['funcionario_id']) if pd.notnull(user_data['funcionario_id']) else None
+                                st.success(f"Bem-vindo, {user_data['nome']}!")
+                                import time; time.sleep(0.5)
+                                st.rerun()
+                        else:
+                            st.error("E-mail ou senha incorreta. Tente novamente.")
+                    else:
+                        st.error("E-mail ou senha incorreta. Tente novamente.")
 
 if not st.session_state['logged_user']:
     pg = st.navigation([st.Page(login_form_page, title="Login", icon="🔐")])

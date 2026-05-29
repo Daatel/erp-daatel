@@ -728,23 +728,139 @@ with tab7:
 # ======= USUÁRIOS =======
 with tab8:
     st.subheader("Governança: Acessos ao Sistema")
+    from database import hash_password
+    
+    # Mapeamento de Perfis/Roles
+    ROLE_MAP = {
+        "Administrador Geral": "ADMIN",
+        "Comercial / Rotas": "VENDAS",
+        "Operador Máquina": "PRODUCAO",
+        "Engenharia P&D": "PRODUCAO",
+        "Tesouraria": "FINANCEIRO",
+        "Suprimentos / Compras": "COMPRAS"
+    }
+    ROLE_LABELS = {
+        "ADMIN": "Administrador Geral",
+        "VENDAS": "Comercial / Rotas",
+        "PRODUCAO": "Operador Máquina",
+        "FINANCEIRO": "Tesouraria",
+        "COMPRAS": "Suprimentos / Compras"
+    }
+
+    # Carrega funcionários ativos para vinculação
+    df_func_disp = fetch_all("SELECT id, nome, cargo FROM funcionarios WHERE status='ATIVO' ORDER BY nome")
+    func_options = ["(Sem Vínculo/Interno)"]
+    func_map = {}
+    if not df_func_disp.empty:
+        for _, r in df_func_disp.iterrows():
+            lbl = f"{r['nome']} ({r['cargo']}) - ID #{r['id']}"
+            func_options.append(lbl)
+            func_map[lbl] = int(r['id'])
+
     with st.form("form_usr", clear_on_submit=True):
-        cu1, cu2, cu3, cu4 = st.columns(4)
-        nome_usr = cu1.text_input("Nome")
+        cu1, cu2, cu3, cu4, cu5 = st.columns(5)
+        nome_usr = cu1.text_input("Nome de Exibição")
         mail_usr = cu2.text_input("Login/E-mail")
         pwd_usr = cu3.text_input("Senha", type="password")
-        nivel_usr = cu4.selectbox("Hierarquia", ["Administrador Geral", "Engenharia P&D", "Operador Máquina", "Comercial / Rotas", "Tesouraria"])
+        nivel_label = cu4.selectbox("Hierarquia / Perfil", list(ROLE_MAP.keys()))
+        vinculo_func = cu5.selectbox("Vincular Colaborador", func_options)
         
         if st.form_submit_button("Registrar Credencial"):
-            if nome_usr and mail_usr and pwd_usr:
-                run_query("INSERT INTO usuarios (nome, email, senha, nivel_permissao, status) VALUES (?, ?, ?, ?, 'ATIVO')", (nome_usr, mail_usr, pwd_usr, nivel_usr))
-                st.success("Licença ativada!")
-                import time; time.sleep(1); st.rerun()
+            if not nome_usr or not mail_usr or not pwd_usr:
+                st.error("Por favor, preencha todos os campos obrigatórios (Nome, Login/E-mail, Senha).")
+            else:
+                # Verifica duplicidade de e-mail
+                chk_email = fetch_all("SELECT id FROM usuarios WHERE email=?", (mail_usr,))
+                if not chk_email.empty:
+                    st.error("Erro: Este e-mail/login já está cadastrado.")
+                else:
+                    role_code = ROLE_MAP[nivel_label]
+                    hashed_pwd = hash_password(pwd_usr)
+                    func_id = func_map.get(vinculo_func, None)
+                    
+                    # Se for vincular colaborador, verifica se ele já tem um usuário
+                    if func_id:
+                        chk_vinc = fetch_all("SELECT id FROM usuarios WHERE funcionario_id=?", (func_id,))
+                        if not chk_vinc.empty:
+                            st.error("Erro: Este colaborador já possui um usuário vinculado.")
+                        else:
+                            run_query("""
+                                INSERT INTO usuarios (nome, email, senha, nivel_permissao, status, funcionario_id)
+                                VALUES (?, ?, ?, ?, 'ATIVO', ?)
+                            """, (nome_usr, mail_usr, hashed_pwd, role_code, func_id))
+                            st.success("Licença ativada com sucesso!")
+                            import time; time.sleep(1); st.rerun()
+                    else:
+                        run_query("""
+                            INSERT INTO usuarios (nome, email, senha, nivel_permissao, status, funcionario_id)
+                            VALUES (?, ?, ?, ?, 'ATIVO', NULL)
+                        """, (nome_usr, mail_usr, hashed_pwd, role_code))
+                        st.success("Licença ativada com sucesso!")
+                        import time; time.sleep(1); st.rerun()
 
     st.markdown("---")
-    df_usr = fetch_all("SELECT id, nome as 'Usuário', email as 'Login', nivel_permissao as 'Hierarquia', status as 'Status' FROM usuarios")
+    st.subheader("Gerenciamento de Acessos")
+    
+    # Carrega usuários cadastrados exibindo dados do funcionário vinculado
+    df_usr = fetch_all("""
+        SELECT u.id, u.nome as 'Usuário', u.email as 'Login', u.nivel_permissao as 'Hierarquia_Cod',
+               u.status as 'Status', f.nome as 'Colaborador Vinculado'
+        FROM usuarios u
+        LEFT JOIN funcionarios f ON u.funcionario_id = f.id
+    """)
+    
     if not df_usr.empty:
-        st.dataframe(df_usr, hide_index=True, width="stretch")
+        # Traduz a sigla de hierarquia para exibição amigável
+        df_usr['Hierarquia'] = df_usr['Hierarquia_Cod'].map(lambda x: ROLE_LABELS.get(x, x))
+        df_usr_display = df_usr[['id', 'Usuário', 'Login', 'Hierarquia', 'Colaborador Vinculado', 'Status']]
+        st.dataframe(df_usr_display, hide_index=True, width="stretch")
+        
+        # Área de Edição/Inativação de Usuários
+        with st.expander("✏️ Editar ou Inativar Usuário"):
+            opts_usr = {f"ID {r['id']} | {r['Usuário']} ({r['Login']})": r['id'] for _, r in df_usr.iterrows()}
+            u_sel = st.selectbox("Selecione o Usuário:", list(opts_usr.keys()))
+            if u_sel:
+                uid = opts_usr[u_sel]
+                u_data = fetch_all("SELECT * FROM usuarios WHERE id=?", (uid,))
+                if not u_data.empty:
+                    ub = u_data.iloc[0]
+                    with st.form("edit_usr"):
+                        eu1, eu2, eu3, eu4, eu5 = st.columns(5)
+                        e_nome = eu1.text_input("Nome de Exibição", ub['nome'])
+                        e_mail = eu2.text_input("Login/E-mail", ub['email'])
+                        e_pwd = eu3.text_input("Nova Senha (deixe em branco para manter)", type="password")
+                        
+                        # Set default for selectbox
+                        cur_role_label = ROLE_LABELS.get(ub['nivel_permissao'], "Administrador Geral")
+                        role_list = list(ROLE_MAP.keys())
+                        e_role_label = eu4.selectbox("Hierarquia", role_list, index=role_list.index(cur_role_label) if cur_role_label in role_list else 0)
+                        
+                        stts_opts = ["ATIVO", "INATIVO"]
+                        cur_status = ub['status'] if ub['status'] in stts_opts else "ATIVO"
+                        e_status = eu5.selectbox("Status", stts_opts, index=stts_opts.index(cur_status))
+                        
+                        st.caption("Nota: O vínculo de funcionário é definitivo. Para alterá-lo, recadastre o usuário.")
+                        
+                        if st.form_submit_button("Salvar Alterações"):
+                            if not e_nome or not e_mail:
+                                st.error("Nome e E-mail de login são obrigatórios.")
+                            else:
+                                role_code = ROLE_MAP[e_role_label]
+                                if e_pwd.strip():
+                                    hashed_pwd = hash_password(e_pwd.strip())
+                                    run_query("""
+                                        UPDATE usuarios 
+                                        SET nome=?, email=?, senha=?, nivel_permissao=?, status=? 
+                                        WHERE id=?
+                                    """, (e_nome, e_mail, hashed_pwd, role_code, e_status, uid))
+                                else:
+                                    run_query("""
+                                        UPDATE usuarios 
+                                        SET nome=?, email=?, nivel_permissao=?, status=? 
+                                        WHERE id=?
+                                    """, (e_nome, e_mail, role_code, e_status, uid))
+                                st.success("Usuário atualizado com sucesso!")
+                                import time; time.sleep(1); st.rerun()
 
 # ======= REDES E GRUPOS =======
 with tab9:
