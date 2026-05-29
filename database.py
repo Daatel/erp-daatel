@@ -894,7 +894,7 @@ def enviar_mensagem_telegram(mensagem: str) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Erro interno de conexao: {str(e)}"
 
-def enviar_relatorio_financeiro_diario() -> tuple[bool, str]:
+def enviar_relatorio_profilaxia() -> tuple[bool, str]:
     def escape_html(text: str) -> str:
         return str(text or "").replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         
@@ -902,59 +902,118 @@ def enviar_relatorio_financeiro_diario() -> tuple[bool, str]:
         from datetime import date
         hoje = date.today().strftime('%Y-%m-%d')
         
-        # 1. Busca lançamentos do dia no fluxo de caixa
-        query_fc = """
-            SELECT fc.tipo, fc.categoria, fc.descricao, fc.valor
-            FROM fluxo_caixa fc
-            WHERE fc.data = ?
+        # Busca todos os lançamentos de fluxo de caixa de hoje
+        query = """
+            SELECT tipo, categoria, descricao, valor
+            FROM fluxo_caixa
+            WHERE data = ?
+            ORDER BY tipo, categoria
         """
-        df_fc = fetch_all(query_fc, (hoje,))
+        df = fetch_all(query, (hoje,))
         
-        # 2. Busca vendas do dia no módulo comercial
-        query_vd = """
-            SELECT v.valor_total, p.nome as produto, f.nome as vendedor, c.nome as cliente
-            FROM vendas v
-            JOIN produtos p ON v.produto_id = p.id
-            JOIN funcionarios f ON v.vendedor_id = f.id
-            JOIN clientes c ON v.cliente_id = c.id
-            WHERE v.data = ?
-        """
-        df_vendas = fetch_all(query_vd, (hoje,))
+        msg = f"🔍 <b>ERP Alho - Profilaxia Diária de Lançamentos ({date.today().strftime('%d/%m/%Y')})</b>\n"
+        msg += "<i>Objetivo: Revisar classificações e orientar a equipe de lançamentos.</i>\n\n"
         
-        # Montar a mensagem em HTML
-        msg = f"📊 <b>ERP Alho - Relatório Diário ({date.today().strftime('%d/%m/%Y')})</b>\n\n"
-        
-        msg += "💰 <b>Fluxo de Caixa (Lançamentos de Hoje):</b>\n"
-        if df_fc.empty:
-            msg += "<i>Nenhum lançamento financeiro hoje.</i>\n"
+        if df.empty:
+            msg += "<i>Nenhum lançamento financeiro realizado hoje para auditoria.</i>\n"
         else:
-            total_entrada = 0.0
-            total_saida = 0.0
-            for _, r in df_fc.iterrows():
+            msg += "<b>💰 Auditoria de Plano de Contas:</b>\n"
+            for _, r in df.iterrows():
                 valor = float(r['valor'] or 0.0)
                 tipo = str(r['tipo']).upper()
-                emoji = "🟢" if "RECEITA" in tipo or "ENTRADA" in tipo or "RECEB" in tipo else "🔴"
-                if emoji == "🟢":
-                    total_entrada += valor
-                else:
-                    total_saida += valor
-                msg += f"{emoji} <b>{escape_html(r['categoria'])}</b>: {escape_html(r['descricao'])} - <i>R$ {valor:,.2f}</i>\n"
-            msg += f"\n<b>Resumo do Caixa:</b> Entrada R$ {total_entrada:,.2f} | Saída R$ {total_saida:,.2f}\n"
-            
-        msg += "\n🛒 <b>Pedidos de Venda de Hoje:</b>\n"
-        if df_vendas.empty:
-            msg += "<i>Nenhuma venda realizada hoje.</i>\n"
-        else:
-            total_vendas = 0.0
-            for _, r in df_vendas.iterrows():
-                vlr = float(r['valor_total'] or 0.0)
-                total_vendas += vlr
-                msg += f"📦 <b>{escape_html(r['produto'])}</b>: {escape_html(r['cliente'])} (Vend: {escape_html(r['vendedor'])}) - <i>R$ {vlr:,.2f}</i>\n"
-            msg += f"\n<b>Total Vendido:</b> <i>R$ {total_vendas:,.2f}</i>\n"
-            
+                emoji = "🟢 RECEITA" if "RECEITA" in tipo or "ENTRADA" in tipo or "RECEB" in tipo else "🔴 DESPESA"
+                msg += f"• <code>[{emoji}]</code> <b>{escape_html(r['descricao'])}</b>\n"
+                msg += f"  └➔ Classificado como: <u>{escape_html(r['categoria'])}</u> | Valor: <i>R$ {valor:,.2f}</i>\n\n"
+                
         return enviar_mensagem_telegram(msg)
     except Exception as e:
-        return False, f"Erro ao gerar relatorio: {str(e)}"
+        return False, f"Erro ao gerar profilaxia: {str(e)}"
+
+def enviar_relatorio_resumo_executivo() -> tuple[bool, str]:
+    def escape_html(text: str) -> str:
+        return str(text or "").replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        
+    try:
+        from datetime import date
+        hoje = date.today().strftime('%Y-%m-%d')
+        
+        # 1. FINANCEIRO (Fluxo de caixa de hoje + Saldos de contas)
+        df_fc = fetch_all("SELECT tipo, valor FROM fluxo_caixa WHERE data = ?", (hoje,))
+        entradas_hoje = 0.0
+        saidas_hoje = 0.0
+        if not df_fc.empty:
+            for _, r in df_fc.iterrows():
+                val = float(r['valor'] or 0.0)
+                tipo = str(r['tipo']).upper()
+                if "RECEITA" in tipo or "ENTRADA" in tipo or "RECEB" in tipo:
+                    entradas_hoje += val
+                else:
+                    saidas_hoje += val
+                    
+        df_saldos = fetch_all("SELECT SUM(saldo_inicial) as total FROM contas_bancarias WHERE status='ATIVO'")
+        saldo_caixa_total = float(df_saldos.iloc[0]['total'] or 0.0) if not df_saldos.empty else 0.0
+        
+        # 2. COMERCIAL (Vendas de hoje)
+        query_vendas = "SELECT SUM(valor_total) as total, COUNT(*) as qtd FROM vendas WHERE data = ?"
+        df_vendas = fetch_all(query_vendas, (hoje,))
+        faturamento_hoje = float(df_vendas.iloc[0]['total'] or 0.0) if not df_vendas.empty else 0.0
+        qtd_pedidos_hoje = int(df_vendas.iloc[0]['qtd'] or 0) if not df_vendas.empty else 0
+        
+        # 3. PRODUÇÃO (Produção de hoje)
+        query_prod = "SELECT SUM(produto_final_kg) as total FROM producao_diaria WHERE data = ?"
+        df_prod = fetch_all(query_prod, (hoje,))
+        produzido_hoje = float(df_prod.iloc[0]['total'] or 0.0) if not df_prod.empty else 0.0
+        
+        # 4. LOGÍSTICA (Manifestos de hoje)
+        query_log = "SELECT COUNT(*) as qtd, SUM(valor_total_frete) as frete FROM manifestos_carga WHERE DATE(data_criacao) = ?"
+        df_log = fetch_all(query_log, (hoje,))
+        manifestos_hoje = int(df_log.iloc[0]['qtd'] or 0) if not df_log.empty else 0
+        frete_hoje = float(df_log.iloc[0]['frete'] or 0.0) if not df_log.empty else 0.0
+        
+        # 5. ESTOQUE (Saídas de Hoje + Valoração de Estoque a Preço de Custo)
+        # 5.1 Saídas de hoje
+        query_saidas = "SELECT SUM(quantidade) as total FROM estoque_movimentos WHERE tipo_movimento = 'Saída' AND DATE(data) = ?"
+        df_saidas = fetch_all(query_saidas, (hoje,))
+        saidas_estoque_hoje = float(df_saidas.iloc[0]['total'] or 0.0) if not df_saidas.empty else 0.0
+        
+        # 5.2 Valoração Total a Preço de Custo
+        query_val = """
+            SELECT SUM(
+                (COALESCE((SELECT SUM(quantidade) FROM estoque_movimentos WHERE produto_id = p.id AND tipo_movimento = 'Entrada'), 0.0) -
+                 COALESCE((SELECT SUM(quantidade) FROM estoque_movimentos WHERE produto_id = p.id AND tipo_movimento = 'Saída'), 0.0)) * COALESCE(p.custo_unidade, 0.0)
+            ) as total_valor
+            FROM produtos p
+        """
+        df_val = fetch_all(query_val)
+        valor_estoque_custo = float(df_val.iloc[0]['total_valor'] or 0.0) if not df_val.empty else 0.0
+        
+        # Montar a mensagem Executiva em HTML
+        msg = f"📊 <b>ERP Alho - Resumo Executivo Diário ({date.today().strftime('%d/%m/%Y')})</b>\n"
+        msg += "<i>Cockpit estratégico consolidado de bolso para o CEO.</i>\n\n"
+        
+        msg += "💰 <b>FINANCEIRO</b>\n"
+        msg += f"• Entradas do Dia: <i>R$ {entradas_hoje:,.2f}</i>\n"
+        msg += f"• Saídas do Dia: <i>R$ {saidas_hoje:,.2f}</i>\n"
+        msg += f"• Saldo Total de Contas Bancárias: <b>R$ {saldo_caixa_total:,.2f}</b>\n\n"
+        
+        msg += "🛒 <b>COMERCIAL</b>\n"
+        msg += f"• Faturamento de Hoje: <b>R$ {faturamento_hoje:,.2f}</b>\n"
+        msg += f"• Pedidos Faturados: <i>{qtd_pedidos_hoje} pedidos</i>\n\n"
+        
+        msg += "🏭 <b>PRODUÇÃO</b>\n"
+        msg += f"• Total Fabricado Hoje: <b>{produzido_hoje:,.2f} Kg</b> de produto acabado\n\n"
+        
+        msg += "🚚 <b>LOGÍSTICA</b>\n"
+        msg += f"• Manifestos Criados: <i>{manifestos_hoje} manifestos</i>\n"
+        msg += f"• Custo com Frete: <i>R$ {frete_hoje:,.2f}</i>\n\n"
+        
+        msg += "📦 <b>ESTOQUE</b>\n"
+        msg += f"• Saídas de Estoque Hoje: <b>{saidas_estoque_hoje:,.2f} Kg / un</b>\n"
+        msg += f"• Saldo Atual de Estoque: <b>R$ {valor_estoque_custo:,.2f}</b> <i>(Valorado a Preço de Custo)</i>\n"
+        
+        return enviar_mensagem_telegram(msg)
+    except Exception as e:
+        return False, f"Erro ao gerar resumo executivo: {str(e)}"
 
 if __name__ == "__main__":
     create_tables()

@@ -64,18 +64,31 @@ with tab_empresa:
             st.success("Dados da Empresa e credenciais de Telegram atualizados!")
             import time; time.sleep(1); st.rerun()
 
-    # Botão de Teste de Disparo do Relatório
+    # Botões de Teste de Disparo dos Relatórios
     if emp.get('telegram_token') and emp.get('telegram_chat_id'):
         st.markdown("---")
-        st.markdown("#### 🧪 Teste de Conectividade")
-        if st.button("📲 Testar Envio do Relatório Diário no Telegram", use_container_width=True):
-            from database import enviar_relatorio_financeiro_diario
-            with st.spinner("Gerando relatório e disparando mensagem..."):
-                res, err_msg = enviar_relatorio_financeiro_diario()
-            if res:
-                st.success("✅ Sucesso! O relatório de movimentações financeiras e vendas do dia foi enviado para o seu Telegram.")
-            else:
-                st.error(f"❌ Falha no envio. Detalhes do erro retornado pelo Telegram:\n\n`{err_msg}`")
+        st.markdown("#### 🧪 Testes de Conectividade de Relatórios")
+        col_t1, col_t2 = st.columns(2)
+        
+        with col_t1:
+            if st.button("📲 Enviar Relatório de Profilaxia (Auditoria)", use_container_width=True):
+                from database import enviar_relatorio_profilaxia
+                with st.spinner("Gerando auditoria de lançamentos..."):
+                    res, err_msg = enviar_relatorio_profilaxia()
+                if res:
+                    st.success("✅ Enviado! Verifique seu Telegram.")
+                else:
+                    st.error(f"❌ Falha: {err_msg}")
+                    
+        with col_t2:
+            if st.button("📊 Enviar Resumo do Dia do CEO (Cockpit)", use_container_width=True):
+                from database import enviar_relatorio_resumo_executivo
+                with st.spinner("Gerando resumo executivo consolidado..."):
+                    res, err_msg = enviar_relatorio_resumo_executivo()
+                if res:
+                    st.success("✅ Enviado! Verifique seu Telegram.")
+                else:
+                    st.error(f"❌ Falha: {err_msg}")
 
 def export_btn(df, filename, label="📥 Exportar Lista (CSV)"):
     if not df.empty:
