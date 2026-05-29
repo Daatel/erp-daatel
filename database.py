@@ -875,7 +875,7 @@ def enviar_mensagem_telegram(mensagem: str) -> bool:
         data = urllib.parse.urlencode({
             "chat_id": chat_id,
             "text": mensagem,
-            "parse_mode": "Markdown"
+            "parse_mode": "HTML"
         }).encode("utf-8")
         
         req = urllib.request.Request(url, data=data, method="POST")
@@ -886,6 +886,9 @@ def enviar_mensagem_telegram(mensagem: str) -> bool:
         return False
 
 def enviar_relatorio_financeiro_diario() -> bool:
+    def escape_html(text: str) -> str:
+        return str(text or "").replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        
     try:
         from datetime import date
         hoje = date.today().strftime('%Y-%m-%d')
@@ -909,12 +912,12 @@ def enviar_relatorio_financeiro_diario() -> bool:
         """
         df_vendas = fetch_all(query_vd, (hoje,))
         
-        # Montar a mensagem em Markdown
-        msg = f"📊 *ERP Alho - Relatório Diário ({date.today().strftime('%d/%m/%Y')})*\n\n"
+        # Montar a mensagem em HTML
+        msg = f"📊 <b>ERP Alho - Relatório Diário ({date.today().strftime('%d/%m/%Y')})</b>\n\n"
         
-        msg += "💰 *Fluxo de Caixa (Lançamentos de Hoje):*\n"
+        msg += "💰 <b>Fluxo de Caixa (Lançamentos de Hoje):</b>\n"
         if df_fc.empty:
-            msg += "_Nenhum lançamento financeiro hoje._\n"
+            msg += "<i>Nenhum lançamento financeiro hoje.</i>\n"
         else:
             total_entrada = 0.0
             total_saida = 0.0
@@ -926,19 +929,19 @@ def enviar_relatorio_financeiro_diario() -> bool:
                     total_entrada += valor
                 else:
                     total_saida += valor
-                msg += f"{emoji} *{r['categoria']}*: {r['descricao']} - _R$ {valor:,.2f}_\n"
-            msg += f"\n*Resumo do Caixa:* Entrada R$ {total_entrada:,.2f} | Saída R$ {total_saida:,.2f}\n"
+                msg += f"{emoji} <b>{escape_html(r['categoria'])}</b>: {escape_html(r['descricao'])} - <i>R$ {valor:,.2f}</i>\n"
+            msg += f"\n<b>Resumo do Caixa:</b> Entrada R$ {total_entrada:,.2f} | Saída R$ {total_saida:,.2f}\n"
             
-        msg += "\n🛒 *Pedidos de Venda de Hoje:*\n"
+        msg += "\n🛒 <b>Pedidos de Venda de Hoje:</b>\n"
         if df_vendas.empty:
-            msg += "_Nenhuma venda realizada hoje._\n"
+            msg += "<i>Nenhuma venda realizada hoje.</i>\n"
         else:
             total_vendas = 0.0
             for _, r in df_vendas.iterrows():
                 vlr = float(r['valor_total'] or 0.0)
                 total_vendas += vlr
-                msg += f"📦 *{r['produto']}*: {r['cliente']} (Vend: {r['vendedor']}) - _R$ {vlr:,.2f}_\n"
-            msg += f"\n*Total Vendido:* _R$ {total_vendas:,.2f}_\n"
+                msg += f"📦 <b>{escape_html(r['produto'])}</b>: {escape_html(r['cliente'])} (Vend: {escape_html(r['vendedor'])}) - <i>R$ {vlr:,.2f}</i>\n"
+            msg += f"\n<b>Total Vendido:</b> <i>R$ {total_vendas:,.2f}</i>\n"
             
         return enviar_mensagem_telegram(msg)
     except Exception as e:
