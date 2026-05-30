@@ -215,7 +215,7 @@ backdrop-filter: blur(16px) saturate(180%) !important;
 -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
 border: 1px solid rgba(255,255,255,0.15) !important;
 border-radius: 32px !important;
-padding: 40px 30px 25px 30px !important;
+padding: 30px 25px 20px 25px !important;
 box-shadow: 
 0 0 40px rgba(0,255,140,0.08),
 0 0 50px rgba(140,0,255,0.08) !important;
@@ -224,19 +224,19 @@ position: relative !important;
 }}
 .login-logo-container {{
 text-align: center;
-margin-bottom: 15px;
+margin-bottom: 12px;
 }}
 .login-logo-container img {{
-width: 240px !important;
+width: 190px !important;
 filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.15)) !important;
-margin-bottom: 15px;
+margin-bottom: 10px;
 display: inline-block !important;
 }}
 .login-subtitle {{
 color: #d7d7d7 !important;
 font-size: 15px !important;
 text-align: center !important;
-margin: 0 0 6px 0 !important;
+margin: 0 0 4px 0 !important;
 font-weight: 500 !important;
 }}
 .login-version {{
@@ -246,12 +246,12 @@ font-weight: 600 !important;
 text-align: center !important;
 text-transform: uppercase !important;
 letter-spacing: 1px !important;
-margin: 0 0 18px 0 !important;
+margin: 0 0 12px 0 !important;
 }}
 .color-divider {{
 height: 2px;
 width: 50px;
-margin: 0 auto 18px auto;
+margin: 0 auto 12px auto;
 background: linear-gradient(90deg, #40d97a 0%, #8854ff 100%);
 border-radius: 2px;
 }}
@@ -261,7 +261,7 @@ justify-content: center !important;
 gap: 16px !important;
 color: #dcdcdc !important;
 font-size: 13px !important;
-margin-bottom: 25px !important;
+margin-bottom: 20px !important;
 background: transparent !important;
 border: none !important;
 padding: 0 !important;
@@ -277,7 +277,7 @@ color: #dcdcdc !important;
 }}
 .custom-input-group {{
 position: relative !important;
-margin-bottom: 20px !important;
+margin-bottom: 16px !important;
 width: 100% !important;
 }}
 .custom-input-group input {{
@@ -366,8 +366,8 @@ background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/200
 display: flex !important;
 justify-content: space-between !important;
 align-items: center !important;
-margin-top: -5px !important;
-margin-bottom: 25px !important;
+margin-top: -4px !important;
+margin-bottom: 20px !important;
 width: 100% !important;
 }}
 .custom-checkbox-container {{
@@ -484,7 +484,7 @@ display: flex !important;
 justify-content: center !important;
 align-items: center !important;
 gap: 10px !important;
-margin-top: 30px !important;
+margin-top: 20px !important;
 font-size: 11px !important;
 color: #bfbfbf !important;
 border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
