@@ -126,14 +126,11 @@ def carregar_estilo():
             border-radius: 4px;
         }
     </style>
-    <div class="daatel-footer notranslate" translate="no">
-        <span style="display: block; font-size: 9px; text-align: left; opacity: 0.7; margin-bottom: -2px; letter-spacing: 0.5px;">Powered by</span>
-        Daatel : Wisdom into Tech
     </div>
     """, unsafe_allow_html=True)
 
 
-def carregar_estilo_login(error_msg=None, logo_html=""):
+def carregar_estilo_login(error_msg=None, logo_html="", fundo_base64=""):
     error_banner_html = ""
     if error_msg:
         error_banner_html = f"""<div class="login-error-banner"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><span>{error_msg}</span></div>"""
@@ -165,10 +162,10 @@ pointer-events: none !important;
 display: none !important;
 }}
 [data-testid="stAppViewContainer"] {{
-background: 
-radial-gradient(circle at top left, #133f5e 0%, transparent 40%),
-radial-gradient(circle at bottom right, #5d2f8e 0%, transparent 35%),
-linear-gradient(135deg,#07172f,#0c2748,#081225) !important;
+background-image: url('data:image/jpeg;base64,{fundo_base64}') !important;
+background-size: cover !important;
+background-position: center !important;
+background-repeat: no-repeat !important;
 background-attachment: fixed !important;
 position: relative !important;
 overflow: hidden !important;
@@ -219,120 +216,116 @@ box-sizing: border-box !important;
 }}
 .custom-login-card {{
 width: 420px !important;
-background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(18, 45, 90, 0.22) 50%, rgba(10, 20, 45, 0.45) 100%) !important;
-backdrop-filter: blur(28px) saturate(190%) !important;
--webkit-backdrop-filter: blur(28px) saturate(190%) !important;
-border: 1px solid rgba(255, 255, 255, 0.08) !important;
-border-top: 1px solid rgba(255, 255, 255, 0.25) !important;
-border-left: 1px solid rgba(255, 255, 255, 0.18) !important;
-border-bottom: 1px solid rgba(0, 0, 0, 0.2) !important;
+background: rgba(12, 33, 67, 0.4) !important;
+backdrop-filter: blur(24px) saturate(180%) !important;
+-webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+border: 1px solid rgba(255, 255, 255, 0.15) !important;
+border-top: 1px solid rgba(255, 255, 255, 0.28) !important;
+border-left: 1px solid rgba(255, 255, 255, 0.22) !important;
 border-radius: 32px !important;
-padding: 30px 25px 20px 25px !important;
+padding: 35px 30px 25px 30px !important;
 box-shadow:
-inset 1px 1px 0px rgba(255, 255, 255, 0.18),
+inset 1px 1px 0px rgba(255, 255, 255, 0.15),
 0 0 30px rgba(70, 255, 150, 0.15),
 0 0 40px rgba(140, 80, 255, 0.15) !important;
 box-sizing: border-box !important;
 position: relative !important;
+transition: box-shadow 0.3s ease, border-color 0.3s ease !important;
+}}
+.custom-login-card:hover {{
+box-shadow:
+inset 1px 1px 0px rgba(255, 255, 255, 0.2),
+0 0 40px rgba(85, 255, 170, 0.22),
+0 0 45px rgba(180, 120, 255, 0.22) !important;
+border-color: rgba(255, 255, 255, 0.25) !important;
 }}
 .login-logo-container {{
 text-align: center;
-margin-bottom: 12px;
+margin-bottom: 15px;
 }}
 .login-logo-container img {{
 width: 190px !important;
 filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.15)) !important;
-margin-bottom: 10px;
+margin-bottom: 12px;
 display: inline-block !important;
 }}
 .login-subtitle {{
 color: #d7d7d7 !important;
 font-size: 15px !important;
 text-align: center !important;
-margin: 0 0 4px 0 !important;
+margin: 0 0 8px 0 !important;
 font-weight: 500 !important;
-}}
-.login-version {{
-color: #d7d7d7 !important;
-font-size: 11px !important;
-font-weight: 600 !important;
-text-align: center !important;
-text-transform: uppercase !important;
-letter-spacing: 1px !important;
-margin: 0 0 12px 0 !important;
 }}
 .color-divider {{
 height: 2px;
-width: 50px;
-margin: 0 auto 12px auto;
+width: 60px;
+margin: 0 auto 15px auto;
 background: linear-gradient(90deg, #40d97a 0%, #8854ff 100%);
 border-radius: 2px;
 }}
 .modules-bar {{
 display: flex !important;
 justify-content: center !important;
-gap: 16px !important;
+align-items: center !important;
+gap: 6px !important;
 color: #dcdcdc !important;
-font-size: 13px !important;
-margin-bottom: 20px !important;
+font-size: 11px !important;
+margin-bottom: 10px !important;
 background: transparent !important;
 border: none !important;
 padding: 0 !important;
 flex-wrap: wrap !important;
+letter-spacing: 0.5px !important;
 }}
 .module-item {{
 display: flex;
 align-items: center;
-gap: 4px;
-font-size: 13px;
-font-weight: 400;
+gap: 3px;
+font-weight: 500;
 color: #dcdcdc !important;
+}}
+.module-dot {{
+color: rgba(255, 255, 255, 0.35) !important;
+font-size: 12px !important;
 }}
 .custom-input-group {{
 position: relative !important;
-margin-bottom: 16px !important;
+margin-bottom: 20px !important;
 width: 100% !important;
 }}
-.custom-input-group input {{
+.custom-input-label {{
+display: block !important;
+text-align: left !important;
+color: #5ae893 !important;
+font-size: 13.5px !important;
+font-weight: 500 !important;
+margin-bottom: 6px !important;
+letter-spacing: 0.5px !important;
+}}
+.input-wrapper {{
+position: relative !important;
 width: 100% !important;
-height: 55px !important;
-padding: 16px 16px 16px 44px !important;
-background: rgba(255,255,255,0.08) !important;
-border: 1px solid rgba(255,255,255,0.15) !important;
-backdrop-filter: blur(12px) !important;
--webkit-backdrop-filter: blur(12px) !important;
+}}
+.input-wrapper input {{
+width: 100% !important;
+height: 50px !important;
+padding: 12px 16px 12px 46px !important;
+background: rgba(255, 255, 255, 0.05) !important;
+border: 1px solid rgba(255, 255, 255, 0.15) !important;
 border-radius: 12px !important;
-color: white !important;
+color: #ffffff !important;
 font-size: 15px !important;
 outline: none !important;
-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+transition: all 0.3s ease !important;
 box-sizing: border-box !important;
 }}
-.custom-input-group input:hover,
-.custom-input-group input:focus {{
-border-color: rgba(85, 255, 170, 0.5) !important;
-box-shadow: 
-0 0 20px rgba(85,255,170,.2),
-0 0 20px rgba(180,120,255,.2) !important;
+.input-wrapper input::placeholder {{
+color: rgba(255, 255, 255, 0.35) !important;
 }}
-.custom-input-group label {{
-position: absolute !important;
-left: 44px !important;
-top: 50% !important;
-transform: translateY(-50%) !important;
-color: rgba(255, 255, 255, 0.4) !important;
-font-size: 14px !important;
-pointer-events: none !important;
-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}}
-.custom-input-group input:focus ~ label,
-.custom-input-group input:not(:placeholder-shown) ~ label {{
-top: -6px !important;
-left: 4px !important;
-font-size: 11px !important;
-color: rgba(64, 217, 122, 0.85) !important;
-background: transparent !important;
-padding: 0 !important;
+.input-wrapper input:focus, .input-wrapper input:hover {{
+border-color: rgba(90, 232, 147, 0.5) !important;
+background: rgba(255, 255, 255, 0.08) !important;
+box-shadow: 0 0 15px rgba(90, 232, 147, 0.15) !important;
 }}
 .input-icon {{
 position: absolute !important;
@@ -344,12 +337,12 @@ height: 18px !important;
 background-size: contain !important;
 background-repeat: no-repeat !important;
 pointer-events: none !important;
-opacity: 0.35 !important;
+opacity: 0.45 !important;
 transition: all 0.3s ease !important;
 }}
-.custom-input-group input:focus ~ .input-icon {{
+.input-wrapper input:focus ~ .input-icon {{
 opacity: 0.85 !important;
-filter: drop-shadow(0 0 4px rgba(64, 217, 122, 0.4)) !important;
+filter: drop-shadow(0 0 4px rgba(90, 232, 147, 0.4)) !important;
 }}
 .user-icon {{
 background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') !important;
@@ -369,7 +362,7 @@ background-repeat: no-repeat !important;
 background-color: transparent !important;
 border: none !important;
 cursor: pointer !important;
-opacity: 0.35 !important;
+opacity: 0.45 !important;
 transition: all 0.3s ease !important;
 background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>') !important;
 }}
@@ -383,18 +376,18 @@ background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/200
 display: flex !important;
 justify-content: space-between !important;
 align-items: center !important;
-margin-top: -4px !important;
-margin-bottom: 20px !important;
+margin-top: 10px !important;
+margin-bottom: 24px !important;
 width: 100% !important;
 }}
 .custom-checkbox-container {{
 display: flex !important;
 align-items: center !important;
 position: relative !important;
-padding-left: 26px !important;
+padding-left: 24px !important;
 cursor: pointer !important;
-font-size: 13px !important;
-color: rgba(255, 255, 255, 0.65) !important;
+font-size: 13.5px !important;
+color: rgba(255, 255, 255, 0.7) !important;
 user-select: none !important;
 }}
 .custom-checkbox-container input {{
@@ -412,12 +405,13 @@ transform: translateY(-50%) !important;
 height: 16px !important;
 width: 16px !important;
 background-color: rgba(255, 255, 255, 0.05) !important;
-border: 1px solid rgba(255, 255, 255, 0.15) !important;
+border: 1px solid rgba(255, 255, 255, 0.25) !important;
 border-radius: 4px !important;
 transition: all 0.2s ease !important;
 }}
 .custom-checkbox-container:hover input ~ .checkmark {{
 background-color: rgba(255, 255, 255, 0.1) !important;
+border-color: rgba(255, 255, 255, 0.35) !important;
 }}
 .custom-checkbox-container input:checked ~ .checkmark {{
 background-color: #40d97a !important;
@@ -441,15 +435,16 @@ border-width: 0 2px 2px 0 !important;
 transform: rotate(45deg) !important;
 }}
 .forgot-password {{
-color: #8854ff !important;
-font-size: 13px !important;
+color: #a78bfa !important;
+font-size: 13.5px !important;
 text-decoration: none !important;
 font-weight: 500 !important;
 opacity: 0.85 !important;
-transition: opacity 0.2s ease !important;
+transition: opacity 0.2s ease, color 0.2s ease !important;
 }}
 .forgot-password:hover {{
 opacity: 1 !important;
+color: #c084fc !important;
 }}
 .custom-submit-btn {{
 background: linear-gradient(90deg, #40d97a, #8854ff) !important;
@@ -457,21 +452,23 @@ color: white !important;
 border: none !important;
 border-radius: 14px !important;
 font-weight: 700 !important;
-font-size: 20px !important;
-height: 58px !important;
+font-size: 16px !important;
+letter-spacing: 1px !important;
+height: 52px !important;
 width: 100% !important;
-box-shadow: 0 4px 20px rgba(64, 217, 122, 0.25) !important;
-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+box-shadow: 0 4px 15px rgba(64, 217, 122, 0.2) !important;
+transition: all 0.3s ease !important;
 cursor: pointer !important;
 display: flex !important;
 align-items: center !important;
 justify-content: center !important;
 box-sizing: border-box !important;
-margin-top: 5px !important;
+margin-top: 10px !important;
 }}
 .custom-submit-btn:hover {{
 transform: translateY(-2px) !important;
-box-shadow: 0 6px 24px rgba(136, 84, 255, 0.45) !important;
+box-shadow: 0 6px 20px rgba(136, 84, 255, 0.35) !important;
+filter: brightness(1.05) !important;
 }}
 .custom-submit-btn:active {{
 transform: translateY(0) !important;
@@ -498,27 +495,36 @@ stroke: #f87171 !important;
 }}
 .card-footer {{
 display: flex !important;
-justify-content: center !important;
+flex-direction: column !important;
 align-items: center !important;
-gap: 10px !important;
-margin-top: 20px !important;
+gap: 6px !important;
+margin-top: 24px !important;
 font-size: 11px !important;
-color: #bfbfbf !important;
-border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
-padding-top: 15px !important;
+color: rgba(255, 255, 255, 0.45) !important;
+border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+padding-top: 16px !important;
 width: 100% !important;
 box-sizing: border-box !important;
-opacity: 0.8 !important;
-font-family: Arial, sans-serif !important;
 }}
-.card-footer span {{
+.footer-row {{
 display: flex !important;
+justify-content: center !important;
 align-items: center !important;
-gap: 4px !important;
+gap: 8px !important;
+color: #5ae893 !important;
+font-weight: 500 !important;
 }}
-.card-footer strong {{
+.footer-row svg {{
+stroke: #5ae893 !important;
+}}
+.footer-signature {{
+color: rgba(255, 255, 255, 0.6) !important;
+font-size: 11px !important;
+margin-top: 2px !important;
+}}
+.footer-signature strong {{
 color: #ffffff !important;
-letter-spacing: 1px !important;
+letter-spacing: 0.5px !important;
 }}
 </style>
 <div class="custom-login-overlay">
@@ -527,27 +533,33 @@ letter-spacing: 1px !important;
 <div class="login-logo-container">
 {logo_html}
 <div class="login-subtitle">Sistema Integrado de Gestão</div>
-<div class="login-version">Versão 1.0</div>
 <div class="color-divider"></div>
 <div class="modules-bar">
-<div class="module-item">🌱 Produção</div>
-<div class="module-item">📦 Estoque</div>
-<div class="module-item">🛒 Comercial</div>
-<div class="module-item">📊 Financeiro</div>
+<div class="module-item">🌱 PRODUÇÃO</div>
+<span class="module-dot">&bull;</span>
+<div class="module-item">📦 ESTOQUE</div>
+<span class="module-dot">&bull;</span>
+<div class="module-item">🛒 COMERCIAL</div>
+<span class="module-dot">&bull;</span>
+<div class="module-item">📊 FINANCEIRO</div>
 </div>
 </div>
 {error_banner_html}
 <form id="custom-login-form" onsubmit="event.preventDefault(); submitLoginForm();">
 <div class="custom-input-group">
+<span class="custom-input-label">E-mail</span>
+<div class="input-wrapper">
+<input type="text" id="custom-email" required placeholder="Digite seu e-mail" autocomplete="username">
 <span class="input-icon user-icon"></span>
-<input type="text" id="custom-email" required placeholder=" " autocomplete="username">
-<label for="custom-email">E-mail</label>
+</div>
 </div>
 <div class="custom-input-group">
+<span class="custom-input-label">Senha</span>
+<div class="input-wrapper">
+<input type="password" id="custom-password" required placeholder="Digite sua senha" autocomplete="current-password">
 <span class="input-icon lock-icon"></span>
-<input type="password" id="custom-password" required placeholder=" " autocomplete="current-password">
-<label for="custom-password">Senha</label>
 <button type="button" class="password-toggle" onclick="togglePasswordVisibility()"></button>
+</div>
 </div>
 <div class="custom-form-options">
 <label class="custom-checkbox-container">
@@ -558,13 +570,19 @@ Lembrar-me
 <a href="#" class="forgot-password">Esqueci minha senha</a>
 </div>
 <button type="submit" class="custom-submit-btn">
-<span>→ ENTRAR</span>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+<span>ENTRAR</span>
 </button>
 </form>
 <div class="card-footer">
-<span>🛡️ Ambiente Corporativo</span>
+<div class="footer-row">
+<span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px; margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Ambiente Corporativo</span>
 <span>|</span>
-<span>Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech</span>
+<span>Versão 1.0.0</span>
+</div>
+<div class="footer-signature">
+Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
+</div>
 </div>
 </div>
 </div>
