@@ -65,23 +65,23 @@ def login_form_page():
         except Exception:
             pass
             
-    # Cabeçalho do Card (Logo, Títulos e Módulos)
-    st.markdown(f"""
-    <div class="login-logo-container">
-        {logo_html}
-        <h2 class="login-title">EMPORIO DO ALHO</h2>
-        <div class="login-subtitle">Sistema Integrado de Gestão</div>
-        <div class="color-divider"></div>
-        <div class="modules-bar">
-            <div class="module-item mod-prod">🌱 PRODUÇÃO</div>
-            <div class="module-item mod-est">📦 ESTOQUE</div>
-            <div class="module-item mod-com">🛒 COMERCIAL</div>
-            <div class="module-item mod-fin">📊 FINANCEIRO</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
     with st.form("login_form"):
+        # Cabeçalho do Card (Logo, Títulos e Módulos) - Agora dentro do card glassmorphic!
+        st.markdown(f"""
+        <div class="login-logo-container">
+            {logo_html}
+            <h2 class="login-title">EMPORIO DO ALHO</h2>
+            <div class="login-subtitle">Sistema Integrado de Gestão</div>
+            <div class="color-divider"></div>
+            <div class="modules-bar">
+                <div class="module-item mod-prod">🌱 PRODUÇÃO</div>
+                <div class="module-item mod-est">📦 ESTOQUE</div>
+                <div class="module-item mod-com">🛒 COMERCIAL</div>
+                <div class="module-item mod-fin">📊 FINANCEIRO</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         email = st.text_input("E-mail", placeholder="Digite seu e-mail").strip()
         senha = st.text_input("Senha", type="password", placeholder="Digite sua senha").strip()
         

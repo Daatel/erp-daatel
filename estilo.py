@@ -241,7 +241,7 @@ def carregar_estilo_login():
         }
 
         /* 7. O Botão Degradê de Login */
-        div[data-testid="stForm"] button {
+        div[data-testid="stFormSubmitButton"] button {
             background: linear-gradient(135deg, #10b981 0%, #7c3aed 100%) !important;
             color: #ffffff !important;
             border: none !important;
@@ -258,12 +258,12 @@ def carregar_estilo_login():
             margin-top: 20px !important;
         }
         
-        div[data-testid="stForm"] button:hover {
+        div[data-testid="stFormSubmitButton"] button:hover {
             transform: translateY(-2px) !important;
             box-shadow: 0 6px 24px rgba(124, 58, 237, 0.45) !important;
         }
         
-        div[data-testid="stForm"] button:active {
+        div[data-testid="stFormSubmitButton"] button:active {
             transform: translateY(0) !important;
         }
 
@@ -274,9 +274,15 @@ def carregar_estilo_login():
         }
         
         .login-logo-container img {
-            width: 130px;
-            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.1));
-            margin-bottom: 12px;
+            width: 90px !important;
+            height: 90px !important;
+            background: #ffffff !important;
+            border-radius: 50% !important;
+            padding: 8px !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35) !important;
+            object-fit: contain !important;
+            margin-bottom: 12px !important;
+            display: inline-block !important;
         }
         
         .login-title {
