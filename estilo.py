@@ -219,15 +219,19 @@ box-sizing: border-box !important;
 }}
 .custom-login-card {{
 width: 420px !important;
-background: rgba(18,45,90,0.55) !important;
-backdrop-filter: blur(28px) saturate(180%) !important;
--webkit-backdrop-filter: blur(28px) saturate(180%) !important;
-border: 1px solid rgba(255,255,255,0.15) !important;
+background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(18, 45, 90, 0.22) 50%, rgba(10, 20, 45, 0.45) 100%) !important;
+backdrop-filter: blur(28px) saturate(190%) !important;
+-webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+border: 1px solid rgba(255, 255, 255, 0.08) !important;
+border-top: 1px solid rgba(255, 255, 255, 0.25) !important;
+border-left: 1px solid rgba(255, 255, 255, 0.18) !important;
+border-bottom: 1px solid rgba(0, 0, 0, 0.2) !important;
 border-radius: 32px !important;
 padding: 30px 25px 20px 25px !important;
 box-shadow:
-0 0 30px rgba(70,255,150,.15),
-0 0 40px rgba(140,80,255,.15) !important;
+inset 1px 1px 0px rgba(255, 255, 255, 0.18),
+0 0 30px rgba(70, 255, 150, 0.15),
+0 0 40px rgba(140, 80, 255, 0.15) !important;
 box-sizing: border-box !important;
 position: relative !important;
 }}
