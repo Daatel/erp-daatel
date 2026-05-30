@@ -188,6 +188,15 @@ pointer-events: none !important;
 opacity: 0.8 !important;
 z-index: 0 !important;
 }}
+[data-testid="stMainBlockContainer"], 
+[data-testid="stVerticalBlock"], 
+[data-testid="stVerticalBlockBorderWrapper"],
+[data-testid="stCustomComponentContainer"] {{
+background-color: transparent !important;
+background: transparent !important;
+border: none !important;
+box-shadow: none !important;
+}}
 .custom-login-overlay {{
 position: fixed !important;
 top: 0 !important;
@@ -211,8 +220,8 @@ box-sizing: border-box !important;
 .custom-login-card {{
 width: 420px !important;
 background: rgba(255,255,255,0.08) !important;
-backdrop-filter: blur(16px) saturate(180%) !important;
--webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+backdrop-filter: blur(18px) !important;
+-webkit-backdrop-filter: blur(18px) !important;
 border: 1px solid rgba(255,255,255,0.15) !important;
 border-radius: 32px !important;
 padding: 30px 25px 20px 25px !important;
