@@ -163,8 +163,8 @@ display: none !important;
 }}
 [data-testid="stAppViewContainer"] {{
 background-image: url('data:image/png;base64,{fundo_base64}') !important;
-background-size: 100% 100% !important;
-background-position: center !important;
+background-size: cover !important;
+background-position: left center !important;
 background-repeat: no-repeat !important;
 background-attachment: fixed !important;
 position: relative !important;
