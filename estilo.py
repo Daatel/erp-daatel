@@ -317,8 +317,8 @@ width: 100% !important;
 width: 100% !important;
 height: 50px !important;
 padding: 12px 16px 12px 46px !important;
-background: rgba(18, 45, 90, 0.22) !important;
-border: 1px solid rgba(255, 255, 255, 0.48) !important;
+background: rgba(0, 0, 0, 0.35) !important;
+border: 1px solid rgba(255, 255, 255, 0.4) !important;
 border-radius: 12px !important;
 color: #ffffff !important;
 font-size: 15px !important;
@@ -330,9 +330,9 @@ box-sizing: border-box !important;
 color: rgba(255, 255, 255, 0.45) !important;
 }}
 .input-wrapper input:focus, .input-wrapper input:hover {{
-border-color: rgba(255, 255, 255, 0.85) !important;
-background: rgba(18, 45, 90, 0.32) !important;
-box-shadow: 0 0 15px rgba(255, 255, 255, 0.2) !important;
+border-color: rgba(255, 255, 255, 0.8) !important;
+background: rgba(0, 0, 0, 0.45) !important;
+box-shadow: 0 0 12px rgba(255, 255, 255, 0.15) !important;
 }}
 .input-icon {{
 position: absolute !important;
