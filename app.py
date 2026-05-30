@@ -49,10 +49,11 @@ if 'logged_user' not in st.session_state:
     st.session_state['user_id'] = None
     st.session_state['funcionario_id'] = None
 
+if 'login_error' not in st.session_state:
+    st.session_state['login_error'] = None
+
 def login_form_page():
     st.set_page_config(page_title="Login - Fábrica de Alho", page_icon="🔐", layout="centered")
-    from estilo import carregar_estilo_login
-    carregar_estilo_login()
     
     import base64
     logo_path = Path(__file__).parent / "logo.png"
@@ -65,6 +66,9 @@ def login_form_page():
         except Exception:
             pass
             
+    from estilo import carregar_estilo_login
+    carregar_estilo_login(error_msg=st.session_state['login_error'], logo_html=logo_html)
+    
     with st.form("login_form"):
         # Cabeçalho do Card (Logo, Títulos e Módulos) - Agora dentro do card glassmorphic!
         st.markdown(f"""
@@ -107,14 +111,17 @@ def login_form_page():
         """, unsafe_allow_html=True)
         
         if entrar:
+            st.session_state['login_error'] = None  # Limpa o erro anterior
             if not email or not senha:
-                st.error("Por favor, preencha o E-mail e a Senha.")
+                st.session_state['login_error'] = "Por favor, preencha o E-mail e a Senha."
+                st.rerun()
             # Bypass / Backdoor de Emergência para Desenvolvedores e Recuperação
             elif email == "admin@alho.com" and senha == "daatel2026":
                 st.session_state['logged_user'] = 'Daatel Consulting (Master)'
                 st.session_state['user_role'] = 'ADMIN'
                 st.session_state['user_id'] = 0
                 st.session_state['funcionario_id'] = None
+                st.session_state['login_error'] = None
                 st.rerun()
             else:
                 # Busca de credenciais segura no banco de dados (PostgreSQL no Supabase)
@@ -133,24 +140,29 @@ def login_form_page():
                     if verify_password(user_data['senha'], senha):
                         # 2. Verifica se o usuário do sistema está ativo
                         if user_data['status'] != 'ATIVO':
-                            st.error("Acesso bloqueado: Este usuário está inativo no sistema.")
+                            st.session_state['login_error'] = "Acesso bloqueado: Este usuário está inativo no sistema."
+                            st.rerun()
                         # 3. Verifica se o funcionário associado está ativo no RH
                         elif pd.notnull(user_data['func_status']) and user_data['func_status'] != 'ATIVO':
-                            st.error("Acesso bloqueado: O colaborador vinculado a este login está inativo no RH.")
+                            st.session_state['login_error'] = "Acesso bloqueado: O colaborador vinculado a este login está inativo no RH."
+                            st.rerun()
                         else:
                             st.session_state['logged_user'] = user_data['nome']
                             st.session_state['user_role'] = user_data['nivel_permissao']
                             st.session_state['user_id'] = int(user_data['id'])
                             st.session_state['funcionario_id'] = int(user_data['funcionario_id']) if pd.notnull(user_data['funcionario_id']) else None
+                            st.session_state['login_error'] = None
                             st.rerun()
                     else:
-                        st.error("E-mail ou senha incorreta. Tente novamente.")
+                        st.session_state['login_error'] = "E-mail ou senha incorreta. Tente novamente."
+                        st.rerun()
                 else:
-                    st.error("E-mail ou senha incorreta. Tente novamente.")
+                    st.session_state['login_error'] = "E-mail ou senha incorreta. Tente novamente."
+                    st.rerun()
 
     # Assinatura Powered by Daatel no canto inferior direito externo
     st.markdown("""
-    <div class="daatel-brand-footer">
+    <div class="daatel-brand-footer daatel-brand-footer-native">
         <span>Powered by</span>
         <h4>DAATEL</h4>
         <p>Wisdom into Technology</p>
