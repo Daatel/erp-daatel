@@ -219,9 +219,9 @@ box-sizing: border-box !important;
 }}
 .custom-login-card {{
 width: 420px !important;
-background: rgba(255,255,255,0.08) !important;
-backdrop-filter: blur(18px) !important;
--webkit-backdrop-filter: blur(18px) !important;
+background: rgba(18,45,90,0.55) !important;
+backdrop-filter: blur(28px) saturate(180%) !important;
+-webkit-backdrop-filter: blur(28px) saturate(180%) !important;
 border: 1px solid rgba(255,255,255,0.15) !important;
 border-radius: 32px !important;
 padding: 30px 25px 20px 25px !important;
