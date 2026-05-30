@@ -490,6 +490,12 @@
     </div>
 
     <script>
+        // --- 0. Informar ao Streamlit que o componente está pronto e carregado ---
+        window.parent.postMessage({
+            type: "streamlit:componentReady",
+            apiVersion: 1
+        }, "*");
+
         // --- 1. Lógica do Botão de Visibilidade de Senha ---
         const togglePassword = document.getElementById('toggle-password');
         const passwordInput = document.getElementById('password');
