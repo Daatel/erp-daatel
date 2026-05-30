@@ -43,6 +43,11 @@ initialize_database()
 check_and_migrate_once()
 
 
+import streamlit.components.v1 as components
+parent_dir = Path(__file__).parent
+login_comp = components.declare_component("login_comp", path=str(parent_dir / "login_component"))
+
+
 if 'logged_user' not in st.session_state:
     st.session_state['logged_user'] = None
     st.session_state['user_role'] = None
@@ -54,112 +59,85 @@ def login_form_page():
     from estilo import carregar_estilo_login
     carregar_estilo_login()
     
+    # 1. Carregar logo em Base64 para repassar ao componente
     import base64
     logo_path = Path(__file__).parent / "logo.png"
-    logo_html = ""
+    logo_b64 = ""
     if logo_path.exists():
         try:
             with open(logo_path, "rb") as image_file:
-                encoded_string = base64.b64encode(image_file.read()).decode()
-            logo_html = f'<img src="data:image/png;base64,{encoded_string}" alt="Logo">'
+                logo_b64 = base64.b64encode(image_file.read()).decode()
         except Exception:
             pass
             
-    with st.form("login_form"):
-        # Cabeçalho do Card (Logo, Títulos e Módulos) - Agora dentro do card glassmorphic!
-        st.markdown(f"""
-        <div class="login-logo-container">
-            {logo_html}
-            <h2 class="login-title">EMPORIO DO ALHO</h2>
-            <div class="login-subtitle">Sistema Integrado de Gestão</div>
-            <div class="color-divider"></div>
-            <div class="modules-bar">
-                <div class="module-item mod-prod">🌱 PRODUÇÃO</div>
-                <div class="module-item mod-est">📦 ESTOQUE</div>
-                <div class="module-item mod-com">🛒 COMERCIAL</div>
-                <div class="module-item mod-fin">📊 FINANCEIRO</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    # 2. Inicializar o estado de erro de login se não existir
+    if 'login_error' not in st.session_state:
+        st.session_state['login_error'] = None
         
-        email = st.text_input("E-mail", placeholder="Digite seu e-mail").strip()
-        senha = st.text_input("Senha", type="password", placeholder="Digite sua senha").strip()
+    # 3. Renderizar o componente HTML5 independente de login
+    # Retorna o dicionário {email, password} quando o formulário é submetido
+    login_data = login_comp(
+        logo_b64=logo_b64, 
+        error_msg=st.session_state['login_error'], 
+        key="login_screen"
+    )
+    
+    if login_data:
+        email = login_data.get("email", "").strip()
+        senha = login_data.get("password", "").strip()
         
-        # Lembrar-me & Esqueci minha senha
-        st.checkbox("Lembrar-me", value=True)
-        st.markdown(
-            '<div style="text-align: right; margin-top: -34px; margin-bottom: 24px; position: relative; z-index: 10;">'
-            '<a href="#" style="color: #a78bfa; font-size: 13px; text-decoration: none; font-weight: 500; opacity: 0.85;">Esqueci minha senha</a>'
-            '</div>', 
-            unsafe_allow_html=True
-        )
+        # Limpa o erro anterior para a nova validação
+        st.session_state['login_error'] = None
         
-        # Botão Entrar
-        entrar = st.form_submit_button("→ ENTRAR", use_container_width=True)
-        
-        # Rodapé interno do card
-        st.markdown("""
-        <div class="card-footer">
-            <span>🛡️ Ambiente Corporativo</span>
-            <span>|</span>
-            <span>Versão 1.0.0</span>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if entrar:
-            if not email or not senha:
-                st.error("Por favor, preencha o E-mail e a Senha.")
-            # Bypass / Backdoor de Emergência para Desenvolvedores e Recuperação
-            elif email == "admin@alho.com" and senha == "daatel2026":
-                st.session_state['logged_user'] = 'Daatel Consulting (Master)'
-                st.session_state['user_role'] = 'ADMIN'
-                st.session_state['user_id'] = 0
-                st.session_state['funcionario_id'] = None
-                st.success("Acesso administrativo mestre concedido!")
-                import time; time.sleep(0.5)
-                st.rerun()
-            else:
-                # Busca de credenciais segura no banco de dados
-                query = """
-                    SELECT u.id, u.nome, u.email, u.senha, u.nivel_permissao, u.status, u.funcionario_id,
-                           f.status as func_status
-                    FROM usuarios u
-                    LEFT JOIN funcionarios f ON u.funcionario_id = f.id
-                    WHERE u.email = ?
-                """
-                df_user = fetch_all(query, (email,))
-                
-                if not df_user.empty:
-                    user_data = df_user.iloc[0]
-                    # 1. Verifica se a senha está correta
-                    if verify_password(user_data['senha'], senha):
-                        # 2. Verifica se o usuário do sistema está ativo
-                        if user_data['status'] != 'ATIVO':
-                            st.error("Acesso bloqueado: Este usuário está inativo no sistema.")
-                        # 3. Verifica se o funcionário associado está ativo no RH
-                        elif pd.notnull(user_data['func_status']) and user_data['func_status'] != 'ATIVO':
-                            st.error("Acesso bloqueado: O colaborador vinculado a este login está inativo no RH.")
-                        else:
-                            st.session_state['logged_user'] = user_data['nome']
-                            st.session_state['user_role'] = user_data['nivel_permissao']
-                            st.session_state['user_id'] = int(user_data['id'])
-                            st.session_state['funcionario_id'] = int(user_data['funcionario_id']) if pd.notnull(user_data['funcionario_id']) else None
-                            st.success(f"Bem-vindo, {user_data['nome']}!")
-                            import time; time.sleep(0.5)
-                            st.rerun()
+        if not email or not senha:
+            st.session_state['login_error'] = "Por favor, preencha o E-mail e a Senha."
+            st.rerun()
+            
+        # Bypass / Backdoor de Emergência para Desenvolvedores e Recuperação
+        elif email == "admin@alho.com" and senha == "daatel2026":
+            st.session_state['logged_user'] = 'Daatel Consulting (Master)'
+            st.session_state['user_role'] = 'ADMIN'
+            st.session_state['user_id'] = 0
+            st.session_state['funcionario_id'] = None
+            st.session_state['login_error'] = None
+            st.rerun()
+            
+        else:
+            # Busca de credenciais segura no banco de dados (PostgreSQL no Supabase)
+            query = """
+                SELECT u.id, u.nome, u.email, u.senha, u.nivel_permissao, u.status, u.funcionario_id,
+                       f.status as func_status
+                FROM usuarios u
+                LEFT JOIN funcionarios f ON u.funcionario_id = f.id
+                WHERE u.email = ?
+            """
+            df_user = fetch_all(query, (email,))
+            
+            if not df_user.empty:
+                user_data = df_user.iloc[0]
+                # 1. Verifica se a senha está correta
+                if verify_password(user_data['senha'], senha):
+                    # 2. Verifica se o usuário do sistema está ativo
+                    if user_data['status'] != 'ATIVO':
+                        st.session_state['login_error'] = "Acesso bloqueado: Este usuário está inativo no sistema."
+                        st.rerun()
+                    # 3. Verifica se o funcionário associado está ativo no RH
+                    elif pd.notnull(user_data['func_status']) and user_data['func_status'] != 'ATIVO':
+                        st.session_state['login_error'] = "Acesso bloqueado: O colaborador vinculado a este login está inativo no RH."
+                        st.rerun()
                     else:
-                        st.error("E-mail ou senha incorreta. Tente novamente.")
+                        st.session_state['logged_user'] = user_data['nome']
+                        st.session_state['user_role'] = user_data['nivel_permissao']
+                        st.session_state['user_id'] = int(user_data['id'])
+                        st.session_state['funcionario_id'] = int(user_data['funcionario_id']) if pd.notnull(user_data['funcionario_id']) else None
+                        st.session_state['login_error'] = None
+                        st.rerun()
                 else:
-                    st.error("E-mail ou senha incorreta. Tente novamente.")
-
-    # Assinatura Powered by Daatel no canto inferior direito externo
-    st.markdown("""
-    <div class="daatel-brand-footer">
-        <span>Powered by</span>
-        <h4>DAATEL</h4>
-        <p>Wisdom into Technology</p>
-    </div>
-    """, unsafe_allow_html=True)
+                    st.session_state['login_error'] = "E-mail ou senha incorreta. Tente novamente."
+                    st.rerun()
+            else:
+                st.session_state['login_error'] = "E-mail ou senha incorreta. Tente novamente."
+                st.rerun()
 
 
 if not st.session_state['logged_user']:
