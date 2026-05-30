@@ -225,9 +225,9 @@ backdrop-filter: blur(18px) !important;
 border: 1px solid rgba(255,255,255,0.15) !important;
 border-radius: 32px !important;
 padding: 30px 25px 20px 25px !important;
-box-shadow: 
-0 0 40px rgba(0,255,140,0.08),
-0 0 50px rgba(140,0,255,0.08) !important;
+box-shadow:
+0 0 30px rgba(70,255,150,.15),
+0 0 40px rgba(140,80,255,.15) !important;
 box-sizing: border-box !important;
 position: relative !important;
 }}
