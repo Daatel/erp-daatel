@@ -163,7 +163,7 @@ display: none !important;
 }}
 [data-testid="stAppViewContainer"] {{
 background-image: url('data:image/png;base64,{fundo_base64}') !important;
-background-size: cover !important;
+background-size: 100% 100% !important;
 background-position: center !important;
 background-repeat: no-repeat !important;
 background-attachment: fixed !important;
@@ -310,8 +310,8 @@ width: 100% !important;
 width: 100% !important;
 height: 50px !important;
 padding: 12px 16px 12px 46px !important;
-background: rgba(255, 255, 255, 0.05) !important;
-border: 1px solid rgba(255, 255, 255, 0.15) !important;
+background: rgba(18, 45, 90, 0.25) !important;
+border: 1px solid rgba(255, 255, 255, 0.3) !important;
 border-radius: 12px !important;
 color: #ffffff !important;
 font-size: 15px !important;
@@ -320,12 +320,12 @@ transition: all 0.3s ease !important;
 box-sizing: border-box !important;
 }}
 .input-wrapper input::placeholder {{
-color: rgba(255, 255, 255, 0.35) !important;
+color: rgba(255, 255, 255, 0.45) !important;
 }}
 .input-wrapper input:focus, .input-wrapper input:hover {{
-border-color: rgba(90, 232, 147, 0.5) !important;
-background: rgba(255, 255, 255, 0.08) !important;
-box-shadow: 0 0 15px rgba(90, 232, 147, 0.15) !important;
+border-color: rgba(255, 255, 255, 0.6) !important;
+background: rgba(18, 45, 90, 0.35) !important;
+box-shadow: 0 0 15px rgba(255, 255, 255, 0.15) !important;
 }}
 .input-icon {{
 position: absolute !important;
@@ -337,12 +337,12 @@ height: 18px !important;
 background-size: contain !important;
 background-repeat: no-repeat !important;
 pointer-events: none !important;
-opacity: 0.45 !important;
+opacity: 0.65 !important;
 transition: all 0.3s ease !important;
 }}
 .input-wrapper input:focus ~ .input-icon {{
-opacity: 0.85 !important;
-filter: drop-shadow(0 0 4px rgba(90, 232, 147, 0.4)) !important;
+opacity: 0.95 !important;
+filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4)) !important;
 }}
 .user-icon {{
 background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') !important;
