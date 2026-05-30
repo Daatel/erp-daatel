@@ -240,7 +240,7 @@ margin: 0 0 4px 0 !important;
 font-weight: 500 !important;
 }}
 .login-version {{
-color: #f87171 !important;
+color: #d7d7d7 !important;
 font-size: 11px !important;
 font-weight: 600 !important;
 text-align: center !important;
