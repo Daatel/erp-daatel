@@ -215,7 +215,7 @@ backdrop-filter: blur(16px) saturate(180%) !important;
 -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
 border: 1px solid rgba(255,255,255,0.15) !important;
 border-radius: 32px !important;
-padding: 40px !important;
+padding: 40px 30px 25px 30px !important;
 box-shadow: 
 0 0 40px rgba(0,255,140,0.08),
 0 0 50px rgba(140,0,255,0.08) !important;
@@ -224,43 +224,44 @@ position: relative !important;
 }}
 .login-logo-container {{
 text-align: center;
-margin-bottom: 20px;
+margin-bottom: 15px;
 }}
 .login-logo-container img {{
-width: 180px !important;
-filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.12)) !important;
-margin-bottom: 20px;
+width: 240px !important;
+filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.15)) !important;
+margin-bottom: 15px;
 display: inline-block !important;
-}}
-.login-title {{
-color: white !important;
-font-size: 36px !important;
-font-weight: 700 !important;
-text-align: center !important;
-margin: 0 !important;
-line-height: 1.2 !important;
 }}
 .login-subtitle {{
 color: #d7d7d7 !important;
 font-size: 15px !important;
 text-align: center !important;
-margin-top: 10px !important;
-margin-bottom: 30px !important;
+margin: 0 0 6px 0 !important;
+font-weight: 500 !important;
+}}
+.login-version {{
+color: #f87171 !important;
+font-size: 11px !important;
+font-weight: 600 !important;
+text-align: center !important;
+text-transform: uppercase !important;
+letter-spacing: 1px !important;
+margin: 0 0 18px 0 !important;
 }}
 .color-divider {{
 height: 2px;
 width: 50px;
-margin: 0 auto 15px auto;
+margin: 0 auto 18px auto;
 background: linear-gradient(90deg, #40d97a 0%, #8854ff 100%);
 border-radius: 2px;
 }}
 .modules-bar {{
 display: flex !important;
 justify-content: center !important;
-gap: 18px !important;
+gap: 16px !important;
 color: #dcdcdc !important;
 font-size: 13px !important;
-margin-bottom: 35px !important;
+margin-bottom: 25px !important;
 background: transparent !important;
 border: none !important;
 padding: 0 !important;
@@ -276,7 +277,7 @@ color: #dcdcdc !important;
 }}
 .custom-input-group {{
 position: relative !important;
-margin-bottom: 24px !important;
+margin-bottom: 20px !important;
 width: 100% !important;
 }}
 .custom-input-group input {{
@@ -365,7 +366,8 @@ background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/200
 display: flex !important;
 justify-content: space-between !important;
 align-items: center !important;
-margin-bottom: 24px !important;
+margin-top: -5px !important;
+margin-bottom: 25px !important;
 width: 100% !important;
 }}
 .custom-checkbox-container {{
@@ -448,6 +450,7 @@ display: flex !important;
 align-items: center !important;
 justify-content: center !important;
 box-sizing: border-box !important;
+margin-top: 5px !important;
 }}
 .custom-submit-btn:hover {{
 transform: translateY(-2px) !important;
@@ -461,7 +464,7 @@ background: rgba(239, 68, 68, 0.12) !important;
 border: 1px solid rgba(239, 68, 68, 0.25) !important;
 border-radius: 12px !important;
 padding: 12px 16px !important;
-margin-bottom: 24px !important;
+margin-bottom: 20px !important;
 color: #fca5a5 !important;
 font-size: 13px !important;
 display: flex !important;
@@ -480,52 +483,25 @@ stroke: #f87171 !important;
 display: flex !important;
 justify-content: center !important;
 align-items: center !important;
-gap: 12px !important;
-margin-top: 25px !important;
-font-size: 13px !important;
+gap: 10px !important;
+margin-top: 30px !important;
+font-size: 11px !important;
 color: #bfbfbf !important;
-border-top: 1px solid rgba(255, 255, 255, 0.04) !important;
+border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
 padding-top: 15px !important;
 width: 100% !important;
 box-sizing: border-box !important;
+opacity: 0.8 !important;
+font-family: Arial, sans-serif !important;
 }}
 .card-footer span {{
 display: flex !important;
 align-items: center !important;
 gap: 4px !important;
 }}
-.daatel-brand-footer {{
-position: fixed !important;
-right: 35px !important;
-bottom: 25px !important;
-text-align: right !important;
-color: rgba(255,255,255,.75) !important;
-font-family: Arial, sans-serif !important;
-z-index: 999999 !important;
-pointer-events: auto !important;
-}}
-.daatel-brand-footer span {{
-display: block !important;
-font-size: 14px !important;
-opacity: .7 !important;
-margin-bottom: 2px !important;
-color: rgba(255, 255, 255, 0.7) !important;
-letter-spacing: normal !important;
-text-transform: none !important;
-}}
-.daatel-brand-footer h4 {{
-margin: 0 !important;
-font-size: 24px !important;
-font-weight: 700 !important;
-letter-spacing: 12px !important;
+.card-footer strong {{
 color: #ffffff !important;
-}}
-.daatel-brand-footer p {{
-margin: 2px 0 0 0 !important;
-font-size: 14px !important;
-opacity: .7 !important;
-color: rgba(255, 255, 255, 0.7) !important;
-letter-spacing: normal !important;
+letter-spacing: 1px !important;
 }}
 </style>
 <div class="custom-login-overlay">
@@ -533,8 +509,8 @@ letter-spacing: normal !important;
 <div class="custom-login-card">
 <div class="login-logo-container">
 {logo_html}
-<h2 class="login-title">EMPORIO DO ALHO</h2>
 <div class="login-subtitle">Sistema Integrado de Gestão</div>
+<div class="login-version">Versão 1.0</div>
 <div class="color-divider"></div>
 <div class="modules-bar">
 <div class="module-item">🌱 Produção</div>
@@ -571,14 +547,9 @@ Lembrar-me
 <div class="card-footer">
 <span>🛡️ Ambiente Corporativo</span>
 <span>|</span>
-<span>Versão 1.0.0</span>
+<span>Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech</span>
 </div>
 </div>
-</div>
-<div class="daatel-brand-footer">
-<span>Powered by</span>
-<h4>DAATEL</h4>
-<p>Wisdom into Technology</p>
 </div>
 </div>
 <script>
