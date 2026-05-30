@@ -164,12 +164,19 @@ display: none !important;
 [data-testid="stAppViewContainer"] {{
 background-image: url('data:image/png;base64,{fundo_base64}') !important;
 background-size: cover !important;
-background-position: left center !important;
+background-position: center !important;
 background-repeat: no-repeat !important;
 background-attachment: fixed !important;
 position: relative !important;
 overflow: hidden !important;
 min-height: 100vh !important;
+}}
+@media (min-width: 1024px) {{
+[data-testid="stAppViewContainer"] {{
+background-size: contain !important;
+background-position: left center !important;
+background-color: #0b0d2b !important;
+}}
 }}
 [data-testid="stAppViewContainer"]::before {{
 content: "" !important;
@@ -310,8 +317,8 @@ width: 100% !important;
 width: 100% !important;
 height: 50px !important;
 padding: 12px 16px 12px 46px !important;
-background: rgba(18, 45, 90, 0.25) !important;
-border: 1px solid rgba(255, 255, 255, 0.3) !important;
+background: rgba(18, 45, 90, 0.22) !important;
+border: 1px solid rgba(255, 255, 255, 0.48) !important;
 border-radius: 12px !important;
 color: #ffffff !important;
 font-size: 15px !important;
@@ -323,9 +330,9 @@ box-sizing: border-box !important;
 color: rgba(255, 255, 255, 0.45) !important;
 }}
 .input-wrapper input:focus, .input-wrapper input:hover {{
-border-color: rgba(255, 255, 255, 0.6) !important;
-background: rgba(18, 45, 90, 0.35) !important;
-box-shadow: 0 0 15px rgba(255, 255, 255, 0.15) !important;
+border-color: rgba(255, 255, 255, 0.85) !important;
+background: rgba(18, 45, 90, 0.32) !important;
+box-shadow: 0 0 15px rgba(255, 255, 255, 0.2) !important;
 }}
 .input-icon {{
 position: absolute !important;
