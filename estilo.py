@@ -293,8 +293,10 @@ width: 100% !important;
 width: 100% !important;
 height: 55px !important;
 padding: 16px 16px 16px 44px !important;
-background: rgba(255,255,255,0.05) !important;
+background: rgba(255,255,255,0.08) !important;
 border: 1px solid rgba(255,255,255,0.15) !important;
+backdrop-filter: blur(12px) !important;
+-webkit-backdrop-filter: blur(12px) !important;
 border-radius: 12px !important;
 color: white !important;
 font-size: 15px !important;
@@ -302,10 +304,12 @@ outline: none !important;
 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 box-sizing: border-box !important;
 }}
+.custom-input-group input:hover,
 .custom-input-group input:focus {{
-border-color: rgba(64, 217, 122, 0.6) !important;
-background: rgba(255, 255, 255, 0.08) !important;
-box-shadow: 0 0 14px rgba(64, 217, 122, 0.25) !important;
+border-color: rgba(85, 255, 170, 0.5) !important;
+box-shadow: 
+0 0 20px rgba(85,255,170,.2),
+0 0 20px rgba(180,120,255,.2) !important;
 }}
 .custom-input-group label {{
 position: absolute !important;
