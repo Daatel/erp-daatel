@@ -334,6 +334,15 @@ border-color: rgba(255, 255, 255, 0.8) !important;
 background: rgba(0, 0, 0, 0.45) !important;
 box-shadow: 0 0 12px rgba(255, 255, 255, 0.15) !important;
 }}
+.input-wrapper input:-webkit-autofill,
+.input-wrapper input:-webkit-autofill:hover, 
+.input-wrapper input:-webkit-autofill:focus, 
+.input-wrapper input:-webkit-autofill:active {{
+-webkit-box-shadow: 0 0 0 1000px rgba(10, 20, 45, 0.75) inset !important;
+-webkit-text-fill-color: #ffffff !important;
+transition: background-color 5000s ease-in-out 0s !important;
+border: 1px solid rgba(255, 255, 255, 0.4) !important;
+}}
 .input-icon {{
 position: absolute !important;
 left: 14px !important;
