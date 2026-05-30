@@ -66,7 +66,7 @@ def login_form_page():
         except Exception:
             pass
             
-    fundo_path = Path(__file__).parent / "fundo.jpg"
+    fundo_path = Path(__file__).parent / "fundo.png"
     fundo_base64 = ""
     if fundo_path.exists():
         try:

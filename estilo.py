@@ -162,7 +162,7 @@ pointer-events: none !important;
 display: none !important;
 }}
 [data-testid="stAppViewContainer"] {{
-background-image: url('data:image/jpeg;base64,{fundo_base64}') !important;
+background-image: url('data:image/png;base64,{fundo_base64}') !important;
 background-size: cover !important;
 background-position: center !important;
 background-repeat: no-repeat !important;
