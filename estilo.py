@@ -130,7 +130,7 @@ def carregar_estilo():
     """, unsafe_allow_html=True)
 
 
-def carregar_estilo_login(error_msg=None, logo_html="", fundo_base64=""):
+def carregar_estilo_login(error_msg=None, logo_html="", fundo_base64="", fundo_largo_base64=""):
     error_banner_html = ""
     if error_msg:
         error_banner_html = f"""<div class="login-error-banner"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><span>{error_msg}</span></div>"""
@@ -173,9 +173,9 @@ min-height: 100vh !important;
 }}
 @media (min-width: 1024px) {{
 [data-testid="stAppViewContainer"] {{
-background-size: contain !important;
-background-position: left center !important;
-background-color: #0b0d2b !important;
+background-image: url('data:image/png;base64,{fundo_largo_base64}') !important;
+background-size: cover !important;
+background-position: center !important;
 }}
 }}
 [data-testid="stAppViewContainer"]::before {{

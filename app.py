@@ -75,8 +75,22 @@ def login_form_page():
         except Exception:
             pass
 
+    fundo_largo_path = Path(__file__).parent / "fundo_largo.png"
+    fundo_largo_base64 = ""
+    if fundo_largo_path.exists():
+        try:
+            with open(fundo_largo_path, "rb") as image_file:
+                fundo_largo_base64 = base64.b64encode(image_file.read()).decode()
+        except Exception:
+            pass
+
     from estilo import carregar_estilo_login
-    carregar_estilo_login(error_msg=st.session_state['login_error'], logo_html=logo_html, fundo_base64=fundo_base64)
+    carregar_estilo_login(
+        error_msg=st.session_state['login_error'], 
+        logo_html=logo_html, 
+        fundo_base64=fundo_base64,
+        fundo_largo_base64=fundo_largo_base64
+    )
     
     with st.form("login_form"):
         # Cabeçalho do Card (Logo, Títulos e Módulos) - Agora dentro do card glassmorphic!
