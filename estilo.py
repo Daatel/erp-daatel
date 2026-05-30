@@ -223,28 +223,33 @@ box-sizing: border-box !important;
 }}
 .custom-login-card {{
 width: 420px !important;
-background: rgba(12, 33, 67, 0.4) !important;
-backdrop-filter: blur(24px) saturate(180%) !important;
--webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-border: 1px solid rgba(255, 255, 255, 0.15) !important;
-border-top: 1px solid rgba(255, 255, 255, 0.28) !important;
-border-left: 1px solid rgba(255, 255, 255, 0.22) !important;
+background-image: 
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 25%),
+    radial-gradient(circle at bottom left, rgba(70, 255, 140, 0.10) 0%, transparent 45%),
+    radial-gradient(circle at top right, rgba(180, 110, 255, 0.12) 0%, transparent 45%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%) !important;
+background-color: rgba(15, 30, 65, 0.55) !important;
+backdrop-filter: blur(22px) !important;
+-webkit-backdrop-filter: blur(22px) !important;
+border: 1px solid rgba(255, 255, 255, 0.18) !important;
 border-radius: 32px !important;
 padding: 35px 30px 25px 30px !important;
 box-shadow:
-inset 1px 1px 0px rgba(255, 255, 255, 0.15),
-0 0 30px rgba(70, 255, 150, 0.15),
-0 0 40px rgba(140, 80, 255, 0.15) !important;
+    inset 0 0 1px rgba(255, 255, 255, 0.35),
+    0 0 25px rgba(70, 255, 140, 0.08),
+    0 0 35px rgba(180, 110, 255, 0.08),
+    0 10px 40px rgba(0, 0, 0, 0.25) !important;
 box-sizing: border-box !important;
 position: relative !important;
-transition: box-shadow 0.3s ease, border-color 0.3s ease !important;
+transition: all 0.3s ease !important;
 }}
 .custom-login-card:hover {{
-box-shadow:
-inset 1px 1px 0px rgba(255, 255, 255, 0.2),
-0 0 40px rgba(85, 255, 170, 0.22),
-0 0 45px rgba(180, 120, 255, 0.22) !important;
 border-color: rgba(255, 255, 255, 0.25) !important;
+box-shadow:
+    inset 0 0 2px rgba(255, 255, 255, 0.45),
+    0 0 35px rgba(70, 255, 140, 0.12),
+    0 0 45px rgba(180, 110, 255, 0.12),
+    0 15px 50px rgba(0, 0, 0, 0.3) !important;
 }}
 .login-logo-container {{
 text-align: center;
