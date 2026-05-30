@@ -165,13 +165,14 @@ pointer-events: none !important;
 display: none !important;
 }}
 [data-testid="stAppViewContainer"] {{
-background-color: #060913 !important;
-background-image: 
-radial-gradient(circle at 10% 85%, rgba(16, 185, 129, 0.12) 0%, transparent 45%),
-radial-gradient(circle at 90% 15%, rgba(139, 92, 246, 0.12) 0%, transparent 45%) !important;
+background: 
+radial-gradient(circle at top left, #133f5e 0%, transparent 40%),
+radial-gradient(circle at bottom right, #5d2f8e 0%, transparent 35%),
+linear-gradient(135deg,#07172f,#0c2748,#081225) !important;
 background-attachment: fixed !important;
 position: relative !important;
 overflow: hidden !important;
+min-height: 100vh !important;
 }}
 [data-testid="stAppViewContainer"]::before {{
 content: "" !important;
@@ -180,7 +181,7 @@ top: 0 !important;
 right: 0 !important;
 width: 50% !important;
 height: 100% !important;
-background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="%238b5cf6" stroke-width="0.5" stroke-opacity="0.04" stroke-dasharray="4 4"><path d="M0 100h800M0 200h800M0 300h800M0 400h800M0 500h800M0 600h800M0 700h800M100 0v800M200 0v800M300 0v800M400 0v800M500 0v800M600 0v800M700 0v800"/><path d="M0 0l800 800M800 0L0 800"/></svg>') !important;
+background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="%238b5cf6" stroke-width="0.5" stroke-opacity="0.02" stroke-dasharray="4 4"><path d="M0 100h800M0 200h800M0 300h800M0 400h800M0 500h800M0 600h800M0 700h800M100 0v800M200 0v800M300 0v800M400 0v800M500 0v800M600 0v800M700 0v800"/><path d="M0 0l800 800M800 0L0 800"/></svg>') !important;
 background-size: cover !important;
 background-position: right center !important;
 pointer-events: none !important;
@@ -208,15 +209,16 @@ margin: auto !important;
 box-sizing: border-box !important;
 }}
 .custom-login-card {{
-background: rgba(11, 17, 33, 0.45) !important;
-backdrop-filter: blur(24px) saturate(180%) !important;
--webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-border: 1px solid rgba(255, 255, 255, 0.06) !important;
-border-top: 1px solid rgba(255, 255, 255, 0.14) !important;
-border-radius: 24px !important;
-padding: 35px 25px 25px 25px !important;
-box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5) !important;
-width: 100% !important;
+width: 420px !important;
+background: rgba(255,255,255,0.08) !important;
+backdrop-filter: blur(16px) saturate(180%) !important;
+-webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+border: 1px solid rgba(255,255,255,0.15) !important;
+border-radius: 32px !important;
+padding: 40px !important;
+box-shadow: 
+0 0 40px rgba(0,255,140,0.08),
+0 0 50px rgba(140,0,255,0.08) !important;
 box-sizing: border-box !important;
 position: relative !important;
 }}
@@ -225,59 +227,53 @@ text-align: center;
 margin-bottom: 20px;
 }}
 .login-logo-container img {{
-width: 140px !important;
+width: 180px !important;
 filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.12)) !important;
-margin-bottom: 12px;
+margin-bottom: 20px;
 display: inline-block !important;
 }}
 .login-title {{
-color: #ffffff !important;
-font-size: 20px !important;
+color: white !important;
+font-size: 36px !important;
 font-weight: 700 !important;
 text-align: center !important;
 margin: 0 !important;
-letter-spacing: 0.5px !important;
+line-height: 1.2 !important;
 }}
 .login-subtitle {{
-color: rgba(255, 255, 255, 0.45) !important;
-font-size: 13px !important;
+color: #d7d7d7 !important;
+font-size: 15px !important;
 text-align: center !important;
-margin-top: 4px !important;
-margin-bottom: 22px !important;
+margin-top: 10px !important;
+margin-bottom: 30px !important;
 }}
 .color-divider {{
 height: 2px;
 width: 50px;
 margin: 0 auto 15px auto;
-background: linear-gradient(90deg, #10b981 0%, #7c3aed 100%);
+background: linear-gradient(90deg, #40d97a 0%, #8854ff 100%);
 border-radius: 2px;
 }}
 .modules-bar {{
-display: flex;
-justify-content: space-around;
-flex-wrap: wrap;
-gap: 8px;
-margin-bottom: 28px;
-padding: 8px 12px;
-background: rgba(255, 255, 255, 0.02);
-border-radius: 12px;
-border: 1px solid rgba(255, 255, 255, 0.04);
+display: flex !important;
+justify-content: center !important;
+gap: 18px !important;
+color: #dcdcdc !important;
+font-size: 13px !important;
+margin-bottom: 35px !important;
+background: transparent !important;
+border: none !important;
+padding: 0 !important;
+flex-wrap: wrap !important;
 }}
 .module-item {{
 display: flex;
 align-items: center;
 gap: 4px;
-font-size: 9px;
-font-weight: 600;
-letter-spacing: 0.5px;
-text-transform: uppercase;
-padding: 4px 6px;
-border-radius: 6px;
+font-size: 13px;
+font-weight: 400;
+color: #dcdcdc !important;
 }}
-.mod-prod {{ color: #10b981; }}
-.mod-est {{ color: #a78bfa; }}
-.mod-com {{ color: #f59e0b; }}
-.mod-fin {{ color: #3b82f6; }}
 .custom-input-group {{
 position: relative !important;
 margin-bottom: 24px !important;
@@ -285,20 +281,21 @@ width: 100% !important;
 }}
 .custom-input-group input {{
 width: 100% !important;
+height: 55px !important;
 padding: 16px 16px 16px 44px !important;
-background: rgba(255, 255, 255, 0.03) !important;
-border: 1px solid rgba(255, 255, 255, 0.08) !important;
+background: rgba(255,255,255,0.05) !important;
+border: 1px solid rgba(255,255,255,0.15) !important;
 border-radius: 12px !important;
-color: #ffffff !important;
+color: white !important;
 font-size: 15px !important;
 outline: none !important;
 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 box-sizing: border-box !important;
 }}
 .custom-input-group input:focus {{
-border-color: rgba(16, 185, 129, 0.6) !important;
-background: rgba(255, 255, 255, 0.06) !important;
-box-shadow: 0 0 14px rgba(16, 185, 129, 0.25) !important;
+border-color: rgba(64, 217, 122, 0.6) !important;
+background: rgba(255, 255, 255, 0.08) !important;
+box-shadow: 0 0 14px rgba(64, 217, 122, 0.25) !important;
 }}
 .custom-input-group label {{
 position: absolute !important;
@@ -315,7 +312,7 @@ transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 top: -6px !important;
 left: 4px !important;
 font-size: 11px !important;
-color: rgba(16, 185, 129, 0.85) !important;
+color: rgba(64, 217, 122, 0.85) !important;
 background: transparent !important;
 padding: 0 !important;
 }}
@@ -334,7 +331,7 @@ transition: all 0.3s ease !important;
 }}
 .custom-input-group input:focus ~ .input-icon {{
 opacity: 0.85 !important;
-filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.4)) !important;
+filter: drop-shadow(0 0 4px rgba(64, 217, 122, 0.4)) !important;
 }}
 .user-icon {{
 background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') !important;
@@ -404,8 +401,8 @@ transition: all 0.2s ease !important;
 background-color: rgba(255, 255, 255, 0.1) !important;
 }}
 .custom-checkbox-container input:checked ~ .checkmark {{
-background-color: #10b981 !important;
-border-color: #10b981 !important;
+background-color: #40d97a !important;
+border-color: #40d97a !important;
 }}
 .checkmark:after {{
 content: "" !important;
@@ -425,7 +422,7 @@ border-width: 0 2px 2px 0 !important;
 transform: rotate(45deg) !important;
 }}
 .forgot-password {{
-color: #a78bfa !important;
+color: #8854ff !important;
 font-size: 13px !important;
 text-decoration: none !important;
 font-weight: 500 !important;
@@ -436,17 +433,15 @@ transition: opacity 0.2s ease !important;
 opacity: 1 !important;
 }}
 .custom-submit-btn {{
-background: linear-gradient(135deg, #10b981 0%, #7c3aed 100%) !important;
-color: #ffffff !important;
+background: linear-gradient(90deg, #40d97a, #8854ff) !important;
+color: white !important;
 border: none !important;
-border-radius: 12px !important;
-font-weight: 600 !important;
-font-size: 14px !important;
-text-transform: uppercase !important;
-letter-spacing: 2px !important;
-padding: 16px 20px !important;
+border-radius: 14px !important;
+font-weight: 700 !important;
+font-size: 20px !important;
+height: 58px !important;
 width: 100% !important;
-box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25) !important;
+box-shadow: 0 4px 20px rgba(64, 217, 122, 0.25) !important;
 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 cursor: pointer !important;
 display: flex !important;
@@ -456,7 +451,7 @@ box-sizing: border-box !important;
 }}
 .custom-submit-btn:hover {{
 transform: translateY(-2px) !important;
-box-shadow: 0 6px 24px rgba(124, 58, 237, 0.45) !important;
+box-shadow: 0 6px 24px rgba(136, 84, 255, 0.45) !important;
 }}
 .custom-submit-btn:active {{
 transform: translateY(0) !important;
@@ -487,9 +482,8 @@ justify-content: center !important;
 align-items: center !important;
 gap: 12px !important;
 margin-top: 25px !important;
-font-size: 11px !important;
-color: rgba(255, 255, 255, 0.35) !important;
-letter-spacing: 0.5px !important;
+font-size: 13px !important;
+color: #bfbfbf !important;
 border-top: 1px solid rgba(255, 255, 255, 0.04) !important;
 padding-top: 15px !important;
 width: 100% !important;
@@ -502,37 +496,36 @@ gap: 4px !important;
 }}
 .daatel-brand-footer {{
 position: fixed !important;
-bottom: 20px !important;
-right: 25px !important;
+right: 35px !important;
+bottom: 25px !important;
 text-align: right !important;
-opacity: 0.8 !important;
+color: rgba(255,255,255,.75) !important;
+font-family: Arial, sans-serif !important;
 z-index: 999999 !important;
-transition: opacity 0.3s ease !important;
 pointer-events: auto !important;
-}}
-.daatel-brand-footer:hover {{
-opacity: 1 !important;
 }}
 .daatel-brand-footer span {{
 display: block !important;
-font-size: 8px !important;
-text-transform: uppercase !important;
-letter-spacing: 1.5px !important;
-color: rgba(255, 255, 255, 0.35) !important;
+font-size: 14px !important;
+opacity: .7 !important;
 margin-bottom: 2px !important;
+color: rgba(255, 255, 255, 0.7) !important;
+letter-spacing: normal !important;
+text-transform: none !important;
 }}
 .daatel-brand-footer h4 {{
 margin: 0 !important;
-font-size: 13px !important;
+font-size: 24px !important;
 font-weight: 700 !important;
-letter-spacing: 2px !important;
+letter-spacing: 12px !important;
 color: #ffffff !important;
 }}
 .daatel-brand-footer p {{
 margin: 2px 0 0 0 !important;
-font-size: 9px !important;
-color: rgba(255, 255, 255, 0.45) !important;
-letter-spacing: 0.5px !important;
+font-size: 14px !important;
+opacity: .7 !important;
+color: rgba(255, 255, 255, 0.7) !important;
+letter-spacing: normal !important;
 }}
 </style>
 <div class="custom-login-overlay">
@@ -544,10 +537,10 @@ letter-spacing: 0.5px !important;
 <div class="login-subtitle">Sistema Integrado de Gestão</div>
 <div class="color-divider"></div>
 <div class="modules-bar">
-<div class="module-item mod-prod">🌱 PRODUÇÃO</div>
-<div class="module-item mod-est">📦 ESTOQUE</div>
-<div class="module-item mod-com">🛒 COMERCIAL</div>
-<div class="module-item mod-fin">📊 FINANCEIRO</div>
+<div class="module-item">🌱 Produção</div>
+<div class="module-item">📦 Estoque</div>
+<div class="module-item">🛒 Comercial</div>
+<div class="module-item">📊 Financeiro</div>
 </div>
 </div>
 {error_banner_html}
