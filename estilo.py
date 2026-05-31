@@ -610,139 +610,174 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
 </div>
 </div>
 </div>
+""", unsafe_allow_html=True)
+
+    # JavaScript executado via components.html (Streamlit remove <script> do st.markdown)
+    import streamlit.components.v1 as components
+    components.html("""
 <script>
-function togglePasswordVisibility() {{
-const passwordInput = document.getElementById('custom-password');
-const toggleButton = document.getElementById('custom-password-toggle') || document.querySelector('.password-toggle');
-if (passwordInput && toggleButton) {{
-if (passwordInput.type === 'password') {{
-passwordInput.type = 'text';
-toggleButton.classList.add('visible');
-}} else {{
-passwordInput.type = 'password';
-toggleButton.classList.remove('visible');
-}}
-}}
-}}
-function getNativeForm() {{
-const nativeInput = Array.from(document.querySelectorAll('input[placeholder="Digite seu e-mail"]')).find(input => !input.closest('.custom-login-container'));
-if (nativeInput) {{
-return nativeInput.closest('form') || nativeInput.closest('[data-testid="stForm"]');
-}}
-return document.querySelector('div[data-testid="stForm"]') || document.querySelector('form:not(#custom-login-form)');
-}}
-function getNativeEmail(nativeForm) {{
-if (!nativeForm) return null;
-return nativeForm.querySelector('input[placeholder="Digite seu e-mail"]') || 
-Array.from(nativeForm.querySelectorAll('input')).find(el => el.type === 'text' || el.type === 'email' || !el.type);
-}}
-function getNativeSenha(nativeForm) {{
-if (!nativeForm) return null;
-return nativeForm.querySelector('input[placeholder="Digite sua senha"]') || 
-Array.from(nativeForm.querySelectorAll('input')).find(el => el.type === 'password');
-}}
-function getNativeSubmit(nativeForm) {{
-if (!nativeForm) return null;
-return nativeForm.querySelector('button[type="submit"]') || 
-nativeForm.querySelector('button') || 
-document.querySelector('div[data-testid="stFormSubmitButton"] button') ||
-document.querySelector('button[data-testid="stFormSubmitButton"]');
-}}
-function getNativeCheckbox(nativeForm) {{
-if (!nativeForm) return null;
-return nativeForm.querySelector('input[type="checkbox"]') || 
-document.querySelector('div[data-testid="stCheckbox"] input') || 
-document.querySelector('input[type="checkbox"]');
-}}
-function syncCheckbox() {{
-const customRemember = document.getElementById('custom-remember');
-const nativeForm = getNativeForm();
-const nativeCheckbox = getNativeCheckbox(nativeForm);
-if (customRemember && nativeCheckbox && nativeCheckbox.checked !== customRemember.checked) {{
-nativeCheckbox.click();
-}}
-}}
-function setNativeValue(element, value) {{
-const valueSetter = Object.getOwnPropertyDescriptor(element, 'value');
-const prototype = Object.getPrototypeOf(element);
-const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value');
-if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {{
-prototypeValueSetter.set.call(element, value);
-}} else {{
-valueSetter.set.call(element, value);
-}}
-element.dispatchEvent(new Event('input', {{ bubbles: true }}));
-element.dispatchEvent(new Event('change', {{ bubbles: true }}));
-}}
-function submitLoginForm() {{
-const customEmail = document.getElementById('custom-email').value;
-const customSenha = document.getElementById('custom-password').value;
-const nativeForm = getNativeForm();
-if (!nativeForm) {{
-console.error("Formulário nativo Streamlit não encontrado!");
-return;
-}}
-const nativeEmail = getNativeEmail(nativeForm);
-const nativeSenha = getNativeSenha(nativeForm);
-const nativeSubmit = getNativeSubmit(nativeForm);
-if (nativeEmail && nativeSenha && nativeSubmit) {{
-setNativeValue(nativeEmail, customEmail);
-setNativeValue(nativeSenha, customSenha);
-syncCheckbox();
-setTimeout(() => {{
-nativeSubmit.click();
-}}, 50);
-}} else {{
-console.error("Campos nativos ocultos não encontrados!", {{nativeEmail, nativeSenha, nativeSubmit}});
-}}
-}}
-function syncAutofill() {{
-const nativeForm = getNativeForm();
-if (!nativeForm) return;
-const nativeEmail = getNativeEmail(nativeForm);
-const nativeSenha = getNativeSenha(nativeForm);
-const customEmail = document.getElementById('custom-email');
-const customSenha = document.getElementById('custom-password');
-if (nativeEmail && customEmail && nativeEmail.value && !customEmail.value) {{
-customEmail.value = nativeEmail.value;
-customEmail.dispatchEvent(new Event('input', {{ bubbles: true }}));
-}}
-if (nativeSenha && customSenha && nativeSenha.value && !customSenha.value) {{
-customSenha.value = nativeSenha.value;
-customSenha.dispatchEvent(new Event('input', {{ bubbles: true }}));
-}}
-}}
-function setupCustomLoginFormListeners() {{
-const form = document.getElementById('custom-login-form');
-if (form && !form.dataset.listenerAttached) {{
-form.addEventListener('submit', function(event) {{
-event.preventDefault();
-submitLoginForm();
-}});
-form.dataset.listenerAttached = 'true';
-}}
-const toggleBtn = document.getElementById('custom-password-toggle') || document.querySelector('.password-toggle');
-if (toggleBtn && !toggleBtn.dataset.listenerAttached) {{
-toggleBtn.addEventListener('click', function(event) {{
-event.preventDefault();
-event.stopPropagation();
-togglePasswordVisibility();
-}});
-toggleBtn.dataset.listenerAttached = 'true';
-}}
-const rememberCheckbox = document.getElementById('custom-remember');
-if (rememberCheckbox && !rememberCheckbox.dataset.listenerAttached) {{
-rememberCheckbox.addEventListener('change', function() {{
-syncCheckbox();
-}});
-rememberCheckbox.dataset.listenerAttached = 'true';
-}}
-}}
-setupCustomLoginFormListeners();
-const listenerInterval = setInterval(setupCustomLoginFormListeners, 150);
-const autofillInterval = setInterval(syncAutofill, 200);
-document.getElementById('custom-login-form')?.addEventListener('submit', () => {{
-clearInterval(autofillInterval);
-clearInterval(listenerInterval);
-}});
-</script>""", unsafe_allow_html=True)
+(function() {
+    const doc = window.parent.document;
+
+    function togglePasswordVisibility() {
+        const passwordInput = doc.getElementById('custom-password');
+        const toggleButton = doc.getElementById('custom-password-toggle') || doc.querySelector('.password-toggle');
+        if (passwordInput && toggleButton) {
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleButton.classList.add('visible');
+            } else {
+                passwordInput.type = 'password';
+                toggleButton.classList.remove('visible');
+            }
+        }
+    }
+
+    function getNativeForm() {
+        const nativeInput = Array.from(doc.querySelectorAll('input[placeholder="Digite seu e-mail"]')).find(input => !input.closest('.custom-login-container'));
+        if (nativeInput) {
+            return nativeInput.closest('form') || nativeInput.closest('[data-testid="stForm"]');
+        }
+        return doc.querySelector('div[data-testid="stForm"]') || doc.querySelector('form:not(#custom-login-form)');
+    }
+
+    function getNativeEmail(nativeForm) {
+        if (!nativeForm) return null;
+        return nativeForm.querySelector('input[placeholder="Digite seu e-mail"]') ||
+            Array.from(nativeForm.querySelectorAll('input')).find(el => el.type === 'text' || el.type === 'email' || !el.type);
+    }
+
+    function getNativeSenha(nativeForm) {
+        if (!nativeForm) return null;
+        return nativeForm.querySelector('input[placeholder="Digite sua senha"]') ||
+            Array.from(nativeForm.querySelectorAll('input')).find(el => el.type === 'password');
+    }
+
+    function getNativeSubmit(nativeForm) {
+        if (!nativeForm) return null;
+        return nativeForm.querySelector('button[type="submit"]') ||
+            nativeForm.querySelector('button') ||
+            doc.querySelector('div[data-testid="stFormSubmitButton"] button') ||
+            doc.querySelector('button[data-testid="stFormSubmitButton"]');
+    }
+
+    function getNativeCheckbox(nativeForm) {
+        if (!nativeForm) return null;
+        return nativeForm.querySelector('input[type="checkbox"]') ||
+            doc.querySelector('div[data-testid="stCheckbox"] input') ||
+            doc.querySelector('input[type="checkbox"]');
+    }
+
+    function syncCheckbox() {
+        const customRemember = doc.getElementById('custom-remember');
+        const nativeForm = getNativeForm();
+        const nativeCheckbox = getNativeCheckbox(nativeForm);
+        if (customRemember && nativeCheckbox && nativeCheckbox.checked !== customRemember.checked) {
+            nativeCheckbox.click();
+        }
+    }
+
+    function setNativeValue(element, value) {
+        const valueSetter = Object.getOwnPropertyDescriptor(element, 'value');
+        const prototype = Object.getPrototypeOf(element);
+        const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value');
+        if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
+            prototypeValueSetter.set.call(element, value);
+        } else if (valueSetter) {
+            valueSetter.set.call(element, value);
+        } else {
+            element.value = value;
+        }
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function submitLoginForm() {
+        const customEmail = doc.getElementById('custom-email');
+        const customSenha = doc.getElementById('custom-password');
+        if (!customEmail || !customSenha) return;
+
+        const nativeForm = getNativeForm();
+        if (!nativeForm) {
+            console.error("Formulário nativo Streamlit não encontrado!");
+            return;
+        }
+        const nativeEmail = getNativeEmail(nativeForm);
+        const nativeSenha = getNativeSenha(nativeForm);
+        const nativeSubmit = getNativeSubmit(nativeForm);
+        if (nativeEmail && nativeSenha && nativeSubmit) {
+            setNativeValue(nativeEmail, customEmail.value);
+            setNativeValue(nativeSenha, customSenha.value);
+            syncCheckbox();
+            setTimeout(() => {
+                nativeSubmit.click();
+            }, 50);
+        } else {
+            console.error("Campos nativos ocultos não encontrados!", {nativeEmail, nativeSenha, nativeSubmit});
+        }
+    }
+
+    function syncAutofill() {
+        const nativeForm = getNativeForm();
+        if (!nativeForm) return;
+        const nativeEmail = getNativeEmail(nativeForm);
+        const nativeSenha = getNativeSenha(nativeForm);
+        const customEmail = doc.getElementById('custom-email');
+        const customSenha = doc.getElementById('custom-password');
+        if (nativeEmail && customEmail && nativeEmail.value && !customEmail.value) {
+            customEmail.value = nativeEmail.value;
+            customEmail.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (nativeSenha && customSenha && nativeSenha.value && !customSenha.value) {
+            customSenha.value = nativeSenha.value;
+            customSenha.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+
+    function setupCustomLoginFormListeners() {
+        const form = doc.getElementById('custom-login-form');
+        if (form && !form.dataset.listenerAttached) {
+            form.addEventListener('submit', function(event) {
+                event.preventDefault();
+                submitLoginForm();
+            });
+            form.dataset.listenerAttached = 'true';
+        }
+        const toggleBtn = doc.getElementById('custom-password-toggle') || doc.querySelector('.password-toggle');
+        if (toggleBtn && !toggleBtn.dataset.listenerAttached) {
+            toggleBtn.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                togglePasswordVisibility();
+            });
+            toggleBtn.dataset.listenerAttached = 'true';
+        }
+        const rememberCheckbox = doc.getElementById('custom-remember');
+        if (rememberCheckbox && !rememberCheckbox.dataset.listenerAttached) {
+            rememberCheckbox.addEventListener('change', function() {
+                syncCheckbox();
+            });
+            rememberCheckbox.dataset.listenerAttached = 'true';
+        }
+    }
+
+    // Aguardar o DOM do parent estar pronto antes de atachar listeners
+    function waitAndSetup() {
+        if (doc.getElementById('custom-login-form')) {
+            setupCustomLoginFormListeners();
+            syncAutofill();
+        } else {
+            setTimeout(waitAndSetup, 100);
+        }
+    }
+    waitAndSetup();
+
+    const listenerInterval = setInterval(setupCustomLoginFormListeners, 300);
+    const autofillInterval = setInterval(syncAutofill, 400);
+    setTimeout(() => {
+        clearInterval(listenerInterval);
+        clearInterval(autofillInterval);
+    }, 15000);
+})();
+</script>
+""", height=0, scrolling=False)
