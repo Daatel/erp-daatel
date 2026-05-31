@@ -386,6 +386,8 @@ cursor: pointer !important;
 opacity: 0.45 !important;
 transition: all 0.3s ease !important;
 background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>') !important;
+z-index: 100 !important;
+pointer-events: auto !important;
 }}
 .password-toggle:hover {{
 opacity: 0.8 !important;
@@ -566,7 +568,7 @@ letter-spacing: 0.5px !important;
 </div>
 </div>
 {error_banner_html}
-<form id="custom-login-form" onsubmit="event.preventDefault(); submitLoginForm();">
+<form id="custom-login-form">
 <div class="custom-input-group">
 <span class="custom-input-label">E-mail</span>
 <div class="input-wrapper">
@@ -579,12 +581,12 @@ letter-spacing: 0.5px !important;
 <div class="input-wrapper">
 <input type="password" id="custom-password" required placeholder="Digite sua senha" autocomplete="current-password">
 <span class="input-icon lock-icon"></span>
-<button type="button" class="password-toggle" onclick="togglePasswordVisibility()"></button>
+<button type="button" class="password-toggle" id="custom-password-toggle"></button>
 </div>
 </div>
 <div class="custom-form-options">
 <label class="custom-checkbox-container">
-<input type="checkbox" id="custom-remember" checked onchange="syncCheckbox()">
+<input type="checkbox" id="custom-remember" checked>
 <span class="checkmark"></span>
 Lembrar-me
 </label>
@@ -610,68 +612,151 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
 </div>
 <script>
 function togglePasswordVisibility() {{
-const passwordInput = document.getElementById('custom-password');
-const toggleButton = document.querySelector('.password-toggle');
-if (passwordInput.type === 'password') {{
-passwordInput.type = 'text';
-toggleButton.classList.add('visible');
-}} else {{
-passwordInput.type = 'password';
-toggleButton.classList.remove('visible');
+    const passwordInput = document.getElementById('custom-password');
+    const toggleButton = document.getElementById('custom-password-toggle') || document.querySelector('.password-toggle');
+    if (passwordInput && toggleButton) {{
+        if (passwordInput.type === 'password') {{
+            passwordInput.type = 'text';
+            toggleButton.classList.add('visible');
+        }} else {{
+            passwordInput.type = 'password';
+            toggleButton.classList.remove('visible');
+        }}
+    }}
 }}
+function getNativeForm() {{
+    return document.querySelector('div[data-testid="stForm"]');
 }}
+
+function getNativeEmail(nativeForm) {{
+    if (!nativeForm) return null;
+    return nativeForm.querySelector('input[placeholder="Digite seu e-mail"]') || 
+           Array.from(nativeForm.querySelectorAll('input')).find(el => el.type === 'text' || el.type === 'email' || !el.type);
+}}
+
+function getNativeSenha(nativeForm) {{
+    if (!nativeForm) return null;
+    return nativeForm.querySelector('input[placeholder="Digite sua senha"]') || 
+           Array.from(nativeForm.querySelectorAll('input')).find(el => el.type === 'password');
+}}
+
+function getNativeSubmit(nativeForm) {{
+    if (!nativeForm) return null;
+    return nativeForm.querySelector('button[type="submit"]') || 
+           nativeForm.querySelector('button') || 
+           document.querySelector('div[data-testid="stFormSubmitButton"] button') ||
+           document.querySelector('button[data-testid="stFormSubmitButton"]');
+}}
+
+function getNativeCheckbox(nativeForm) {{
+    if (!nativeForm) return null;
+    return nativeForm.querySelector('input[type="checkbox"]') || 
+           document.querySelector('div[data-testid="stCheckbox"] input') || 
+           document.querySelector('input[type="checkbox"]');
+}}
+
 function syncCheckbox() {{
-const customRemember = document.getElementById('custom-remember').checked;
-const nativeCheckbox = document.querySelector('div[data-testid="stCheckbox"] input');
-if (nativeCheckbox && nativeCheckbox.checked !== customRemember) {{
-nativeCheckbox.click();
+    const customRemember = document.getElementById('custom-remember');
+    const nativeForm = getNativeForm();
+    const nativeCheckbox = getNativeCheckbox(nativeForm);
+    if (customRemember && nativeCheckbox && nativeCheckbox.checked !== customRemember.checked) {{
+        nativeCheckbox.click();
+    }}
 }}
-}}
+
 function setNativeValue(element, value) {{
-const valueSetter = Object.getOwnPropertyDescriptor(element, 'value');
-const prototype = Object.getPrototypeOf(element);
-const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value');
-if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {{
-prototypeValueSetter.set.call(element, value);
-}} else {{
-valueSetter.set.call(element, value);
+    const valueSetter = Object.getOwnPropertyDescriptor(element, 'value');
+    const prototype = Object.getPrototypeOf(element);
+    const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value');
+    if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {{
+        prototypeValueSetter.set.call(element, value);
+    }} else {{
+        valueSetter.set.call(element, value);
+    }}
+    element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+    element.dispatchEvent(new Event('change', {{ bubbles: true }}));
 }}
-element.dispatchEvent(new Event('input', {{ bubbles: true }}));
-element.dispatchEvent(new Event('change', {{ bubbles: true }}));
-}}
+
 function submitLoginForm() {{
-const customEmail = document.getElementById('custom-email').value;
-const customSenha = document.getElementById('custom-password').value;
-const nativeEmail = document.querySelector('input[placeholder="Digite seu e-mail"]');
-const nativeSenha = document.querySelector('input[placeholder="Digite sua senha"]');
-const nativeSubmit = document.querySelector('div[data-testid="stFormSubmitButton"] button');
-if (nativeEmail && nativeSenha && nativeSubmit) {{
-setNativeValue(nativeEmail, customEmail);
-setNativeValue(nativeSenha, customSenha);
-syncCheckbox();
-setTimeout(() => {{
-nativeSubmit.click();
-}}, 50);
-}} else {{
-console.error("Native Streamlit inputs not found for mirroring!");
+    const customEmail = document.getElementById('custom-email').value;
+    const customSenha = document.getElementById('custom-password').value;
+    
+    const nativeForm = getNativeForm();
+    if (!nativeForm) {{
+        console.error("Formulário nativo Streamlit não encontrado!");
+        return;
+    }}
+    
+    const nativeEmail = getNativeEmail(nativeForm);
+    const nativeSenha = getNativeSenha(nativeForm);
+    const nativeSubmit = getNativeSubmit(nativeForm);
+    
+    if (nativeEmail && nativeSenha && nativeSubmit) {{
+        setNativeValue(nativeEmail, customEmail);
+        setNativeValue(nativeSenha, customSenha);
+        syncCheckbox();
+        setTimeout(() => {{
+            nativeSubmit.click();
+        }}, 50);
+    }} else {{
+        console.error("Campos nativos ocultos não encontrados!", {{nativeEmail, nativeSenha, nativeSubmit}});
+    }}
 }}
-}}
+
 function syncAutofill() {{
-const nativeEmail = document.querySelector('input[placeholder="Digite seu e-mail"]');
-const nativeSenha = document.querySelector('input[placeholder="Digite sua senha"]');
-const customEmail = document.getElementById('custom-email');
-const customSenha = document.getElementById('custom-password');
-if (nativeEmail && customEmail && nativeEmail.value && !customEmail.value) {{
-customEmail.value = nativeEmail.value;
-customEmail.dispatchEvent(new Event('input', {{ bubbles: true }}));
+    const nativeForm = getNativeForm();
+    if (!nativeForm) return;
+    
+    const nativeEmail = getNativeEmail(nativeForm);
+    const nativeSenha = getNativeSenha(nativeForm);
+    const customEmail = document.getElementById('custom-email');
+    const customSenha = document.getElementById('custom-password');
+    
+    if (nativeEmail && customEmail && nativeEmail.value && !customEmail.value) {{
+        customEmail.value = nativeEmail.value;
+        customEmail.dispatchEvent(new Event('input', {{ bubbles: true }}));
+    }}
+    if (nativeSenha && customSenha && nativeSenha.value && !customSenha.value) {{
+        customSenha.value = nativeSenha.value;
+        customSenha.dispatchEvent(new Event('input', {{ bubbles: true }}));
+    }}
 }}
-if (nativeSenha && customSenha && nativeSenha.value && !customSenha.value) {{
-customSenha.value = nativeSenha.value;
-customSenha.dispatchEvent(new Event('input', {{ bubbles: true }}));
+
+function setupCustomLoginFormListeners() {{
+    const form = document.getElementById('custom-login-form');
+    if (form && !form.dataset.listenerAttached) {{
+        form.addEventListener('submit', function(event) {{
+            event.preventDefault();
+            submitLoginForm();
+        }});
+        form.dataset.listenerAttached = 'true';
+    }}
+    
+    const toggleBtn = document.getElementById('custom-password-toggle') || document.querySelector('.password-toggle');
+    if (toggleBtn && !toggleBtn.dataset.listenerAttached) {{
+        toggleBtn.addEventListener('click', function(event) {{
+            event.preventDefault();
+            event.stopPropagation();
+            togglePasswordVisibility();
+        }});
+        toggleBtn.dataset.listenerAttached = 'true';
+    }}
+    
+    const rememberCheckbox = document.getElementById('custom-remember');
+    if (rememberCheckbox && !rememberCheckbox.dataset.listenerAttached) {{
+        rememberCheckbox.addEventListener('change', function() {{
+            syncCheckbox();
+        }});
+        rememberCheckbox.dataset.listenerAttached = 'true';
+    }}
 }}
-}}
+
+setupCustomLoginFormListeners();
+const listenerInterval = setInterval(setupCustomLoginFormListeners, 150);
 const autofillInterval = setInterval(syncAutofill, 200);
-document.getElementById('custom-login-form').addEventListener('submit', () => {{
-clearInterval(autofillInterval);
+
+document.getElementById('custom-login-form')?.addEventListener('submit', () => {{
+    clearInterval(autofillInterval);
+    clearInterval(listenerInterval);
 }});
 </script>""", unsafe_allow_html=True)

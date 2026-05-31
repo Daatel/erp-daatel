@@ -6,6 +6,8 @@ import sys
 import importlib
 import database
 importlib.reload(database)
+import estilo
+importlib.reload(estilo)
 from database import fetch_all, run_query, initialize_database, verify_password
 
 _migration_checked = False
