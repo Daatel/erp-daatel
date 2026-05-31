@@ -634,38 +634,42 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
     }
 
     function getNativeForm() {
-        const nativeInput = Array.from(doc.querySelectorAll('input[placeholder="Digite seu e-mail"]')).find(input => !input.closest('.custom-login-container'));
-        if (nativeInput) {
-            return nativeInput.closest('form') || nativeInput.closest('[data-testid="stForm"]');
+        // Busca o formulário nativo do Streamlit (não o customizado)
+        const allInputs = doc.querySelectorAll('input[placeholder="Digite seu e-mail"]');
+        for (let i = 0; i < allInputs.length; i++) {
+            if (!allInputs[i].closest('.custom-login-container')) {
+                const form = allInputs[i].closest('[data-testid="stForm"]');
+                if (form) return form;
+            }
         }
-        return doc.querySelector('div[data-testid="stForm"]') || doc.querySelector('form:not(#custom-login-form)');
+        return doc.querySelector('div[data-testid="stForm"]');
     }
 
     function getNativeEmail(nativeForm) {
         if (!nativeForm) return null;
         return nativeForm.querySelector('input[placeholder="Digite seu e-mail"]') ||
-            Array.from(nativeForm.querySelectorAll('input')).find(el => el.type === 'text' || el.type === 'email' || !el.type);
+            nativeForm.querySelector('input[type="text"]');
     }
 
     function getNativeSenha(nativeForm) {
         if (!nativeForm) return null;
         return nativeForm.querySelector('input[placeholder="Digite sua senha"]') ||
-            Array.from(nativeForm.querySelectorAll('input')).find(el => el.type === 'password');
+            nativeForm.querySelector('input[type="password"]');
     }
 
     function getNativeSubmit(nativeForm) {
         if (!nativeForm) return null;
-        return nativeForm.querySelector('button[type="submit"]') ||
+        return nativeForm.querySelector('div[data-testid="stFormSubmitButton"] button') ||
+            nativeForm.querySelector('button[kind="formSubmit"]') ||
+            nativeForm.querySelector('button[type="submit"]') ||
             nativeForm.querySelector('button') ||
-            doc.querySelector('div[data-testid="stFormSubmitButton"] button') ||
-            doc.querySelector('button[data-testid="stFormSubmitButton"]');
+            doc.querySelector('div[data-testid="stFormSubmitButton"] button');
     }
 
     function getNativeCheckbox(nativeForm) {
         if (!nativeForm) return null;
         return nativeForm.querySelector('input[type="checkbox"]') ||
-            doc.querySelector('div[data-testid="stCheckbox"] input') ||
-            doc.querySelector('input[type="checkbox"]');
+            doc.querySelector('div[data-testid="stCheckbox"] input');
     }
 
     function syncCheckbox() {
@@ -677,107 +681,147 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
         }
     }
 
+    // Usa o prototype do parent window para bypass do React
     function setNativeValue(element, value) {
-        const valueSetter = Object.getOwnPropertyDescriptor(element, 'value');
-        const prototype = Object.getPrototypeOf(element);
-        const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value');
-        if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
-            prototypeValueSetter.set.call(element, value);
-        } else if (valueSetter) {
-            valueSetter.set.call(element, value);
-        } else {
-            element.value = value;
+        try {
+            const nativeSetter = Object.getOwnPropertyDescriptor(
+                window.parent.HTMLInputElement.prototype, 'value'
+            ).set;
+            nativeSetter.call(element, value);
+        } catch(e) {
+            // Fallback: tenta via prototype chain do próprio elemento
+            try {
+                const proto = Object.getPrototypeOf(element);
+                const setter = Object.getOwnPropertyDescriptor(proto, 'value');
+                if (setter && setter.set) {
+                    setter.set.call(element, value);
+                } else {
+                    element.value = value;
+                }
+            } catch(e2) {
+                element.value = value;
+            }
         }
+        // Dispara eventos para React/Streamlit processar
         element.dispatchEvent(new Event('input', { bubbles: true }));
         element.dispatchEvent(new Event('change', { bubbles: true }));
+        element.dispatchEvent(new Event('blur', { bubbles: true }));
     }
 
     function submitLoginForm() {
         const customEmail = doc.getElementById('custom-email');
         const customSenha = doc.getElementById('custom-password');
-        if (!customEmail || !customSenha) return;
+        if (!customEmail || !customSenha) {
+            console.error('[LOGIN] Campos customizados não encontrados');
+            return;
+        }
+        const emailVal = customEmail.value;
+        const senhaVal = customSenha.value;
+        if (!emailVal || !senhaVal) {
+            console.error('[LOGIN] Campos vazios - email:', emailVal, 'senha:', senhaVal ? '***' : '(vazio)');
+            return;
+        }
 
         const nativeForm = getNativeForm();
         if (!nativeForm) {
-            console.error("Formulário nativo Streamlit não encontrado!");
+            console.error('[LOGIN] Formulário nativo Streamlit NÃO encontrado!');
             return;
         }
+
         const nativeEmail = getNativeEmail(nativeForm);
         const nativeSenha = getNativeSenha(nativeForm);
         const nativeSubmit = getNativeSubmit(nativeForm);
+
+        console.log('[LOGIN] Encontrados:', {
+            nativeEmail: !!nativeEmail,
+            nativeSenha: !!nativeSenha,
+            nativeSubmit: !!nativeSubmit
+        });
+
         if (nativeEmail && nativeSenha && nativeSubmit) {
-            setNativeValue(nativeEmail, customEmail.value);
-            setNativeValue(nativeSenha, customSenha.value);
+            // Define valores nos inputs nativos
+            setNativeValue(nativeEmail, emailVal);
+            setNativeValue(nativeSenha, senhaVal);
             syncCheckbox();
-            setTimeout(() => {
+
+            // Pequeno delay para React processar os eventos
+            setTimeout(function() {
+                // Força focus no submit antes de clicar
+                nativeSubmit.focus();
                 nativeSubmit.click();
-            }, 50);
+                console.log('[LOGIN] Submit clicado!');
+            }, 150);
         } else {
-            console.error("Campos nativos ocultos não encontrados!", {nativeEmail, nativeSenha, nativeSubmit});
+            console.error('[LOGIN] Campos nativos NÃO encontrados!');
         }
     }
 
-    function syncAutofill() {
+    // Desabilita autofill nos inputs nativos para não poluir o form customizado
+    function disableNativeAutofill() {
         const nativeForm = getNativeForm();
         if (!nativeForm) return;
-        const nativeEmail = getNativeEmail(nativeForm);
-        const nativeSenha = getNativeSenha(nativeForm);
-        const customEmail = doc.getElementById('custom-email');
-        const customSenha = doc.getElementById('custom-password');
-        if (nativeEmail && customEmail && nativeEmail.value && !customEmail.value) {
-            customEmail.value = nativeEmail.value;
-            customEmail.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        if (nativeSenha && customSenha && nativeSenha.value && !customSenha.value) {
-            customSenha.value = nativeSenha.value;
-            customSenha.dispatchEvent(new Event('input', { bubbles: true }));
-        }
+        const inputs = nativeForm.querySelectorAll('input');
+        inputs.forEach(function(input) {
+            input.setAttribute('autocomplete', 'off');
+            input.setAttribute('readonly', 'readonly');
+            // Remove readonly após breve delay (truque anti-autofill)
+            setTimeout(function() { input.removeAttribute('readonly'); }, 200);
+        });
     }
 
-    function setupCustomLoginFormListeners() {
-        const form = doc.getElementById('custom-login-form');
-        if (form && !form.dataset.listenerAttached) {
-            form.addEventListener('submit', function(event) {
-                event.preventDefault();
-                submitLoginForm();
-            });
-            form.dataset.listenerAttached = 'true';
-        }
-        const toggleBtn = doc.getElementById('custom-password-toggle') || doc.querySelector('.password-toggle');
-        if (toggleBtn && !toggleBtn.dataset.listenerAttached) {
-            toggleBtn.addEventListener('click', function(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                togglePasswordVisibility();
-            });
-            toggleBtn.dataset.listenerAttached = 'true';
-        }
-        const rememberCheckbox = doc.getElementById('custom-remember');
-        if (rememberCheckbox && !rememberCheckbox.dataset.listenerAttached) {
-            rememberCheckbox.addEventListener('change', function() {
-                syncCheckbox();
-            });
-            rememberCheckbox.dataset.listenerAttached = 'true';
-        }
-    }
-
-    // Aguardar o DOM do parent estar pronto antes de atachar listeners
+    // Aguardar o DOM do parent estar pronto
     function waitAndSetup() {
         if (doc.getElementById('custom-login-form')) {
-            setupCustomLoginFormListeners();
-            syncAutofill();
+            disableNativeAutofill();
+
+            // Limpa qualquer valor autofill dos inputs customizados
+            const customEmail = doc.getElementById('custom-email');
+            const customSenha = doc.getElementById('custom-password');
+            if (customEmail) {
+                customEmail.setAttribute('autocomplete', 'off');
+                customEmail.value = '';
+            }
+            if (customSenha) {
+                customSenha.setAttribute('autocomplete', 'new-password');
+                customSenha.value = '';
+            }
+
+            console.log('[LOGIN] Setup completo!');
         } else {
             setTimeout(waitAndSetup, 100);
         }
     }
     waitAndSetup();
 
-    const listenerInterval = setInterval(setupCustomLoginFormListeners, 300);
-    const autofillInterval = setInterval(syncAutofill, 400);
-    setTimeout(() => {
-        clearInterval(listenerInterval);
-        clearInterval(autofillInterval);
-    }, 15000);
+    // Event Delegation (muito mais robusto a re-renderizações do Streamlit!)
+    if (!doc.__loginListenersAttached) {
+        doc.addEventListener('submit', function(event) {
+            const form = event.target.closest('#custom-login-form');
+            if (form) {
+                event.preventDefault();
+                submitLoginForm();
+            }
+        });
+
+        doc.addEventListener('click', function(event) {
+            const toggleBtn = event.target.closest('#custom-password-toggle') || event.target.closest('.password-toggle');
+            if (toggleBtn) {
+                event.preventDefault();
+                event.stopPropagation();
+                togglePasswordVisibility();
+            }
+        });
+
+        doc.addEventListener('change', function(event) {
+            const rememberCheckbox = event.target.closest('#custom-remember');
+            if (rememberCheckbox) {
+                syncCheckbox();
+            }
+        });
+        doc.__loginListenersAttached = true;
+        console.log('[LOGIN] Event listeners attached to parent document!');
+    }
 })();
 </script>
 """, height=0, scrolling=False)
+
