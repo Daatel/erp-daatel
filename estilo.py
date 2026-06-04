@@ -995,30 +995,7 @@ def carregar_cabecalho_usuario(logged_user, user_role):
             <span class="user-role">{user_role}</span>
         </div>
     </div>
-    <img src="x" onerror="
-        if (!window._logoutObserverActive) {{
-            window._logoutObserverActive = true;
-            setInterval(function() {{
-                const badge = document.querySelector('.user-badge-floating');
-                if (!badge) return;
-                
-                let wrapper = document.querySelector('div[data-element-id=logout_btn]');
-                if (!wrapper) {{
-                    const buttons = document.querySelectorAll('div[data-testid=stButton] button');
-                    for (let btn of buttons) {{
-                        if (btn.textContent && btn.textContent.trim() === 'Sair') {{
-                            wrapper = btn.closest('div[data-testid=stButton]');
-                            break;
-                        }}
-                    }}
-                }}
-                
-                if (wrapper && wrapper.parentElement !== badge) {{
-                    badge.appendChild(wrapper);
-                }}
-            }}, 200);
-        }}
-    " style="display:none;">
+    <img src="x" onerror="if(!window._logoutObserverActive){{window._logoutObserverActive=true;setInterval(function(){{const badge=document.querySelector('.user-badge-floating');if(!badge)return;let wrapper=document.querySelector('div[data-element-id=logout_btn]');if(!wrapper){{const buttons=document.querySelectorAll('div[data-testid=stButton] button');for(let btn of buttons){{if(btn.textContent&&btn.textContent.trim()==='Sair'){{wrapper=btn.closest('div[data-testid=stButton]');break;}}}}}}if(wrapper&&wrapper.parentElement!==badge){{badge.appendChild(wrapper);}}}},200);}}" style="display:none;">
     """, unsafe_allow_html=True)
 
 
