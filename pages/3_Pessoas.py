@@ -17,13 +17,308 @@ st.title("👥 Pessoas e Folha de Pagamento")
 
 df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%'")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Visão Geral (Quadro)", "Folha de Pagamento", "💎 Central de Comissões", "🖨️ Extrato Mensal do Vendedor"])
+tab_cadastro, tab1, tab2, tab3, tab4 = st.tabs(["📝 Cadastro de Colaboradores", "Visão Geral (Quadro)", "Folha de Pagamento", "💎 Central de Comissões", "🖨️ Extrato Mensal do Vendedor"])
+
+# ======= CADASTRO DE COLABORADORES =======
+with tab_cadastro:
+    opc = st.radio("Ação:", ["Cadastrar Novo Colaborador", "Editar Colaborador Cadastrado"], horizontal=True, key="colab_action_radio")
+    if opc == "Cadastrar Novo Colaborador":
+        st.subheader("Ficha de Registro de Novo Colaborador")
+        with st.form("form_func_new", clear_on_submit=True):
+            # Expander 1: Identificação
+            with st.expander("👤 Bloco 1: Identificação e Contato", expanded=True):
+                col1, col2 = st.columns(2)
+                nome = col1.text_input("Nome Completo", key="reg_nome")
+                nascimento = col2.date_input("Data de Nascimento", value=date(1990, 1, 1), format="DD/MM/YYYY", key="reg_nasc")
+                col3, col4, col5 = st.columns(3)
+                genero = col3.selectbox("Gênero", ["Não Informar", "Masculino", "Feminino", "Outro"], key="reg_genero")
+                estado_civil = col4.selectbox("Estado Civil", ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"], key="reg_civil")
+                nacionalidade = col5.text_input("Nacionalidade / Naturalidade", value="Brasileira", key="reg_nac")
+                col6, col7 = st.columns(2)
+                nome_mae = col6.text_input("Nome da Mãe", key="reg_mae")
+                nome_pai = col7.text_input("Nome do Pai", key="reg_pai")
+                col8, col9 = st.columns([3, 1])
+                endereco = col8.text_input("Endereço Completo (Rua/Av, Nº, Compl)", key="reg_end")
+                cep = col9.text_input("CEP", key="reg_cep")
+                col10, col11, col12 = st.columns(3)
+                bairro = col10.text_input("Bairro", key="reg_bairro")
+                cidade_uf = col11.text_input("Cidade - UF", key="reg_cidade")
+                telefone = col12.text_input("Telefone / Celular (WhatsApp)", key="reg_tel")
+                col13, col14 = st.columns(2)
+                email = col13.text_input("E-mail Pessoal", key="reg_email")
+                contato_emergencia = col14.text_input("Contato de Emergência (Nome, Parentesco, Tel)", key="reg_emerg")
+
+            # Expander 2: Documentação
+            with st.expander("📇 Bloco 2: Documentação e eSocial", expanded=False):
+                col1, col2, col3 = st.columns(3)
+                cnpj_cpf = col1.text_input("CPF / CNPJ", key="reg_cpf")
+                rg = col2.text_input("RG (Número / Órgão / Emissão)", key="reg_rg")
+                pis_pasep = col3.text_input("PIS / PASEP", key="reg_pis")
+                col4, col5 = st.columns(2)
+                ctps = col4.text_input("CTPS (Número / Série / UF)", key="reg_ctps")
+                titulo_eleitor = col5.text_input("Título de Eleitor (Nº / Zona / Seção)", key="reg_titulo")
+                cnh = st.text_input("CNH (Nº / Categoria / Validade)", key="reg_cnh")
+
+            # Expander 3: Dados Bancários
+            with st.expander("💰 Bloco 3: Dados Bancários e Dependentes", expanded=False):
+                col1, col2, col3 = st.columns(3)
+                dados_bancarios = col1.text_input("Banco / Agência / Conta", key="reg_banco")
+                tipo_conta = col2.selectbox("Tipo de Conta", ["Corrente", "Salário", "Poupança"], key="reg_tconta")
+                chave_pix = col3.text_input("Chave PIX (Opcional)", key="reg_pix")
+                col4, col5 = st.columns(2)
+                dependente1 = col4.text_input("Dependente 1 (Nome / CPF / Nasc.)", key="reg_dep1")
+                dependente2 = col5.text_input("Dependente 2 (Nome / CPF / Nasc.)", key="reg_dep2")
+
+            # Expander 4: Dados Contratuais
+            with st.expander("👔 Bloco 4: Dados Contratuais e Jornada", expanded=False):
+                col1, col2, col3 = st.columns(3)
+                cargo = col1.selectbox("Cargo / Função", ["Operário", "Vendedor", "Gerente", "Administrativo", "Representante Comercial"], key="reg_cargo")
+                departamento = col2.text_input("Departamento / Área", key="reg_dept")
+                regime = col3.selectbox("Regime de Contratação", ["CLT", "PJ", "Estágio", "Autônomo", "Diarista", "Outro"], key="reg_regime")
+                col4, col5, col6 = st.columns(3)
+                modelo_trabalho = col4.selectbox("Modelo de Trabalho", ["Presencial", "Híbrido", "Remoto"], key="reg_mt")
+                admissao = col5.date_input("Data de Admissão", value=date.today(), format="DD/MM/YYYY", key="reg_adm")
+                termino = col6.date_input("Data de Término (Opcional)", value=None, format="DD/MM/YYYY", key="reg_term")
+                col7, col8, col9 = st.columns(3)
+                carga_horaria = col7.text_input("Carga Horária Semanal (Ex: 44h)", key="reg_carga")
+                horario_trabalho = col8.text_input("Horário de Trabalho (Ex: Entrada / Saída / Intervalo)", key="reg_horario")
+                escala = col9.text_input("Dias da Semana / Escala (Ex: Segunda a Sexta)", key="reg_escala")
+
+            # Expander 5: Remuneração
+            with st.expander("💸 Bloco 5: Remuneração, Variável e Benefícios", expanded=False):
+                col1, col2 = st.columns(2)
+                salario = col1.number_input("Remuneração Fixa / Bolsa Auxílio (R$)", min_value=0.0, step=100.0, key="reg_sal")
+                adicionais = col2.multiselect("Adicionais Legais", ["Não aplicável", "Periculosidade", "Insalubridade", "Noturno"], default=["Não aplicável"], key="reg_adicionais")
+                adicionais_str = ",".join(adicionais)
+                col3, col4 = st.columns(2)
+                comissionamento = col3.selectbox("Comissionamento?", ["Não", "Sim"], key="reg_comiss")
+                comissao_regra = col4.text_input("Regra de Comissão (Se Sim)", key="reg_comregra")
+                col5, col6, col7 = st.columns(3)
+                gatilho_com = col5.text_input("Gatilho e Pagamento da Comissão", key="reg_gatcom")
+                bonus = col6.text_input("Bônus / Premiações por Meta (Regra/KPI)", key="reg_bonus")
+                adiantamento = col7.text_input("Política de Adiantamento (Vale)", key="reg_valem")
+                st.markdown("🚌 **Benefícios e Custos de Transporte / Refeição**")
+                col8, col9 = st.columns(2)
+                val_transp = col8.number_input("Vale Transporte / Auxílio Combustível Mensal (R$)", min_value=0.0, step=10.0, key="reg_vt")
+                vt_desc = col9.selectbox("Desconto Vale Transporte", ["Sem desconto", "Com desconto"], key="reg_vtdesc")
+                col10, col11 = st.columns(2)
+                val_refei = col10.number_input("Vale Alimentação / Refeição Diário (R$)", min_value=0.0, step=1.0, key="reg_vr")
+                vr_desc = col11.selectbox("Desconto Refeição / Alimentação", ["Sem desconto", "Com desconto"], key="reg_vrdesc")
+                ajuda_custo = st.number_input("Ajuda de Custo Mensal (R$)", min_value=0.0, step=50.0, key="reg_ajuda")
+
+            # Expander 6: Ferramentas
+            with st.expander("💻 Bloco 6: Ferramentas e Termos de Aceite", expanded=False):
+                equipamentos = st.multiselect("Equipamentos e Acessos Fornecidos", ["Notebook", "Celular", "Acesso a ERP/CRM", "Uniforme"], key="reg_equip")
+                equipamentos_str = ",".join(equipamentos)
+                st.markdown("##### **TERMO DE CIÊNCIA E AUTORIZAÇÃO (LGPD)**")
+                st.caption(
+                    "Declaro que as informações acima são verdadeiras e autorizo o uso dos meus dados pessoais pela empresa "
+                    "exclusivamente para fins de registro de funcionários, cumprimento de obrigigações legais, processamento de "
+                    "folha de pagamento e gestão de benefícios, em conformidade com a Lei Geral de Proteção de Dados (LGPD)."
+                )
+                aceite_lgpd = st.checkbox("Aceito os termos da LGPD e autorizo o processamento dos meus dados.", value=False, key="reg_lgpd")
+
+            if st.form_submit_button("Cadastrar Colaborador", type="primary"):
+                if not nome:
+                    st.error("Por favor, preencha o Nome Completo.")
+                elif not aceite_lgpd:
+                    st.error("É necessário aceitar os termos da LGPD para realizar o cadastro.")
+                else:
+                    comiss_int = 1 if comissionamento == "Sim" else 0
+                    aceite_int = 1 if aceite_lgpd else 0
+                    run_query(
+                        """INSERT INTO funcionarios 
+                           (nome, cargo, salario_base, regime_contratacao, data_admissao, data_nascimento, ajuda_custo, status, data_termino, cnpj_cpf, telefone, email, valor_transporte, valor_refeicao,
+                            genero, estado_civil, nacionalidade_naturalidade, nome_mae, nome_pai, endereco, bairro, cidade_uf, cep, contato_emergencia, rg, pis_pasep, ctps, titulo_eleitor, cnh,
+                            dados_bancarios, tipo_conta, chave_pix, dependente1, dependente2, departamento, modelo_trabalho, carga_horaria_semanal, horario_trabalho, escala_trabalho,
+                            adicionais_legais, comissionamento, comissao_regra, gatilho_pagamento_comissao, bonus_premiacao, politica_adiantamento, vt_desconto, vr_desconto, equipamentos_fornecidos, aceite_lgpd) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, 'ATIVO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (nome, cargo, salario, regime, admissao, nascimento, ajuda_custo, termino, cnpj_cpf, telefone, email, val_transp, val_refei,
+                         genero, estado_civil, nacionalidade, nome_mae, nome_pai, endereco, bairro, cidade_uf, cep, contato_emergencia, rg, pis_pasep, ctps, titulo_eleitor, cnh,
+                         dados_bancarios, tipo_conta, chave_pix, dependente1, dependente2, departamento, modelo_trabalho, carga_horaria, horario_trabalho, escala,
+                         adicionais_str, comiss_int, comissao_regra, gatilho_com, bonus, adiantamento, vt_desc, vr_desc, equipamentos_str, aceite_int)
+                    )
+                    st.success(f"Colaborador {nome} cadastrado com sucesso!")
+                    import time; time.sleep(1); st.rerun()
+
+    else:
+        st.subheader("Editar Cadastro de Colaborador")
+        df_func_edit = fetch_all("SELECT id, nome, cargo FROM funcionarios ORDER BY nome")
+        if df_func_edit.empty:
+            st.warning("Nenhum colaborador cadastrado.")
+        else:
+            opts_f = {f"{r['id']} - {r['nome']} ({r['cargo']})": r['id'] for _, r in df_func_edit.iterrows()}
+            f_sel = st.selectbox("Selecione o Colaborador para editar:", list(opts_f.keys()), key="edit_colab_select")
+            if f_sel:
+                f_id = opts_f[f_sel]
+                f_data = fetch_all("SELECT * FROM funcionarios WHERE id=?", (f_id,)).iloc[0]
+                
+                with st.form("form_func_edit"):
+                    # Expander 1: Identificação
+                    with st.expander("👤 Bloco 1: Identificação e Contato", expanded=True):
+                        col1, col2 = st.columns(2)
+                        ef_nome = col1.text_input("Nome Completo", f_data['nome'])
+                        dt_nasc = pd.to_datetime(f_data['data_nascimento']).date() if pd.notnull(f_data['data_nascimento']) else date(1990, 1, 1)
+                        ef_nascimento = col2.date_input("Data de Nascimento", value=dt_nasc, format="DD/MM/YYYY")
+                        
+                        g_opts = ["Não Informar", "Masculino", "Feminino", "Outro"]
+                        db_g = f_data.get('genero', 'Não Informar')
+                        if db_g not in g_opts: db_g = "Não Informar"
+                        
+                        ec_opts = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"]
+                        db_ec = f_data.get('estado_civil', 'Solteiro(a)')
+                        if db_ec not in ec_opts: db_ec = "Solteiro(a)"
+                        
+                        col3, col4, col5 = st.columns(3)
+                        ef_genero = col3.selectbox("Gênero", g_opts, index=g_opts.index(db_g))
+                        ef_estado_civil = col4.selectbox("Estado Civil", ec_opts, index=ec_opts.index(db_ec))
+                        ef_nacionalidade = col5.text_input("Nacionalidade / Naturalidade", f_data.get('nacionalidade_naturalidade', 'Brasileira') or 'Brasileira')
+                        
+                        col6, col7 = st.columns(2)
+                        ef_nome_mae = col6.text_input("Nome da Mãe", f_data.get('nome_mae', '') or '')
+                        ef_nome_pai = col7.text_input("Nome do Pai", f_data.get('nome_pai', '') or '')
+                        
+                        col8, col9 = st.columns([3, 1])
+                        ef_endereco = col8.text_input("Endereço Completo (Rua/Av, Nº, Compl)", f_data.get('endereco', '') or '')
+                        ef_cep = col9.text_input("CEP", f_data.get('cep', '') or '')
+                        
+                        col10, col11, col12 = st.columns(3)
+                        ef_bairro = col10.text_input("Bairro", f_data.get('bairro', '') or '')
+                        ef_cidade_uf = col11.text_input("Cidade - UF", f_data.get('cidade_uf', '') or '')
+                        ef_telefone = col12.text_input("Telefone / Celular (WhatsApp)", f_data.get('telefone', '') or '')
+                        
+                        col13, col14 = st.columns(2)
+                        ef_email = col13.text_input("E-mail Pessoal", f_data.get('email', '') or '')
+                        ef_emergencia = col14.text_input("Contato de Emergência (Nome, Parentesco, Tel)", f_data.get('contato_emergencia', '') or '')
+
+                    # Expander 2: Documentação
+                    with st.expander("📇 Bloco 2: Documentação e eSocial", expanded=False):
+                        col1, col2, col3 = st.columns(3)
+                        ef_cnpj = col1.text_input("CPF / CNPJ", f_data.get('cnpj_cpf', '') or '')
+                        ef_rg = col2.text_input("RG (Número / Órgão / Emissão)", f_data.get('rg', '') or '')
+                        ef_pis = col3.text_input("PIS / PASEP", f_data.get('pis_pasep', '') or '')
+                        col4, col5 = st.columns(2)
+                        ef_ctps = col4.text_input("CTPS (Número / Série / UF)", f_data.get('ctps', '') or '')
+                        ef_titulo = col5.text_input("Título de Eleitor (Nº / Zona / Seção)", f_data.get('titulo_eleitor', '') or '')
+                        ef_cnh = st.text_input("CNH (Nº / Categoria / Validade)", f_data.get('cnh', '') or '')
+
+                    # Expander 3: Dados Bancários
+                    with st.expander("💰 Bloco 3: Dados Bancários e Dependentes", expanded=False):
+                        col1, col2, col3 = st.columns(3)
+                        ef_banco = col1.text_input("Banco / Agência / Conta", f_data.get('dados_bancarios', '') or '')
+                        tc_opts = ["Corrente", "Salário", "Poupança"]
+                        db_tc = f_data.get('tipo_conta', 'Corrente')
+                        if db_tc not in tc_opts: db_tc = "Corrente"
+                        ef_tipo_conta = col2.selectbox("Tipo de Conta", tc_opts, index=tc_opts.index(db_tc))
+                        ef_pix = col3.text_input("Chave PIX (Opcional)", f_data.get('chave_pix', '') or '')
+                        col4, col5 = st.columns(2)
+                        ef_dep1 = col4.text_input("Dependente 1 (Nome / CPF / Nasc.)", f_data.get('dependente1', '') or '')
+                        ef_dep2 = col5.text_input("Dependente 2 (Nome / CPF / Nasc.)", f_data.get('dependente2', '') or '')
+
+                    # Expander 4: Dados Contratuais
+                    with st.expander("👔 Bloco 4: Dados Contratuais e Jornada", expanded=False):
+                        col1, col2, col3 = st.columns(3)
+                        c_lst = ["Operário", "Vendedor", "Gerente", "Administrativo", "Representante Comercial"]
+                        ef_cargo = col1.selectbox("Cargo / Função", c_lst, index=c_lst.index(f_data['cargo']) if f_data['cargo'] in c_lst else 0)
+                        ef_dept = col2.text_input("Departamento / Área", f_data.get('departamento', '') or '')
+                        reg_opts = ["CLT", "PJ", "Estágio", "Autônomo", "Diarista", "Outro"]
+                        db_reg = f_data.get('regime_contratacao', 'CLT')
+                        if db_reg not in reg_opts: db_reg = "CLT"
+                        ef_regime = col3.selectbox("Regime de Contratação", reg_opts, index=reg_opts.index(db_reg))
+                        
+                        col4, col5, col6 = st.columns(3)
+                        mt_opts = ["Presencial", "Híbrido", "Remoto"]
+                        db_mt = f_data.get('modelo_trabalho', 'Presencial')
+                        if db_mt not in mt_opts: db_mt = "Presencial"
+                        ef_modelo = col4.selectbox("Modelo de Trabalho", mt_opts, index=mt_opts.index(db_mt))
+                        
+                        dt_adm = pd.to_datetime(f_data['data_admissao']).date() if pd.notnull(f_data['data_admissao']) else date.today()
+                        ef_admissao = col5.date_input("Data de Admissão", value=dt_adm, format="DD/MM/YYYY")
+                        dt_term = pd.to_datetime(f_data['data_termino']).date() if pd.notnull(f_data['data_termino']) else None
+                        ef_termino = col6.date_input("Data de Término (Opcional)", value=dt_term, format="DD/MM/YYYY")
+                        
+                        col7, col8, col9 = st.columns(3)
+                        ef_carga = col7.text_input("Carga Horária Semanal", f_data.get('carga_horaria_semanal', '') or '')
+                        ef_horario = col8.text_input("Horário de Trabalho", f_data.get('horario_trabalho', '') or '')
+                        ef_escala = col9.text_input("Dias da Semana / Escala", f_data.get('escala_trabalho', '') or '')
+
+                    # Expander 5: Remuneração
+                    with st.expander("💸 Bloco 5: Remuneração, Variável e Benefícios", expanded=False):
+                        col1, col2 = st.columns(2)
+                        ef_salario = col1.number_input("Remuneração Fixa / Bolsa Auxílio (R$)", value=float(f_data['salario_base']))
+                        
+                        ad_opts = ["Não aplicável", "Periculosidade", "Insalubridade", "Noturno"]
+                        db_ad = f_data.get('adicionais_legais', 'Não aplicável') or 'Não aplicável'
+                        db_ad_list = [x.strip() for x in db_ad.split(",") if x.strip()]
+                        ef_adicionais = col2.multiselect("Adicionais Legais", ad_opts, default=db_ad_list)
+                        ef_adicionais_str = ",".join(ef_adicionais)
+                        
+                        col3, col4 = st.columns(2)
+                        ef_comiss = col3.selectbox("Comissionamento?", ["Não", "Sim"], index=1 if f_data.get('comissionamento', 0) == 1 else 0)
+                        ef_comiss_regra = col4.text_input("Regra de Comissão (Se Sim)", f_data.get('comissao_regra', '') or '')
+                        
+                        col5, col6, col7 = st.columns(3)
+                        ef_gatilho = col5.text_input("Gatilho e Pagamento da Comissão", f_data.get('gatilho_pagamento_comissao', '') or '')
+                        ef_bonus = col6.text_input("Bônus / Premiações por Meta (Regra/KPI)", f_data.get('bonus_premiacao', '') or '')
+                        ef_adiant = col7.text_input("Política de Adiantamento (Vale)", f_data.get('politica_adiantamento', '') or '')
+                        
+                        st.markdown("🚌 **Benefícios e Custos de Transporte / Refeição**")
+                        col8, col9 = st.columns(2)
+                        ef_val_transp = col8.number_input("Vale Transporte / Auxílio Combustível Mensal (R$)", value=float(f_data.get('valor_transporte', 0.0) or 0.0), step=10.0)
+                        
+                        vtd_opts = ["Sem desconto", "Com desconto"]
+                        db_vtd = f_data.get('vt_desconto', 'Sem desconto')
+                        if db_vtd not in vtd_opts: db_vtd = "Sem desconto"
+                        ef_vt_desc = col9.selectbox("Desconto Vale Transporte", vtd_opts, index=vtd_opts.index(db_vtd))
+                        
+                        col10, col11 = st.columns(2)
+                        ef_val_refei = col10.number_input("Vale Alimentação / Refeição Diário (R$)", value=float(f_data.get('valor_refeicao', 0.0) or 0.0), step=1.0)
+                        
+                        vrd_opts = ["Sem desconto", "Com desconto"]
+                        db_vrd = f_data.get('vr_desconto', 'Sem desconto')
+                        if db_vrd not in vrd_opts: db_vrd = "Sem desconto"
+                        ef_vr_desc = col11.selectbox("Desconto Refeição / Alimentação", vrd_opts, index=vrd_opts.index(db_vrd))
+                        
+                        ef_ajuda = st.number_input("Ajuda de Custo Mensal (R$)", value=float(f_data.get('ajuda_custo', 0.0) or 0.0), step=50.0)
+
+                    # Expander 6: Ferramentas
+                    with st.expander("💻 Bloco 6: Ferramentas e Termos de Aceite", expanded=False):
+                        eq_opts = ["Notebook", "Celular", "Acesso a ERP/CRM", "Uniforme"]
+                        db_eq = f_data.get('equipamentos_fornecidos', '') or ''
+                        db_eq_list = [x.strip() for x in db_eq.split(",") if x.strip()]
+                        ef_equip = st.multiselect("Equipamentos e Acessos Fornecidos", eq_opts, default=db_eq_list)
+                        ef_equip_str = ",".join(ef_equip)
+                        
+                        stts_opts = ["ATIVO", "INATIVO"]
+                        db_stts = f_data.get('status', 'ATIVO')
+                        if db_stts not in stts_opts: db_stts = "ATIVO"
+                        ef_status = st.selectbox("Status Geral do Colaborador", stts_opts, index=stts_opts.index(db_stts))
+
+                    if st.form_submit_button("Salvar Modificações", type="primary"):
+                        if not ef_nome:
+                            st.error("O Nome Completo é obrigatório.")
+                        else:
+                            comiss_int = 1 if ef_comiss == "Sim" else 0
+                            run_query(
+                                """UPDATE funcionarios SET 
+                                   nome=?, cargo=?, salario_base=?, regime_contratacao=?, data_admissao=?, data_nascimento=?, ajuda_custo=?, status=?, data_termino=?, cnpj_cpf=?, telefone=?, email=?, valor_transporte=?, valor_refeicao=?,
+                                   genero=?, estado_civil=?, nacionalidade_naturalidade=?, nome_mae=?, nome_pai=?, endereco=?, bairro=?, cidade_uf=?, cep=?, contato_emergencia=?, rg=?, pis_pasep=?, ctps=?, titulo_eleitor=?, cnh=?,
+                                   dados_bancarios=?, tipo_conta=?, chave_pix=?, dependente1=?, dependente2=?, departamento=?, modelo_trabalho=?, carga_horaria_semanal=?, horario_trabalho=?, escala_trabalho=?,
+                                   adicionais_legais=?, comissionamento=?, comissao_regra=?, gatilho_pagamento_comissao=?, bonus_premiacao=?, politica_adiantamento=?, vt_desconto=?, vr_desconto=?, equipamentos_fornecidos=?
+                                   WHERE id=?""",
+                                (ef_nome, ef_cargo, ef_salario, ef_regime, ef_admissao, ef_nascimento, ef_ajuda, ef_status, ef_termino, ef_cnpj, ef_telefone, ef_email, ef_val_transp, ef_val_refei,
+                                 ef_genero, ef_estado_civil, ef_nacionalidade, ef_nome_mae, ef_nome_pai, ef_endereco, ef_bairro, ef_cidade_uf, ef_cep, ef_emergencia, ef_rg, ef_pis, ef_ctps, ef_titulo, ef_cnh,
+                                 ef_banco, ef_tipo_conta, ef_pix, ef_dep1, ef_dep2, ef_dept, ef_modelo, ef_carga, ef_horario, ef_escala,
+                                 ef_adicionais_str, comiss_int, ef_comiss_regra, ef_gatilho, ef_bonus, ef_adiant, ef_vt_desc, ef_vr_desc, ef_equip_str, f_id)
+                            )
+                            st.success("Modificações salvas com sucesso!")
+                            import time; time.sleep(1); st.rerun()
 
 # ======= QUADRO DE COLABORADORES =======
 with tab1:
     st.subheader("Quadro Geral de Colaboradores")
     
-    filtro_status = st.radio("Filtrar por Status:", ["Ativos", "Inativos", "Todos"], horizontal=True, index=0)
+    filtro_status = st.radio("Filtrar por Status:", ["Ativos", "Inativos", "Todos"], horizontal=True, index=0, key="quadro_status_radio")
     
     query_colab = "SELECT id, nome, cargo, status, data_admissao, data_termino, salario_base, ajuda_custo, outros_descricao, outros_valor, regime_contratacao FROM funcionarios WHERE 1=1"
     if filtro_status == "Ativos":
@@ -42,8 +337,8 @@ with tab1:
             'regime_contratacao': 'Regime'
         })
         
-        df_display['Início'] = pd.to_datetime(df_display['Início']).dt.strftime('%d/%m/%Y')
-        df_display['Término'] = pd.to_datetime(df_display['Término']).dt.strftime('%d/%m/%Y')
+        df_display['Início'] = pd.to_datetime(df_display['Início'], errors='coerce').dt.strftime('%d/%m/%Y').fillna('')
+        df_display['Término'] = pd.to_datetime(df_display['Término'], errors='coerce').dt.strftime('%d/%m/%Y').fillna('')
         
         st.dataframe(df_display, width='stretch', hide_index=True)
         
@@ -53,6 +348,7 @@ with tab1:
             data=csv,
             file_name='colaboradores.csv',
             mime='text/csv',
+            key="quadro_export_csv"
         )
     else:
         st.info("Nenhum colaborador encontrado com este filtro.")
@@ -61,37 +357,121 @@ with tab1:
 with tab2:
     st.subheader("Geração de Pagamento (Folha)")
     
-    df_func2 = fetch_all("SELECT id, nome, salario_base, ajuda_custo, outros_valor FROM funcionarios WHERE status='ATIVO'")
+    df_func2 = fetch_all("""
+        SELECT id, nome, salario_base, ajuda_custo, outros_valor, 
+               regime_contratacao, valor_transporte, valor_refeicao, 
+               vt_desconto, vr_desconto 
+        FROM funcionarios 
+        WHERE status='ATIVO' AND regime_contratacao NOT IN ('PJ', 'Autônomo')
+    """)
     if df_func2.empty:
-        st.warning("Cadastre colaboradores ativos primeiro no módulo Cadastros.")
+        st.warning("Cadastre colaboradores CLT ou Diaristas ativos primeiro na aba Cadastro.")
     else:
         func_dict = dict(zip(df_func2['nome'], df_func2['id']))
         salario_dict = dict(zip(df_func2['nome'], df_func2['salario_base']))
         ajuda_dict = dict(zip(df_func2['nome'], df_func2['ajuda_custo']))
         outros_dict = dict(zip(df_func2['nome'], df_func2['outros_valor']))
+        regime_dict = dict(zip(df_func2['nome'], df_func2['regime_contratacao']))
+        transp_dict = dict(zip(df_func2['nome'], df_func2['valor_transporte']))
+        refeicao_dict = dict(zip(df_func2['nome'], df_func2['valor_refeicao']))
+        vt_desc_dict = dict(zip(df_func2['nome'], df_func2['vt_desconto']))
+        vr_desc_dict = dict(zip(df_func2['nome'], df_func2['vr_desconto']))
         
-        nome_pgto = st.selectbox("Selecione o Colaborador (Apenas Ativos)", list(func_dict.keys()))
+        nome_pgto = st.selectbox("Selecione o Colaborador (Apenas Ativos)", list(func_dict.keys()), key="pgto_func_select")
         
+        emp_regime = regime_dict.get(nome_pgto, 'CLT')
+        base_sal = float(salario_dict[nome_pgto] or 0.0)
+        base_ajuda = float(ajuda_dict[nome_pgto] or 0.0)
+        base_outros = float(outros_dict[nome_pgto] or 0.0)
+        base_vt = float(transp_dict.get(nome_pgto, 0.0) or 0.0)
+        base_vr_diario = float(refeicao_dict.get(nome_pgto, 0.0) or 0.0)
+        db_vt_desc = vt_desc_dict.get(nome_pgto, 'Sem desconto')
+        db_vr_desc = vr_desc_dict.get(nome_pgto, 'Sem desconto')
+
+        # Se for CLT:
+        # Pre-calcula os descontos para apresentar as estimativas informativas do salário líquido
+        salario_bruto = base_sal + base_ajuda + base_outros
+        
+        # Desconto INSS e IRRF (Para informação no card)
+        # INSS 2026
+        if salario_bruto <= 1621.00:
+            desc_inss = salario_bruto * 0.075
+        elif salario_bruto <= 2902.84:
+            desc_inss = (salario_bruto * 0.09) - 24.32
+        elif salario_bruto <= 4354.27:
+            desc_inss = (salario_bruto * 0.12) - 111.40
+        elif salario_bruto <= 8475.55:
+            desc_inss = (salario_bruto * 0.14) - 198.49
+        else:
+            desc_inss = 988.09
+            
+        # IRRF 2026
+        base_irrf = max(0.0, salario_bruto - desc_inss)
+        if salario_bruto <= 5000.00:
+            desc_irrf = 0.0
+        else:
+            if base_irrf <= 2428.80:
+                std_ir = 0.0
+            elif base_irrf <= 2826.65:
+                std_ir = (base_irrf * 0.075) - 182.16
+            elif base_irrf <= 3751.05:
+                std_ir = (base_irrf * 0.15) - 394.16
+            elif base_irrf <= 4664.68:
+                std_ir = (base_irrf * 0.225) - 675.49
+            else:
+                std_ir = (base_irrf * 0.275) - 908.73
+                
+            if salario_bruto <= 7350.00:
+                redutor = 978.62 - (0.133145 * base_irrf)
+                desc_irrf = max(0.0, std_ir - redutor)
+            else:
+                desc_irrf = std_ir
+
         with st.form("form_pagamento", clear_on_submit=False):
             col1, col2, col3 = st.columns(3)
             data_pgto = col1.date_input("Data de Pagamento", value=date.today(), format="DD/MM/YYYY")
             mes_ref = col2.text_input("Mês Referência (Ex: 03/2026)", value=data_pgto.strftime("%m/%Y"))
-            
-            base_sal = float(salario_dict[nome_pgto] or 0.0)
-            base_ajuda = float(ajuda_dict[nome_pgto] or 0.0)
-            base_outros = float(outros_dict[nome_pgto] or 0.0)
-            
             sal_base = col3.number_input("Rem. Fixa (R$)", min_value=0.0, value=base_sal, step=10.0)
             
             st.markdown("##### Outras Verbas e Encargos")
-            col4, col5, col6, col7 = st.columns(4)
+            col4, col5, col_days = st.columns(3)
             ajuda = col4.number_input("Ajuda de Custo (R$)", min_value=0.0, value=base_ajuda, step=10.0)
             outros = col5.number_input("Outros Valores (R$)", min_value=0.0, value=base_outros, step=10.0)
-            refeicao = col6.number_input("Vale Refeição / Alimentação (R$)", min_value=0.0, step=10.0)
-            custo_previ = col7.number_input("Custo Previdenciário (R$)", min_value=0.0, step=10.0)
+            dias_trabalhados = col_days.number_input("Dias Trabalhados no Mês", min_value=1, max_value=31, value=22, step=1)
             
-            valor_total = sal_base + ajuda + outros + refeicao + custo_previ
-            st.info(f"**Total Desembolsado pelo Caixa:** R$ {valor_total:,.2f}".replace('.',','))
+            col_vt, col_vr, col_enc = st.columns(3)
+            
+            # Cálculo de VT
+            if emp_regime == 'CLT' and db_vt_desc == 'Com desconto':
+                desconto_vt = min(0.06 * base_sal, base_vt)
+            else:
+                desconto_vt = 0.0
+            vt_liquido = max(0.0, base_vt - desconto_vt)
+            
+            vt_pago = col_vt.number_input("Vale Transporte / Combustível (R$)", min_value=0.0, value=vt_liquido, step=10.0)
+            
+            # Cálculo de VR
+            vr_calculado = base_vr_diario * dias_trabalhados
+            vr_pago = col_vr.number_input("Vale Refeição / Alimentação (R$)", min_value=0.0, value=vr_calculado, step=10.0)
+            
+            # Custo Previdenciário (Patronal) - 28% para CLT, 0 para outros
+            encargo_patronal = 0.28 * (sal_base + ajuda + outros) if emp_regime == 'CLT' else 0.0
+            custo_previ = col_enc.number_input("Custo Previdenciário Patronal (R$)", min_value=0.0, value=encargo_patronal, step=10.0)
+            
+            valor_total = sal_base + ajuda + outros + vt_pago + vr_pago + custo_previ
+            
+            # Exibir informativos de Deduções e Salário Líquido do Funcionário (Somente CLT)
+            if emp_regime == 'CLT':
+                st.info(
+                    f"**Demonstrativo do Colaborador (CLT):**\n"
+                    f"- Salário Bruto: R$ {salario_bruto:,.2f}\n"
+                    f"- Desconto INSS: -R$ {desc_inss:,.2f}\n"
+                    f"- Desconto IRRF: -R$ {desc_irrf:,.2f}\n"
+                    f"- Desconto VT (6%): -R$ {desconto_vt:,.2f}\n"
+                    f"**Salário Líquido Estimado a Receber:** R$ {max(0.0, salario_bruto - desc_inss - desc_irrf - desconto_vt):,.2f}"
+                )
+                
+            st.info(f"**Total Desembolsado pelo Caixa da Empresa:** R$ {valor_total:,.2f}".replace('.',','))
             
             if st.form_submit_button("Registrar Pagamento"):
                 if valor_total > 0:
@@ -100,7 +480,7 @@ with tab2:
                         """INSERT INTO rh_pagamentos 
                            (funcionario_id, data_pagamento, mes_referencia, salario_base_pago, passagem, refeicao, custo_previdenciario, valor_total_pago) 
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (func_id, data_pgto, mes_ref, sal_base, ajuda + outros, refeicao, custo_previ, valor_total)
+                        (func_id, data_pgto, mes_ref, sal_base, vt_pago + ajuda + outros, vr_pago, custo_previ, valor_total)
                     )
                     
                     desc = f"Pagamento Rem. Fixa e Benefícios ({mes_ref}) - {nome_pgto}"
@@ -109,6 +489,7 @@ with tab2:
                         (data_pgto, "Saída", "Folha de Pagamento", valor_total, desc)
                     )
                     st.success(f"Pagamento lançado com sucesso e adicionado ao fluxo de caixa!")
+                    import time; time.sleep(1); st.rerun()
                     
         st.markdown("---")
         st.subheader("Histórico de Pagamentos")

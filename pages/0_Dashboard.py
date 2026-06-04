@@ -12,13 +12,7 @@ st.set_page_config(
 from estilo import carregar_estilo
 carregar_estilo()
 
-c1, c2 = st.columns([1, 9])
-with c1:
-    logo_path = Path(__file__).parent.parent / "logo.png"
-    if logo_path.exists():
-        st.image(str(logo_path), width="stretch")
-with c2:
-    st.markdown('<h1 style="margin-top: -15px;">Dashboard Executivo</h1>', unsafe_allow_html=True)
+st.title("Dashboard Executivo")
 
 st.markdown(f"Bem-vindo, **{st.session_state.get('logged_user', 'Usuário')}**. Abaixo está o resumo da operação.")
 

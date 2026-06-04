@@ -39,3 +39,15 @@ Este documento registra as ideias, necessidades e módulos planejados para futur
   * **Input por Áudio (Speech-to-Text/LLM):** Envio de notas de voz de representantes e operadores na estrada (ex: lançando pedidos de venda ou apontamentos de fábrica por áudio). A IA transcreve, interpreta a intenção e executa a transação.
   * **Feedback Interativo:** Confirmações detalhadas de lançamentos e alertas educativos diretos no chat privado do usuário.
 * **Público-alvo:** Diretoria, Equipe Administrativa, Representantes de Venda (Comercial) e Operadores de Fábrica.
+
+---
+
+## 👥 5. Módulo de Recursos Humanos Avançado (Fases 3, 4 e 5)
+* **Objetivo:** Expandir o módulo Pessoas para um sistema completo de gestão de RH, incluindo controle de férias, cálculo de rescisões e integração com o sistema de pagamento bancário (CNAB).
+* **Escopo:**
+  * **Controle de Férias:** Rastreamento automatizado de períodos aquisitivos e concessivos de férias para funcionários CLT. Alertas visuais e jobs para notificar férias vencidas ou próximas do vencimento (evitando multas de férias em dobro). Tabela de redução de férias por faltas injustificadas.
+  * **Cálculo Rescisório Automático:** Motor para cálculo de verbas rescisórias conforme tipo de desligamento (sem justa causa, com justa causa, pedido de demissão, acordo mútuo). Geração do Termo de Rescisão de Contrato de Trabalho (TRCT) com provisões de 13º proporcional, férias proporcionais + 1/3, aviso prévio e multa do FGTS (40% ou 20%).
+  * **Exportação CNAB 240 / Lote PIX:** Geração de arquivos de remessa bancária no padrão FEBRABAN para pagamentos em lote de salários e benefícios, além de suporte a lotes de pagamento PIX via JSON API.
+  * **Tabelas Fiscais Dinâmicas:** Migração das faixas e alíquotas de INSS, IRRF e salário mínimo para tabelas do banco de dados, permitindo a atualização anual de tributos via tela administrativa do gestor, sem necessidade de deploy de código.
+* **Público-alvo:** Perfis `ADMIN` e `FINANCEIRO` (Recursos Humanos e Diretoria).
+
