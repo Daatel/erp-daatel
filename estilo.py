@@ -879,14 +879,14 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         -webkit-backdrop-filter: blur(12px) !important;
         border: 1px solid rgba(255, 255, 255, 0.15) !important;
         padding: 6px 12px 6px 10px !important;
-        border-radius: 30px !important;
+        border-radius: 22px !important;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25) !important;
-        height: 38px !important;
+        height: 44px !important;
         box-sizing: border-box !important;
     }}
     .user-avatar {{
-        width: 26px !important;
-        height: 26px !important;
+        width: 28px !important;
+        height: 28px !important;
         background: linear-gradient(135deg, #38bdf8, #0284c7) !important;
         border-radius: 50% !important;
         display: flex !important;
@@ -894,7 +894,7 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         justify-content: center !important;
         color: #ffffff !important;
         font-weight: 700 !important;
-        font-size: 11px !important;
+        font-size: 12px !important;
         border: 1px solid rgba(255, 255, 255, 0.45) !important;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0, 0, 0, 0.25) !important;
         flex-shrink: 0 !important;
@@ -933,8 +933,8 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         padding: 2px 12px !important;
         font-size: 11px !important;
         font-weight: 600 !important;
-        height: 26px !important;
-        line-height: 20px !important;
+        height: 28px !important;
+        line-height: 22px !important;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 4px rgba(2, 132, 199, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
         transition: all 0.2s ease !important;
         box-sizing: border-box !important;
