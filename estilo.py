@@ -873,12 +873,12 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         z-index: 999998 !important;
         display: flex !important;
         align-items: center !important;
-        gap: 8px !important;
+        gap: 12px !important;
         background-color: rgba(15, 23, 42, 0.85) !important;
         backdrop-filter: blur(12px) !important;
         -webkit-backdrop-filter: blur(12px) !important;
         border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        padding: 4px 75px 4px 10px !important;
+        padding: 6px 12px 6px 10px !important;
         border-radius: 30px !important;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25) !important;
         height: 38px !important;
@@ -917,37 +917,35 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         font-weight: 500 !important;
         text-transform: uppercase !important;
     }}
-    /* Estiliza o botão de logout nativo do Streamlit */
-    .top-right-logout-btn {{
-        position: fixed !important;
-        top: 14px !important;
-        right: 86px !important;
-        z-index: 999999 !important;
+    /* Estiliza o botão de logout contido dentro do card flutuante */
+    .user-badge-floating div[data-testid="stButton"] {{
         margin: 0 !important;
         padding: 0 !important;
-        width: 55px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        flex-shrink: 0 !important;
     }}
-    .top-right-logout-btn button {{
-        width: 100% !important;
-        max-width: 55px !important;
+    .user-badge-floating div[data-testid="stButton"] button {{
         background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%) !important;
         color: white !important;
         border: 1px solid rgba(255, 255, 255, 0.4) !important;
         border-radius: 20px !important;
-        padding: 2px 10px !important;
+        padding: 2px 12px !important;
         font-size: 11px !important;
         font-weight: 600 !important;
         height: 26px !important;
-        line-height: 22px !important;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 6px rgba(2, 132, 199, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+        line-height: 20px !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 4px rgba(2, 132, 199, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
         transition: all 0.2s ease !important;
         box-sizing: border-box !important;
+        width: auto !important;
+        margin: 0 !important;
     }}
-    .top-right-logout-btn button:hover {{
+    .user-badge-floating div[data-testid="stButton"] button:hover {{
         background: linear-gradient(180deg, #0284c7 0%, #025a87 100%) !important;
         transform: translateY(-1px) !important;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 10px rgba(2, 132, 199, 0.4), 0 2px 4px rgba(0, 0, 0, 0.15) !important;
-        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 3px 8px rgba(2, 132, 199, 0.4), 0 1px 2px rgba(0, 0, 0, 0.15) !important;
+        border: 1px solid rgba(255, 255, 255, 0.35) !important;
         color: white !important;
     }}
     </style>
@@ -966,12 +964,15 @@ def carregar_cabecalho_usuario(logged_user, user_role):
 (function() {
     const doc = window.parent.document;
     function setupLogoutButton() {
+        const badge = doc.querySelector('.user-badge-floating');
+        if (!badge) return;
+
         const buttons = doc.querySelectorAll('div[data-testid="stButton"] button');
         for (let btn of buttons) {
             if (btn.textContent && btn.textContent.trim() === 'Sair') {
                 const wrapper = btn.closest('div[data-testid="stButton"]');
-                if (wrapper && !wrapper.classList.contains('top-right-logout-btn')) {
-                    wrapper.classList.add('top-right-logout-btn');
+                if (wrapper && wrapper.parentElement !== badge) {
+                    badge.appendChild(wrapper);
                 }
             }
         }
