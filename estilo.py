@@ -125,6 +125,31 @@ def carregar_estilo():
             padding: 2px 8px;
             border-radius: 4px;
         }
+        /* --- ESTILO DO BOTÃO DE LOGOUT NA BARRA LATERAL --- */
+        div.st-key-logout_btn button {
+            background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%) !important; /* Tema azul turquesa */
+            color: #ffffff !important;
+            border: 1px solid #0284c7 !important;
+            border-bottom: 3px solid #014c73 !important; /* Efeito 3D sutil */
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            font-size: 13px !important;
+            height: 38px !important;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15) !important;
+            transition: all 0.1s ease !important;
+            margin-top: 5px !important;
+        }
+        div.st-key-logout_btn button:hover {
+            background: linear-gradient(180deg, #40c4ff 0%, #0284c7 100%) !important;
+            border-bottom: 3px solid #014c73 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 6px 12px rgba(2, 132, 199, 0.3) !important;
+        }
+        div.st-key-logout_btn button:active {
+            transform: translateY(1px) !important;
+            border-bottom: 1px solid #014c73 !important;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+        }
     </style>
     </div>
     """, unsafe_allow_html=True)
@@ -855,148 +880,7 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
 
 
 def carregar_cabecalho_usuario(logged_user, user_role):
-    # Iniciais do nome
-    names = [n for n in logged_user.split() if n]
-    if len(names) >= 2:
-        initials = (names[0][0] + names[-1][0]).upper()
-    elif names:
-        initials = names[0][:2].upper()
-    else:
-        initials = "US"
-
-    st.markdown(f"""
-    <style>
-    .user-badge-floating {{
-        position: fixed !important;
-        top: 8px !important;
-        right: 80px !important;
-        z-index: 999998 !important;
-        display: flex !important;
-        align-items: center !important;
-        gap: 10px !important;
-        background-color: rgba(15, 23, 42, 0.92) !important;
-        backdrop-filter: blur(16px) !important;
-        -webkit-backdrop-filter: blur(16px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.18) !important;
-        border-bottom: 2px solid rgba(0, 0, 0, 0.4) !important; /* Efeito 3D sutil na cápsula */
-        padding: 6px 14px 6px 12px !important;
-        border-radius: 24px !important;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4) !important;
-        height: 44px !important;
-        box-sizing: border-box !important;
-    }}
-    .user-avatar {{
-        width: 28px !important;
-        height: 28px !important;
-        background: linear-gradient(135deg, #38bdf8, #0284c7) !important;
-        border-radius: 50% !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        color: #ffffff !important;
-        font-weight: 700 !important;
-        font-size: 11px !important;
-        border: 1px solid #0284c7 !important;
-        border-bottom: 3px solid #014c73 !important; /* Efeito 3D no DC */
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0, 0, 0, 0.25) !important;
-        flex-shrink: 0 !important;
-        box-sizing: border-box !important;
-    }}
-    .user-details {{
-        display: flex !important;
-        flex-direction: column !important;
-        line-height: 1.1 !important;
-        justify-content: center !important;
-        margin-right: 4px !important;
-    }}
-    .user-name {{
-        color: #f1f5f9 !important;
-        font-weight: 600 !important;
-        font-size: 12px !important;
-        white-space: nowrap !important;
-    }}
-    .user-role {{
-        color: #94a3b8 !important;
-        font-size: 9px !important;
-        font-weight: 500 !important;
-        text-transform: uppercase !important;
-    }}
-    /* Oculta o botão na árvore original para evitar desalinhar antes de ser movido */
-    div[data-element-id="logout_btn"] {{
-        display: none !important;
-    }}
-    /* Mostra e estiliza o botão quando ele for movido para dentro da cápsula flutuante */
-    .user-badge-floating div[data-element-id="logout_btn"],
-    .user-badge-floating div[data-testid="stButton"] {{
-        display: inline-flex !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        align-items: center !important;
-        justify-content: center !important;
-        height: 28px !important;
-        width: 36px !important; /* Formato de cápsula pequena */
-        flex-shrink: 0 !important;
-        box-sizing: border-box !important;
-    }}
-    .user-badge-floating div[data-element-id="logout_btn"] button,
-    .user-badge-floating div[data-testid="stButton"] button {{
-        width: 36px !important;
-        height: 28px !important;
-        background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%) !important;
-        color: transparent !important; /* Oculta o texto 'Sair' */
-        font-size: 0 !important; /* Oculta o texto */
-        border: 1px solid #0284c7 !important;
-        border-bottom: 3px solid #014c73 !important; /* Efeito 3D no Botão */
-        border-radius: 14px !important;
-        padding: 0 !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 6px rgba(2, 132, 199, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2) !important;
-        transition: all 0.1s ease !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        cursor: pointer !important;
-        
-        /* Ícone de Logout (porta e seta) */
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'%3E%3C/path%3E%3Cpolyline points='16 17 21 12 16 7'%3E%3C/polyline%3E%3Cline x1='21' y1='12' x2='9' y2='12'%3E%3C/line%3E%3C/svg%3E") !important;
-        background-repeat: no-repeat !important;
-        background-position: center !important;
-        background-size: 14px !important;
-    }}
-    /* Oculta qualquer texto e corrige parágrafo interno gerado pelo Streamlit */
-    .user-badge-floating div[data-element-id="logout_btn"] button *,
-    .user-badge-floating div[data-testid="stButton"] button * {{
-        margin: 0 !important;
-        padding: 0 !important;
-        font-size: 0 !important;
-        color: transparent !important;
-        line-height: 0 !important;
-        display: none !important;
-    }}
-    .user-badge-floating div[data-element-id="logout_btn"] button:hover,
-    .user-badge-floating div[data-testid="stButton"] button:hover {{
-        background: linear-gradient(180deg, #40c4ff 0%, #0284c7 100%) !important;
-        border-bottom: 3px solid #014c73 !important;
-        transform: translateY(-1px) !important;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 10px rgba(2, 132, 199, 0.5), 0 2px 4px rgba(0, 0, 0, 0.25) !important;
-    }}
-    .user-badge-floating div[data-element-id="logout_btn"] button:active,
-    .user-badge-floating div[data-testid="stButton"] button:active {{
-        transform: translateY(1px) !important;
-        border-bottom: 1px solid #014c73 !important;
-        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
-    }}
-    </style>
-    <div class="user-badge-floating">
-        <div class="user-avatar">{initials}</div>
-        <div class="user-details">
-            <span class="user-name">{logged_user}</span>
-            <span class="user-role">{user_role}</span>
-        </div>
-    </div>
-    <iframe src="javascript:if(parent.window._logoutIntervalId){{parent.window.clearInterval(parent.window._logoutIntervalId);}}parent.window._logoutIntervalId=parent.window.setInterval(function(){{const badge=parent.document.querySelector('.user-badge-floating');if(!badge)return;let wrapper=parent.document.querySelector('.st-key-logout_btn');if(wrapper&&wrapper.parentElement!==badge){{badge.appendChild(wrapper);}}}},200);" style="display:none;"></iframe>
-    """, unsafe_allow_html=True)
+    pass
 
 
 def limpar_session_storage_js():

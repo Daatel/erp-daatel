@@ -260,19 +260,25 @@ else:
 
 pg = st.navigation(pages_dict)
 
-# Cabeçalho flutuante no topo direito com dados do usuário
-from estilo import carregar_cabecalho_usuario, carregar_rastreador_inatividade
-carregar_cabecalho_usuario(st.session_state['logged_user'], st.session_state['user_role'])
-
-# Botão de Logout invisível (reposicionado no topo direito sobre o badge via CSS)
-if st.button("Sair", key="logout_btn"):
-    st.session_state['logged_user'] = None
-    st.session_state['user_role'] = None
-    st.session_state['just_logged_out'] = True
-    st.rerun()
-
 # Rastreador de inatividade em background (60 minutos)
+from estilo import carregar_rastreador_inatividade
 carregar_rastreador_inatividade()
+
+# Credenciais e Botão de Logout no rodapé do menu lateral
+with st.sidebar:
+    st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown(f"""
+    <div style="padding: 2px 0px 8px 0px; line-height: 1.3;">
+        <div style="font-size: 13px; font-weight: 600; color: #f1f5f9;">{st.session_state['logged_user']}</div>
+        <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 500; letter-spacing: 0.5px;">{st.session_state['user_role']}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("Sair", key="logout_btn", use_container_width=True):
+        st.session_state['logged_user'] = None
+        st.session_state['user_role'] = None
+        st.session_state['just_logged_out'] = True
+        st.rerun()
 
 # Run the selected page
 pg.run()
