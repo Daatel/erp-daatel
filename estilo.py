@@ -878,16 +878,16 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         backdrop-filter: blur(12px) !important;
         -webkit-backdrop-filter: blur(12px) !important;
         border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        padding: 4px 85px 4px 10px !important;
+        padding: 4px 75px 4px 10px !important;
         border-radius: 30px !important;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25) !important;
         height: 38px !important;
         box-sizing: border-box !important;
     }}
     .user-avatar {{
-        width: 24px !important;
-        height: 24px !important;
-        background: linear-gradient(135deg, #01743d, #0284c7) !important;
+        width: 26px !important;
+        height: 26px !important;
+        background: linear-gradient(135deg, #38bdf8, #0284c7) !important;
         border-radius: 50% !important;
         display: flex !important;
         align-items: center !important;
@@ -895,7 +895,8 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         color: #ffffff !important;
         font-weight: 700 !important;
         font-size: 11px !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border: 1px solid rgba(255, 255, 255, 0.45) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0, 0, 0, 0.25) !important;
         flex-shrink: 0 !important;
     }}
     .user-details {{
@@ -919,33 +920,34 @@ def carregar_cabecalho_usuario(logged_user, user_role):
     /* Estiliza o botão de logout nativo do Streamlit */
     .top-right-logout-btn {{
         position: fixed !important;
-        top: 15px !important;
-        right: 90px !important;
+        top: 14px !important;
+        right: 86px !important;
         z-index: 999999 !important;
         margin: 0 !important;
         padding: 0 !important;
-        width: 60px !important;
+        width: 55px !important;
     }}
     .top-right-logout-btn button {{
         width: 100% !important;
-        max-width: 60px !important;
-        background-color: #ef4444 !important;
+        max-width: 55px !important;
+        background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%) !important;
         color: white !important;
-        border: none !important;
+        border: 1px solid rgba(255, 255, 255, 0.4) !important;
         border-radius: 20px !important;
         padding: 2px 10px !important;
         font-size: 11px !important;
         font-weight: 600 !important;
-        height: 24px !important;
-        line-height: 20px !important;
-        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2) !important;
+        height: 26px !important;
+        line-height: 22px !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 6px rgba(2, 132, 199, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2) !important;
         transition: all 0.2s ease !important;
         box-sizing: border-box !important;
     }}
     .top-right-logout-btn button:hover {{
-        background-color: #dc2626 !important;
-        transform: scale(1.05) !important;
-        border: none !important;
+        background: linear-gradient(180deg, #0284c7 0%, #025a87 100%) !important;
+        transform: translateY(-1px) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 10px rgba(2, 132, 199, 0.4), 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
         color: white !important;
     }}
     </style>
