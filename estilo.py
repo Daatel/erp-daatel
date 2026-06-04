@@ -921,8 +921,9 @@ def carregar_cabecalho_usuario(logged_user, user_role):
     div[data-element-id="logout_btn"] {{
         display: none !important;
     }}
-    /* Mostra e estiliza o botão quando ele for movido para dentro da cápsula flutuante */
-    .user-badge-floating div[data-element-id="logout_btn"] {{
+    /* Mostra e estiliza o botão quando ele for movido para dentro da cápsula flutuante (suporta seletores múltiplos para robustez extrema) */
+    .user-badge-floating div[data-element-id="logout_btn"],
+    .user-badge-floating div[data-testid="stButton"] {{
         display: inline-flex !important;
         margin: 0 !important;
         padding: 0 !important;
@@ -931,7 +932,8 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         height: 28px !important;
         flex-shrink: 0 !important;
     }}
-    .user-badge-floating div[data-element-id="logout_btn"] button {{
+    .user-badge-floating div[data-element-id="logout_btn"] button,
+    .user-badge-floating div[data-testid="stButton"] button {{
         width: 100% !important;
         max-width: 55px !important;
         background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%) !important;
@@ -951,7 +953,8 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         box-sizing: border-box !important;
         margin: 0 !important;
     }}
-    .user-badge-floating div[data-element-id="logout_btn"] button:hover {{
+    .user-badge-floating div[data-element-id="logout_btn"] button:hover,
+    .user-badge-floating div[data-testid="stButton"] button:hover {{
         background: linear-gradient(180deg, #0284c7 0%, #025a87 100%) !important;
         transform: translateY(-1px) !important;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 10px rgba(2, 132, 199, 0.4), 0 2px 4px rgba(0, 0, 0, 0.15) !important;
@@ -971,8 +974,20 @@ def carregar_cabecalho_usuario(logged_user, user_role):
             window._logoutObserverActive = true;
             setInterval(function() {{
                 const badge = document.querySelector('.user-badge-floating');
-                const wrapper = document.querySelector('div[data-element-id=\\'logout_btn\\']');
-                if (badge && wrapper && wrapper.parentElement !== badge) {{
+                if (!badge) return;
+                
+                let wrapper = document.querySelector('div[data-element-id=\\'logout_btn\\']');
+                if (!wrapper) {{
+                    const buttons = document.querySelectorAll('div[data-testid=\\'stButton\\'] button');
+                    for (let btn of buttons) {{
+                        if (btn.textContent && btn.textContent.trim() === 'Sair') {{
+                            wrapper = btn.closest('div[data-testid=\\'stButton\\']');
+                            break;
+                        }}
+                    }}
+                }}
+                
+                if (wrapper && wrapper.parentElement !== badge) {{
                     badge.appendChild(wrapper);
                 }}
             }}, 200);
