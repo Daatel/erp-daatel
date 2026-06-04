@@ -976,6 +976,18 @@ with tab10:
                 import time; time.sleep(1); st.rerun()
 
     st.markdown("---")
+    st.subheader("Colaboradores Cadastrados")
+    df_colab = fetch_all("""
+        SELECT id, nome as 'Nome', cargo as 'Cargo', regime_contratacao as 'Regime', 
+               salario_base as 'Salário Base (R$)', ajuda_custo as 'Ajuda de Custo (R$)', 
+               status as 'Status' 
+        FROM funcionarios
+    """)
+    if not df_colab.empty:
+        export_btn(df_colab, 'colaboradores.csv')
+        st.dataframe(df_colab, width="stretch", hide_index=True)
+
+    st.markdown("---")
     st.subheader("Editar Cadastro de Colaboradores")
     df_func_edit = fetch_all("SELECT id, nome, cargo FROM funcionarios")
     if not df_func_edit.empty:
