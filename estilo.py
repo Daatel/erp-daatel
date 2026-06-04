@@ -873,14 +873,15 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         z-index: 999998 !important;
         display: flex !important;
         align-items: center !important;
-        gap: 12px !important;
-        background-color: rgba(15, 23, 42, 0.85) !important;
-        backdrop-filter: blur(12px) !important;
-        -webkit-backdrop-filter: blur(12px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        padding: 6px 12px 6px 10px !important; /* Estreito e simétrico, botão será inserido aqui */
-        border-radius: 22px !important;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25) !important;
+        gap: 10px !important;
+        background-color: rgba(15, 23, 42, 0.92) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        border-bottom: 2px solid rgba(0, 0, 0, 0.4) !important; /* Efeito 3D sutil na cápsula */
+        padding: 6px 14px 6px 12px !important;
+        border-radius: 24px !important;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4) !important;
         height: 44px !important;
         box-sizing: border-box !important;
     }}
@@ -894,16 +895,19 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         justify-content: center !important;
         color: #ffffff !important;
         font-weight: 700 !important;
-        font-size: 12px !important;
-        border: 1px solid rgba(255, 255, 255, 0.45) !important;
+        font-size: 11px !important;
+        border: 1px solid #0284c7 !important;
+        border-bottom: 3px solid #014c73 !important; /* Efeito 3D no DC */
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0, 0, 0, 0.25) !important;
         flex-shrink: 0 !important;
+        box-sizing: border-box !important;
     }}
     .user-details {{
         display: flex !important;
         flex-direction: column !important;
         line-height: 1.1 !important;
         justify-content: center !important;
+        margin-right: 4px !important;
     }}
     .user-name {{
         color: #f1f5f9 !important;
@@ -921,7 +925,7 @@ def carregar_cabecalho_usuario(logged_user, user_role):
     div[data-element-id="logout_btn"] {{
         display: none !important;
     }}
-    /* Mostra e estiliza o botão quando ele for movido para dentro da cápsula flutuante (suporta seletores múltiplos para robustez extrema) */
+    /* Mostra e estiliza o botão quando ele for movido para dentro da cápsula flutuante */
     .user-badge-floating div[data-element-id="logout_btn"],
     .user-badge-floating div[data-testid="stButton"] {{
         display: inline-flex !important;
@@ -931,6 +935,7 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         justify-content: center !important;
         height: 28px !important;
         flex-shrink: 0 !important;
+        box-sizing: border-box !important;
     }}
     .user-badge-floating div[data-element-id="logout_btn"] button,
     .user-badge-floating div[data-testid="stButton"] button {{
@@ -938,28 +943,45 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         max-width: 55px !important;
         background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%) !important;
         color: white !important;
-        border: 1px solid rgba(255, 255, 255, 0.4) !important;
-        border-radius: 20px !important;
+        border: 1px solid #0284c7 !important;
+        border-bottom: 3px solid #014c73 !important; /* Efeito 3D no Botão */
+        border-radius: 14px !important;
         padding: 0 10px !important;
         font-size: 11px !important;
-        font-weight: 600 !important;
+        font-weight: 700 !important;
         height: 28px !important;
         line-height: 1 !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 6px rgba(2, 132, 199, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2) !important;
-        transition: all 0.2s ease !important;
+        transition: all 0.1s ease !important;
         box-sizing: border-box !important;
         margin: 0 !important;
+        cursor: pointer !important;
+    }}
+    /* Corrige qualquer parágrafo ou markdown interno gerado pelo Streamlit */
+    .user-badge-floating div[data-element-id="logout_btn"] button *,
+    .user-badge-floating div[data-testid="stButton"] button * {{
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }}
     .user-badge-floating div[data-element-id="logout_btn"] button:hover,
     .user-badge-floating div[data-testid="stButton"] button:hover {{
-        background: linear-gradient(180deg, #0284c7 0%, #025a87 100%) !important;
+        background: linear-gradient(180deg, #40c4ff 0%, #0284c7 100%) !important;
+        border-bottom: 3px solid #014c73 !important;
         transform: translateY(-1px) !important;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 10px rgba(2, 132, 199, 0.4), 0 2px 4px rgba(0, 0, 0, 0.15) !important;
-        border: 1px solid rgba(255, 255, 255, 0.35) !important;
-        color: white !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 10px rgba(2, 132, 199, 0.5), 0 2px 4px rgba(0, 0, 0, 0.25) !important;
+    }}
+    .user-badge-floating div[data-element-id="logout_btn"] button:active,
+    .user-badge-floating div[data-testid="stButton"] button:active {{
+        transform: translateY(1px) !important;
+        border-bottom: 1px solid #014c73 !important;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
     }}
     </style>
     <div class="user-badge-floating">
