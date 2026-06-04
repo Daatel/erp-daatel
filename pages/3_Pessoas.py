@@ -25,21 +25,71 @@ with tab_cadastro:
     with st.expander("💡 Dica: Processo de Pré-cadastro Simplificado via WhatsApp & IA", expanded=False):
         st.markdown("""
         ### 🚀 Economize tempo no Registro de Colaboradores!
-        Em vez de digitar manualmente cada um dos blocos abaixo, você pode usar um fluxo semi-automatizado e gratuito:
+        Para evitar digitar manualmente todos os blocos abaixo, você pode usar este fluxo automatizado e gratuito:
         
-        1. **Envie o Formulário de Coleta**:
-           - Envie o link de um formulário padrão (**Google Forms** ou **Microsoft Forms**) para o WhatsApp do novo colaborador.
-           - O colaborador preenche as informações em minutos e anexa fotos dos documentos necessários (RG, CPF, Comprovante de Residência, Cartão do Banco).
+        #### 1. Crie seu Formulário no Google Drive instantaneamente:
+        Como o Google Forms impede a criação direta de formulários por aplicativos externos sem login, você pode **gerar o seu próprio formulário em 5 segundos** usando o código do Google Apps Script abaixo:
         
-        2. **Processamento e Crítica por IA**:
-           - Abra o **ChatGPT** (criando um *Custom GPT*) ou o **Claude** (criando um *Project*).
-           - Envie a planilha de respostas do formulário e as fotos dos documentos enviados pelo colaborador para o chat.
-           - Instrua a IA a auditar os dados. Exemplo de comando: 
-             > *"Analise as imagens e as respostas fornecidas. Verifique se o CPF e RG batem com os documentos, se o comprovante de residência tem menos de 90 dias e se os dados bancários estão legíveis. Aponte qualquer divergência e estruture os dados prontos para o cadastro."*
-        
-        3. **Revisão e Cadastro**:
-           - A IA listará as críticas (ex: *“⚠️ Comprovante de residência é de 2024 (vencido)”* ou *“❌ Dígito verificador da conta bancária está ilegível”*).
-           - Após a validação rápida da IA, copie e cole os dados já filtrados e corretos nos blocos do formulário abaixo.
+        1. Acesse o **[script.google.com](https://script.google.com/)** e faça login com sua conta do Google.
+        2. Clique em **Novo Projeto** (New Project).
+        3. Apague todo o código existente lá e **cole o código abaixo**:
+        ```javascript
+        function criarFormularioPreCadastro() {
+          var form = FormApp.create('Ficha de Pré-Cadastro - Empório do Alho');
+          form.setDescription('Ficha para preenchimento de dados cadastrais. Responda com atenção.');
+          
+          // Bloco 1: Identificação e Contato
+          form.addSectionHeaderItem().setTitle('👤 Bloco 1: Identificação e Contato');
+          form.addTextItem().setTitle('Nome Completo').setRequired(true);
+          form.addDateItem().setTitle('Data de Nascimento').setRequired(true);
+          
+          var genero = form.addMultipleChoiceItem().setTitle('Gênero');
+          genero.setChoices([genero.createChoice('Masculino'), genero.createChoice('Feminino'), genero.createChoice('Outro'), genero.createChoice('Não Informar')]);
+          
+          var estadoCivil = form.addMultipleChoiceItem().setTitle('Estado Civil');
+          estadoCivil.setChoices([estadoCivil.createChoice('Solteiro(a)'), estadoCivil.createChoice('Casado(a)'), estadoCivil.createChoice('Divorciado(a)'), estadoCivil.createChoice('Viúvo(a)'), estadoCivil.createChoice('União Estável')]);
+          
+          form.addTextItem().setTitle('Nacionalidade / Naturalidade').setDefaultValue('Brasileira');
+          form.addTextItem().setTitle('Nome da Mãe');
+          form.addTextItem().setTitle('Nome do Pai');
+          form.addTextItem().setTitle('Endereço Completo (Rua/Av, Nº, Compl)');
+          form.addTextItem().setTitle('CEP');
+          form.addTextItem().setTitle('Bairro');
+          form.addTextItem().setTitle('Cidade - UF');
+          form.addTextItem().setTitle('Telefone / Celular (WhatsApp)').setRequired(true);
+          form.addTextItem().setTitle('E-mail Pessoal').setRequired(true);
+          form.addTextItem().setTitle('Contato de Emergência (Nome, Parentesco, Tel)');
+          
+          // Bloco 2: Documentos
+          form.addSectionHeaderItem().setTitle('📇 Bloco 2: Documentação');
+          form.addTextItem().setTitle('CPF / CNPJ').setRequired(true);
+          form.addTextItem().setTitle('RG (Número / Órgão / Emissão)');
+          form.addTextItem().setTitle('PIS / PASEP');
+          form.addTextItem().setTitle('CTPS (Número / Série / UF)');
+          form.addTextItem().setTitle('Título de Eleitor (Nº / Zona / Seção)');
+          form.addTextItem().setTitle('CNH (Nº / Categoria / Validade)');
+          
+          // Bloco 3: Dados Bancários
+          form.addSectionHeaderItem().setTitle('💰 Bloco 3: Dados Bancários');
+          form.addTextItem().setTitle('Banco / Agência / Conta');
+          var tipoConta = form.addMultipleChoiceItem().setTitle('Tipo de Conta');
+          tipoConta.setChoices([tipoConta.createChoice('Corrente'), tipoConta.createChoice('Salário'), tipoConta.createChoice('Poupança')]);
+          form.addTextItem().setTitle('Chave PIX');
+          
+          Logger.log('Formulário criado com sucesso!');
+          Logger.log('Link para Editar: ' + form.getEditUrl());
+        }
+        ```
+        4. Clique em **Salvar** (ícone de disquete) e depois em **Executar** (Run). *(Autorize as permissões de acesso ao seu Drive quando solicitado)*.
+        5. **Pronto!** O formulário completo foi criado em seu Google Drive. Acesse-o e, no editor do formulário, **adicione manualmente os campos do tipo "Upload de arquivo"** no final para coletar as fotos dos documentos (RG/CNH, comprovante de residência e dados bancários).
+
+        #### 2. Processamento e Crítica por IA:
+        - Cole as respostas da planilha do formulário e envie as fotos dos documentos enviados pelo colaborador no chat do **ChatGPT** ou **Claude**.
+        - Solicite a auditoria dos dados: 
+          > *"Verifique se os dados digitados coincidem com as fotos dos documentos enviados, se o comprovante de residência tem menos de 90 dias e aponte quaisquer erros."*
+
+        #### 3. Cadastro:
+        - Corrija os alertas pontuados pela IA e preencha os blocos abaixo com as informações 100% corretas.
         """)
         st.divider()
 
