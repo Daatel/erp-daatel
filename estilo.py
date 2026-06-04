@@ -152,6 +152,9 @@ def carregar_estilo():
             box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
         }
         /* --- ESTILO DA LOGO FIXADA NO TOPO DO SIDEBAR --- */
+        section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-logo-container) {
+            position: static !important;
+        }
         .sidebar-logo-container {
             position: absolute;
             top: 25px;
@@ -172,6 +175,10 @@ def carregar_estilo():
         section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {
             padding-top: 105px !important;
             background-color: #0f172a !important;
+        }
+        /* Reduz a margem de cabeçalho (padding-top) em todas as telas em 50% */
+        [data-testid="stMainBlockContainer"], .block-container {
+            padding-top: 3rem !important;
         }
     </style>
     </div>
