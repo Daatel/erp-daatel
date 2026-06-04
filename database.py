@@ -624,7 +624,8 @@ def _create_tables_internal(conn):
         instagram TEXT,
         website TEXT,
         telegram_token TEXT,
-        telegram_chat_id TEXT
+        telegram_chat_id TEXT,
+        google_forms_link TEXT
     )
     ''')
     
@@ -714,7 +715,8 @@ def _create_tables_internal(conn):
         "ALTER TABLE funcionarios ADD COLUMN vt_desconto TEXT DEFAULT 'Sem desconto'",
         "ALTER TABLE funcionarios ADD COLUMN vr_desconto TEXT DEFAULT 'Sem desconto'",
         "ALTER TABLE funcionarios ADD COLUMN equipamentos_fornecidos TEXT",
-        "ALTER TABLE funcionarios ADD COLUMN aceite_lgpd INTEGER DEFAULT 0"
+        "ALTER TABLE funcionarios ADD COLUMN aceite_lgpd INTEGER DEFAULT 0",
+        "ALTER TABLE empresa_config ADD COLUMN google_forms_link TEXT"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)

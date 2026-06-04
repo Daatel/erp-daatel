@@ -40,6 +40,38 @@ with tab_cadastro:
         """)
         st.divider()
 
+    # Seção de Envio Rápido por WhatsApp (Sem API Paga)
+    st.markdown("#### 📲 Envio de Ficha de Admissão por WhatsApp")
+    df_emp = fetch_all("SELECT google_forms_link FROM empresa_config LIMIT 1")
+    link_forms_db = ""
+    if not df_emp.empty:
+        link_forms_db = df_emp.iloc[0]['google_forms_link'] or ""
+
+    col_w1, col_w2 = st.columns(2)
+    link_forms = col_w1.text_input("Link do Google Forms da Empresa", value=link_forms_db, placeholder="https://docs.google.com/forms/d/...").strip()
+    tel_candidato = col_w2.text_input("WhatsApp do Candidato (com DDD)", placeholder="Ex: 11999998888").strip()
+
+    # Salva no banco de dados se for editado
+    if link_forms != link_forms_db:
+        run_query("UPDATE empresa_config SET google_forms_link = ?", (link_forms,))
+        link_forms_db = link_forms
+
+    import urllib.parse
+    import re
+    msg_envio = f"Olá! Para darmos início ao seu processo de admissão no Empório do Alho, por favor preencha os seus dados cadastrais e envie fotos dos seus documentos neste link: {link_forms}"
+    msg_encoded = urllib.parse.quote(msg_envio)
+    tel_limpo = re.sub(r'\D', '', tel_candidato)
+    
+    if tel_limpo:
+        if not tel_limpo.startswith('55') and len(tel_limpo) >= 10:
+            tel_limpo = '55' + tel_limpo
+        whatsapp_link = f"https://wa.me/{tel_limpo}/?text={msg_encoded}"
+        st.link_button("👉 Enviar Convite por WhatsApp", url=whatsapp_link, type="primary", use_container_width=True)
+    else:
+        st.button("👉 Enviar Convite por WhatsApp (Digite o telefone)", disabled=True, use_container_width=True)
+
+    st.divider()
+
     opc = st.radio("Ação:", ["Cadastrar Novo Colaborador", "Editar Colaborador Cadastrado"], horizontal=True, key="colab_action_radio")
     if opc == "Cadastrar Novo Colaborador":
         st.subheader("Ficha de Registro de Novo Colaborador")
