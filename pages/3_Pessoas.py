@@ -31,19 +31,31 @@ with tab_cadastro:
     # Guia de Pré-cadastro simplificado via IA & WhatsApp
     with st.expander("💡 Dica: Pré-cadastro Rápido via WhatsApp & IA", expanded=False):
         st.markdown("""
-        ### 🚀 Agilize a contratação de novos colaboradores!
-        Para evitar digitar todas as informações manualmente no ERP, você pode usar este fluxo simples de coleta e validação:
-        
-        1. **Formulário de Coleta (Google Forms)**:
-           - Crie um formulário simples no **[Google Forms](https://forms.google.com)** contendo as perguntas básicas e envie o link para o WhatsApp do colaborador preencher.
-           - Peça os dados básicos (*Nome, CPF, RG, Telefone, Endereço e Dados Bancários*) e use perguntas do tipo **Upload de arquivo** para que ele envie fotos dos documentos (RG/CNH, comprovante de residência e cartão da conta).
-        
-        2. **Auditoria por IA**:
-           - Cole as respostas e envie as fotos recebidas no chat do **ChatGPT** ou **Claude**.
-           - Peça para a IA analisar: *"Verifique se o CPF e RG digitados coincidem com as fotos, se o comprovante de residência tem menos de 90 dias e aponte inconsistências."*
-        
-        3. **Revisão e Cadastro**:
-           - Corrija os alertas pontuados pela IA e preencha os blocos correspondentes abaixo com os dados validados.
+        ### 🚀 Como funciona o fluxo de admissão integrado
+
+        Este sistema possui uma **página pública de pré-cadastro** própria — sem Google Forms, sem ferramentas externas.
+        O candidato preenche tudo pelo celular e os dados chegam diretamente aqui para revisão do RH.
+
+        ---
+
+        #### 📲 Passo 1 — Envie o link por WhatsApp
+        - Na seção abaixo, insira o **link da página de admissão** (ex: `daatel-erp.streamlit.app/Ficha_de_Admissão`).
+        - Digite o **WhatsApp do candidato** e clique em **"Enviar Convite por WhatsApp"**.
+        - O sistema abre automaticamente o WhatsApp com uma mensagem de boas-vindas já formatada e o link da ficha.
+
+        #### 📝 Passo 2 — Candidato preenche a ficha
+        - O candidato acessa a página pelo celular **sem precisar de login**.
+        - Preenche seus dados pessoais, documentos e informações bancárias.
+        - Ao concluir, os dados ficam **aguardando aprovação** neste sistema.
+
+        #### ✅ Passo 3 — RH revisa e aprova na aba "Aprovações"
+        - Acesse a aba **📥 Aprovações** ao lado.
+        - Selecione o candidato, revise os dados, complete as informações contratuais (cargo, salário, jornada, benefícios).
+        - Clique em **"✔️ APROVAR E CONTRATAR"** para incluí-lo automaticamente no quadro de funcionários ativos.
+        - Ou clique em **"❌ REJEITAR"** para arquivar o cadastro.
+
+        ---
+        > 💬 **Dica extra:** Após o candidato preencher, você pode copiar os dados exibidos na aba Aprovações e colar em um chat de IA (como ChatGPT ou Gemini) pedindo uma análise de consistência antes de aprovar.
         """)
         st.divider()
 
