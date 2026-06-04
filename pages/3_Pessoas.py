@@ -59,37 +59,33 @@ with tab_cadastro:
         """)
         st.divider()
 
-    # Seção de Envio Rápido por WhatsApp (Sem API Paga)
+    # Seção de Envio Rápido por WhatsApp
     st.markdown("#### 📲 Envio de Ficha de Admissão por WhatsApp")
-    df_emp = fetch_all("SELECT google_forms_link FROM empresa_config LIMIT 1")
-    link_forms_db = ""
-    if not df_emp.empty:
-        link_forms_db = df_emp.iloc[0]['google_forms_link'] or ""
+    st.info("🔗 Link fixo da ficha: **https://daatel-erp.streamlit.app/Ficha_de_Admissão** — Pode enviar para quantos candidatos quiser ao mesmo tempo. Cada um cria um registro separado na aba Aprovações.", icon="ℹ️")
+
+    LINK_ADMISSAO = "https://daatel-erp.streamlit.app/Ficha_de_Admi%C3%A7%C3%A3o"
 
     col_w1, col_w2 = st.columns(2)
-    link_forms = col_w1.text_input("Link do Google Forms da Empresa", value=link_forms_db, placeholder="https://docs.google.com/forms/d/...").strip()
+    nome_candidato = col_w1.text_input("Nome do Candidato (para personalizar a mensagem)", placeholder="Ex: João Silva").strip()
     tel_candidato = col_w2.text_input("WhatsApp do Candidato (com DDD)", placeholder="Ex: 11999998888").strip()
-
-    # Salva no banco de dados se for editado
-    if link_forms != link_forms_db:
-        run_query("UPDATE empresa_config SET google_forms_link = ?", (link_forms,))
-        link_forms_db = link_forms
 
     import urllib.parse
     import re
+    saudacao = f"Olá, {nome_candidato}!" if nome_candidato else "Olá! Seja muito bem-vindo(a)!"
     msg_envio = (
-        "Olá! Seja muito bem-vindo(a)!\n"
-        "Estamos muito felizes em ter você conosco e pedimos que você preencha seu cadastro.\n"
+        f"{saudacao}\n"
+        "Estamos felizes em ter você conosco e pedimos que você preencha seu cadastro.\n"
         "É bem simples e rápido! Clique no link abaixo:\n"
-        f"🔗 {link_forms}\n\n"
-        "💡 Instruções rápidas para te ajudar:\n"
-        "- Documentos em mãos: Tenha por perto seus documentos principais (RG, CPF, PIS, Comprovante de Residência recente e seus Dados Bancários/Chave PIX).\n"
-        "- Depois de terminar o formulário, envie aqui no chat fotos nítidas e legíveis dos seus documentos físicos:\n"
-        "  RG / CPF / Comprovante de Residência recente."
+        f"🔗 {LINK_ADMISSAO}\n\n"
+        "💡 Tenha em mãos:\n"
+        "- RG, CPF e PIS / PASEP\n"
+        "- Comprovante de Residência recente\n"
+        "- Dados Bancários ou Chave PIX\n\n"
+        "Qualquer dúvida, é só chamar aqui! 😊"
     )
     msg_encoded = urllib.parse.quote(msg_envio)
     tel_limpo = re.sub(r'\D', '', tel_candidato)
-    
+
     if tel_limpo:
         if not tel_limpo.startswith('55') and len(tel_limpo) >= 10:
             tel_limpo = '55' + tel_limpo
@@ -99,6 +95,7 @@ with tab_cadastro:
         st.button("👉 Enviar Convite por WhatsApp (Digite o telefone)", disabled=True, use_container_width=True)
 
     st.divider()
+
 
     opc = st.radio("Ação:", ["Cadastrar Novo Colaborador", "Editar Colaborador Cadastrado"], horizontal=True, key="colab_action_radio")
     if opc == "Cadastrar Novo Colaborador":
