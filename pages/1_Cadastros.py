@@ -980,10 +980,15 @@ with tab10:
     df_colab = fetch_all("""
         SELECT id, nome as 'Nome', cargo as 'Cargo', regime_contratacao as 'Regime', 
                salario_base as 'Salário Base (R$)', ajuda_custo as 'Ajuda de Custo (R$)', 
-               status as 'Status' 
+               data_admissao as 'Data de Início', status as 'Status' 
         FROM funcionarios
     """)
     if not df_colab.empty:
+        if 'Data de Início' in df_colab and not df_colab['Data de Início'].empty:
+            try:
+                df_colab['Data de Início'] = pd.to_datetime(df_colab['Data de Início']).dt.strftime('%d/%m/%Y')
+            except Exception:
+                pass
         export_btn(df_colab, 'colaboradores.csv')
         st.dataframe(df_colab, width="stretch", hide_index=True)
 
