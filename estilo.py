@@ -924,8 +924,11 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         z-index: 999999 !important;
         margin: 0 !important;
         padding: 0 !important;
+        width: 60px !important;
     }}
     .top-right-logout-btn button {{
+        width: 100% !important;
+        max-width: 60px !important;
         background-color: #ef4444 !important;
         color: white !important;
         border: none !important;
