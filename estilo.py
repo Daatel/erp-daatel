@@ -923,6 +923,8 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         padding: 0 !important;
         display: inline-flex !important;
         align-items: center !important;
+        justify-content: center !important;
+        height: 28px !important;
         flex-shrink: 0 !important;
     }}
     .user-badge-floating div[data-testid="stButton"] button {{
@@ -930,11 +932,14 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         color: white !important;
         border: 1px solid rgba(255, 255, 255, 0.4) !important;
         border-radius: 20px !important;
-        padding: 2px 12px !important;
+        padding: 0 12px !important;
         font-size: 11px !important;
         font-weight: 600 !important;
         height: 28px !important;
-        line-height: 22px !important;
+        line-height: 1 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 4px rgba(2, 132, 199, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
         transition: all 0.2s ease !important;
         box-sizing: border-box !important;
