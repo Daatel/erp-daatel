@@ -29,6 +29,36 @@ tab_cadastro, tab_aprovacoes, tab1, tab2, tab3, tab4 = st.tabs([
 # ======= CADASTRO DE COLABORADORES =======
 with tab_cadastro:
 
+    with st.expander("💡 Dica: Use o Cadastro Rápido via WhatsApp. Informações Aqui.", expanded=False):
+        st.markdown("""
+        ### ⚡ Cadastro Rápido — o jeito mais fácil de integrar um novo colaborador
+
+        Em vez de digitar todos os dados manualmente aqui, você pode usar a aba **⚡ Cadastro Rápido** para
+        enviar um link de autopreenchimento direto para o candidato pelo **WhatsApp**.
+
+        ---
+
+        #### 📲 Como funciona em 3 passos
+
+        **1. Vá até a aba ⚡ Cadastro Rápido**
+        - Digite o nome do candidato e o número do WhatsApp dele.
+        - Clique em **"📨 Enviar via WhatsApp"** — o sistema abre o WhatsApp com uma mensagem já pronta contendo o link da ficha de admissão.
+
+        **2. O candidato preenche pelo celular**
+        - Ele acessa a página de admissão **sem precisar de login**.
+        - Preenche os dados pessoais, documentos e informações bancárias no próprio celular.
+        - Pode ser feito enquanto está aqui na empresa ou de casa, sem papel.
+
+        **3. Você aprova na mesma aba ⚡ Cadastro Rápido**
+        - Os dados chegam automaticamente para revisão logo abaixo do botão de envio.
+        - Selecione o candidato, confira as informações, preencha os dados contratuais (cargo, salário, jornada).
+        - Clique em **"✔️ APROVAR E CONTRATAR"** — o colaborador vai direto para o quadro de ativos.
+
+        ---
+        > 💡 **Quando usar o cadastro manual desta aba?** Quando você já tem todos os dados em mãos e quer
+        > cadastrar diretamente, sem envolver o candidato no processo.
+        """)
+        st.divider()
 
     opc = st.radio("Ação:", ["Cadastrar Novo Colaborador", "Editar Colaborador Cadastrado"], horizontal=True, key="colab_action_radio")
     if opc == "Cadastrar Novo Colaborador":
