@@ -58,7 +58,16 @@ with tab_cadastro:
 
     import urllib.parse
     import re
-    msg_envio = f"Olá! Para darmos início ao seu processo de admissão no Empório do Alho, por favor preencha os seus dados cadastrais e envie fotos dos seus documentos neste link: {link_forms}"
+    msg_envio = (
+        "Olá! Seja muito bem-vindo(a)!\n"
+        "Estamos muito felizes em ter você conosco e pedimos que você preencha seu cadastro.\n"
+        "É bem simples e rápido! Clique no link abaixo:\n"
+        f"🔗 {link_forms}\n\n"
+        "💡 Instruções rápidas para te ajudar:\n"
+        "- Documentos em mãos: Tenha por perto seus documentos principais (RG, CPF, PIS, Comprovante de Residência recente e seus Dados Bancários/Chave PIX).\n"
+        "- Depois de terminar o formulário, envie aqui no chat fotos nítidas e legíveis dos seus documentos físicos:\n"
+        "  RG / CPF / Comprovante de Residência recente."
+    )
     msg_encoded = urllib.parse.quote(msg_envio)
     tel_limpo = re.sub(r'\D', '', tel_candidato)
     
