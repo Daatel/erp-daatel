@@ -21,6 +21,28 @@ tab_cadastro, tab1, tab2, tab3, tab4 = st.tabs(["📝 Cadastro de Colaboradores"
 
 # ======= CADASTRO DE COLABORADORES =======
 with tab_cadastro:
+    # Guia de Pré-cadastro simplificado via IA & WhatsApp
+    with st.expander("💡 Dica: Processo de Pré-cadastro Simplificado via WhatsApp & IA", expanded=False):
+        st.markdown("""
+        ### 🚀 Economize tempo no Registro de Colaboradores!
+        Em vez de digitar manualmente cada um dos blocos abaixo, você pode usar um fluxo semi-automatizado e gratuito:
+        
+        1. **Envie o Formulário de Coleta**:
+           - Envie o link de um formulário padrão (**Google Forms** ou **Microsoft Forms**) para o WhatsApp do novo colaborador.
+           - O colaborador preenche as informações em minutos e anexa fotos dos documentos necessários (RG, CPF, Comprovante de Residência, Cartão do Banco).
+        
+        2. **Processamento e Crítica por IA**:
+           - Abra o **ChatGPT** (criando um *Custom GPT*) ou o **Claude** (criando um *Project*).
+           - Envie a planilha de respostas do formulário e as fotos dos documentos enviados pelo colaborador para o chat.
+           - Instrua a IA a auditar os dados. Exemplo de comando: 
+             > *"Analise as imagens e as respostas fornecidas. Verifique se o CPF e RG batem com os documentos, se o comprovante de residência tem menos de 90 dias e se os dados bancários estão legíveis. Aponte qualquer divergência e estruture os dados prontos para o cadastro."*
+        
+        3. **Revisão e Cadastro**:
+           - A IA listará as críticas (ex: *“⚠️ Comprovante de residência é de 2024 (vencido)”* ou *“❌ Dígito verificador da conta bancária está ilegível”*).
+           - Após a validação rápida da IA, copie e cole os dados já filtrados e corretos nos blocos do formulário abaixo.
+        """)
+        st.divider()
+
     opc = st.radio("Ação:", ["Cadastrar Novo Colaborador", "Editar Colaborador Cadastrado"], horizontal=True, key="colab_action_radio")
     if opc == "Cadastrar Novo Colaborador":
         st.subheader("Ficha de Registro de Novo Colaborador")
