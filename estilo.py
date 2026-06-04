@@ -722,6 +722,11 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
             return;
         }
 
+        // SALVA DADOS DE LOGIN NO SESSIONSTORAGE PARA PERSISTÊNCIA NA MEMÓRIA DO NAVEGADOR
+        sessionStorage.setItem('logged_email', emailVal);
+        sessionStorage.setItem('logged_password', senhaVal);
+        sessionStorage.setItem('last_active', Date.now().toString());
+
         const nativeForm = getNativeForm();
         if (!nativeForm) {
             console.error('[LOGIN] Formulário nativo Streamlit NÃO encontrado!');
@@ -774,17 +779,40 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
         if (doc.getElementById('custom-login-form')) {
             disableNativeAutofill();
 
-            // Limpa qualquer valor autofill dos inputs customizados
             const customEmail = doc.getElementById('custom-email');
             const customSenha = doc.getElementById('custom-password');
             if (customEmail) {
                 customEmail.setAttribute('autocomplete', 'off');
-                customEmail.value = '';
             }
             if (customSenha) {
                 customSenha.setAttribute('autocomplete', 'new-password');
-                customSenha.value = '';
             }
+
+            // AUTO-LOGIN COM DADOS SALVOS EM SESSIONSTORAGE (60 MIN TIMEOUT)
+            const savedEmail = sessionStorage.getItem('logged_email');
+            const savedPassword = sessionStorage.getItem('logged_password');
+            const lastActive = sessionStorage.getItem('last_active');
+
+            if (savedEmail && savedPassword && lastActive) {
+                const TIMEOUT_MS = 60 * 60 * 1000; // 60 minutos
+                const idleTime = Date.now() - parseInt(lastActive, 10);
+                if (idleTime < TIMEOUT_MS) {
+                    console.log('[LOGIN] Auto-login detectado (inativo há ' + Math.round(idleTime/1000) + 's)');
+                    sessionStorage.setItem('last_active', Date.now().toString());
+                    if (customEmail) customEmail.value = savedEmail;
+                    if (customSenha) customSenha.value = savedPassword;
+                    setTimeout(submitLoginForm, 200);
+                    return;
+                } else {
+                    console.log('[LOGIN] Sessão em sessionStorage expirada.');
+                    sessionStorage.removeItem('logged_email');
+                    sessionStorage.removeItem('logged_password');
+                    sessionStorage.removeItem('last_active');
+                }
+            }
+
+            if (customEmail) customEmail.value = '';
+            if (customSenha) customSenha.value = '';
 
             console.log('[LOGIN] Setup completo!');
         } else {
@@ -824,4 +852,178 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
 })();
 </script>
 """, height=0, scrolling=False)
+
+
+def carregar_cabecalho_usuario(logged_user, user_role):
+    # Iniciais do nome
+    names = [n for n in logged_user.split() if n]
+    if len(names) >= 2:
+        initials = (names[0][0] + names[-1][0]).upper()
+    elif names:
+        initials = names[0][:2].upper()
+    else:
+        initials = "US"
+
+    st.markdown(f"""
+    <style>
+    .user-badge-floating {{
+        position: fixed !important;
+        top: 8px !important;
+        right: 80px !important;
+        z-index: 999998 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        background-color: rgba(15, 23, 42, 0.85) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        padding: 4px 85px 4px 10px !important;
+        border-radius: 30px !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25) !important;
+        height: 38px !important;
+        box-sizing: border-box !important;
+    }}
+    .user-avatar {{
+        width: 24px !important;
+        height: 24px !important;
+        background: linear-gradient(135deg, #01743d, #0284c7) !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-size: 11px !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        flex-shrink: 0 !important;
+    }}
+    .user-details {{
+        display: flex !important;
+        flex-direction: column !important;
+        line-height: 1.1 !important;
+        justify-content: center !important;
+    }}
+    .user-name {{
+        color: #f1f5f9 !important;
+        font-weight: 600 !important;
+        font-size: 12px !important;
+        white-space: nowrap !important;
+    }}
+    .user-role {{
+        color: #94a3b8 !important;
+        font-size: 9px !important;
+        font-weight: 500 !important;
+        text-transform: uppercase !important;
+    }}
+    /* Estiliza o botão de logout nativo do Streamlit */
+    div[data-element-id="logout_btn"] {{
+        position: fixed !important;
+        top: 13px !important;
+        right: 90px !important;
+        z-index: 999999 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }}
+    div[data-element-id="logout_btn"] button {{
+        background-color: #ef4444 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 20px !important;
+        padding: 2px 10px !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        height: 24px !important;
+        line-height: 20px !important;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2) !important;
+        transition: all 0.2s ease !important;
+        box-sizing: border-box !important;
+    }}
+    div[data-element-id="logout_btn"] button:hover {{
+        background-color: #dc2626 !important;
+        transform: scale(1.05) !important;
+        border: none !important;
+        color: white !important;
+    }}
+    </style>
+    <div class="user-badge-floating">
+        <div class="user-avatar">{initials}</div>
+        <div class="user-details">
+            <span class="user-name">{logged_user}</span>
+            <span class="user-role">{user_role}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def limpar_session_storage_js():
+    import streamlit.components.v1 as components
+    components.html("""
+<script>
+    sessionStorage.removeItem('logged_email');
+    sessionStorage.removeItem('logged_password');
+    sessionStorage.removeItem('last_active');
+    console.log('[SESSION] sessionStorage limpo com sucesso.');
+</script>
+""", height=0)
+
+
+def carregar_rastreador_inatividade():
+    import streamlit.components.v1 as components
+    components.html("""
+<script>
+(function() {
+    const doc = window.parent.document;
+    const TIMEOUT_MS = 60 * 60 * 1000; // 60 minutos em milissegundos
+    
+    // Atualiza a última atividade no sessionStorage
+    function registrarAtividade() {
+        sessionStorage.setItem('last_active', Date.now().toString());
+    }
+    
+    // Configura os escutadores de eventos para detectar interação do usuário
+    doc.addEventListener('mousemove', registrarAtividade);
+    doc.addEventListener('mousedown', registrarAtividade);
+    doc.addEventListener('keypress', registrarAtividade);
+    doc.addEventListener('scroll', registrarAtividade);
+    doc.addEventListener('touchstart', registrarAtividade);
+    
+    // Registra a atividade inicial na carga da página
+    if (!sessionStorage.getItem('last_active')) {
+        registrarAtividade();
+    }
+    
+    // Verifica inatividade periodicamente (a cada 10 segundos)
+    const checkInterval = setInterval(function() {
+        const lastActive = parseInt(sessionStorage.getItem('last_active') || "0", 10);
+        if (lastActive > 0) {
+            const idleTime = Date.now() - lastActive;
+            if (idleTime >= TIMEOUT_MS) {
+                console.log('[SESSION] Inatividade detectada! Expulso por timeout de 60 minutos.');
+                clearInterval(checkInterval);
+                
+                // Limpa os dados de login
+                sessionStorage.removeItem('logged_email');
+                sessionStorage.removeItem('logged_password');
+                sessionStorage.removeItem('last_active');
+                
+                // Procura e clica no botão "Sair" do Streamlit
+                const buttons = doc.querySelectorAll('button');
+                let clicked = false;
+                for (let btn of buttons) {
+                    if (btn.textContent && btn.textContent.trim() === 'Sair') {
+                        btn.click();
+                        clicked = true;
+                        break;
+                    }
+                }
+                if (!clicked) {
+                    window.parent.location.reload();
+                }
+            }
+        }
+    }, 10000);
+})();
+</script>
+""", height=0)
 

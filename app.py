@@ -196,6 +196,10 @@ def login_form_page():
 
 
 if not st.session_state['logged_user']:
+    if 'just_logged_out' in st.session_state and st.session_state['just_logged_out']:
+        from estilo import limpar_session_storage_js
+        limpar_session_storage_js()
+        st.session_state['just_logged_out'] = False
     pg = st.navigation([st.Page(login_form_page, title="Login", icon="🔐")])
     pg.run()
     st.stop()
@@ -256,12 +260,19 @@ else:
 
 pg = st.navigation(pages_dict)
 
-st.sidebar.markdown(f"### 👤 {st.session_state['logged_user']}")
-st.sidebar.markdown(f"**Cargo:** {st.session_state['user_role']}")
-if st.sidebar.button("Sair / Logout", use_container_width=True):
+# Cabeçalho flutuante no topo direito com dados do usuário
+from estilo import carregar_cabecalho_usuario, carregar_rastreador_inatividade
+carregar_cabecalho_usuario(st.session_state['logged_user'], st.session_state['user_role'])
+
+# Botão de Logout invisível (reposicionado no topo direito sobre o badge via CSS)
+if st.button("Sair", key="logout_btn"):
     st.session_state['logged_user'] = None
     st.session_state['user_role'] = None
+    st.session_state['just_logged_out'] = True
     st.rerun()
+
+# Rastreador de inatividade em background (60 minutos)
+carregar_rastreador_inatividade()
 
 # Run the selected page
 pg.run()
