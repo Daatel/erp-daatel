@@ -917,15 +917,15 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         text-transform: uppercase !important;
     }}
     /* Estiliza o botão de logout nativo do Streamlit */
-    div[data-element-id="logout_btn"] {{
+    .top-right-logout-btn {{
         position: fixed !important;
-        top: 13px !important;
+        top: 15px !important;
         right: 90px !important;
         z-index: 999999 !important;
         margin: 0 !important;
         padding: 0 !important;
     }}
-    div[data-element-id="logout_btn"] button {{
+    .top-right-logout-btn button {{
         background-color: #ef4444 !important;
         color: white !important;
         border: none !important;
@@ -939,7 +939,7 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         transition: all 0.2s ease !important;
         box-sizing: border-box !important;
     }}
-    div[data-element-id="logout_btn"] button:hover {{
+    .top-right-logout-btn button:hover {{
         background-color: #dc2626 !important;
         transform: scale(1.05) !important;
         border: none !important;
@@ -954,6 +954,28 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+    import streamlit.components.v1 as components
+    components.html("""
+<script>
+(function() {
+    const doc = window.parent.document;
+    function setupLogoutButton() {
+        const buttons = doc.querySelectorAll('div[data-testid="stButton"] button');
+        for (let btn of buttons) {
+            if (btn.textContent && btn.textContent.trim() === 'Sair') {
+                const wrapper = btn.closest('div[data-testid="stButton"]');
+                if (wrapper && !wrapper.classList.contains('top-right-logout-btn')) {
+                    wrapper.classList.add('top-right-logout-btn');
+                }
+            }
+        }
+    }
+    setupLogoutButton();
+    setInterval(setupLogoutButton, 500);
+})();
+</script>
+""", height=0)
 
 
 def limpar_session_storage_js():
