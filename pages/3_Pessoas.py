@@ -22,74 +22,21 @@ tab_cadastro, tab1, tab2, tab3, tab4 = st.tabs(["📝 Cadastro de Colaboradores"
 # ======= CADASTRO DE COLABORADORES =======
 with tab_cadastro:
     # Guia de Pré-cadastro simplificado via IA & WhatsApp
-    with st.expander("💡 Dica: Processo de Pré-cadastro Simplificado via WhatsApp & IA", expanded=False):
+    with st.expander("💡 Dica: Pré-cadastro Rápido via WhatsApp & IA", expanded=False):
         st.markdown("""
-        ### 🚀 Economize tempo no Registro de Colaboradores!
-        Para evitar digitar manualmente todos os blocos abaixo, você pode usar este fluxo automatizado e gratuito:
+        ### 🚀 Agilize a contratação de novos colaboradores!
+        Para evitar digitar todas as informações manualmente no ERP, você pode usar este fluxo simples de coleta e validação:
         
-        #### 1. Crie seu Formulário no Google Drive instantaneamente:
-        Como o Google Forms impede a criação direta de formulários por aplicativos externos sem login, você pode **gerar o seu próprio formulário em 5 segundos** usando o código do Google Apps Script abaixo:
+        1. **Formulário de Coleta (Google Forms)**:
+           - Crie um formulário simples no **[Google Forms](https://forms.google.com)** contendo as perguntas básicas e envie o link para o WhatsApp do colaborador preencher.
+           - Peça os dados básicos (*Nome, CPF, RG, Telefone, Endereço e Dados Bancários*) e use perguntas do tipo **Upload de arquivo** para que ele envie fotos dos documentos (RG/CNH, comprovante de residência e cartão da conta).
         
-        1. Acesse o **[script.google.com](https://script.google.com/)** e faça login com sua conta do Google.
-        2. Clique em **Novo Projeto** (New Project).
-        3. Apague todo o código existente lá e **cole o código abaixo**:
-        ```javascript
-        function criarFormularioPreCadastro() {
-          var form = FormApp.create('Ficha de Pré-Cadastro - Empório do Alho');
-          form.setDescription('Ficha para preenchimento de dados cadastrais. Responda com atenção.');
-          
-          // Bloco 1: Identificação e Contato
-          form.addSectionHeaderItem().setTitle('👤 Bloco 1: Identificação e Contato');
-          form.addTextItem().setTitle('Nome Completo').setRequired(true);
-          form.addDateItem().setTitle('Data de Nascimento').setRequired(true);
-          
-          var genero = form.addMultipleChoiceItem().setTitle('Gênero');
-          genero.setChoices([genero.createChoice('Masculino'), genero.createChoice('Feminino'), genero.createChoice('Outro'), genero.createChoice('Não Informar')]);
-          
-          var estadoCivil = form.addMultipleChoiceItem().setTitle('Estado Civil');
-          estadoCivil.setChoices([estadoCivil.createChoice('Solteiro(a)'), estadoCivil.createChoice('Casado(a)'), estadoCivil.createChoice('Divorciado(a)'), estadoCivil.createChoice('Viúvo(a)'), estadoCivil.createChoice('União Estável')]);
-          
-          form.addTextItem().setTitle('Nacionalidade / Naturalidade').setDefaultValue('Brasileira');
-          form.addTextItem().setTitle('Nome da Mãe');
-          form.addTextItem().setTitle('Nome do Pai');
-          form.addTextItem().setTitle('Endereço Completo (Rua/Av, Nº, Compl)');
-          form.addTextItem().setTitle('CEP');
-          form.addTextItem().setTitle('Bairro');
-          form.addTextItem().setTitle('Cidade - UF');
-          form.addTextItem().setTitle('Telefone / Celular (WhatsApp)').setRequired(true);
-          form.addTextItem().setTitle('E-mail Pessoal').setRequired(true);
-          form.addTextItem().setTitle('Contato de Emergência (Nome, Parentesco, Tel)');
-          
-          // Bloco 2: Documentos
-          form.addSectionHeaderItem().setTitle('📇 Bloco 2: Documentação');
-          form.addTextItem().setTitle('CPF / CNPJ').setRequired(true);
-          form.addTextItem().setTitle('RG (Número / Órgão / Emissão)');
-          form.addTextItem().setTitle('PIS / PASEP');
-          form.addTextItem().setTitle('CTPS (Número / Série / UF)');
-          form.addTextItem().setTitle('Título de Eleitor (Nº / Zona / Seção)');
-          form.addTextItem().setTitle('CNH (Nº / Categoria / Validade)');
-          
-          // Bloco 3: Dados Bancários
-          form.addSectionHeaderItem().setTitle('💰 Bloco 3: Dados Bancários');
-          form.addTextItem().setTitle('Banco / Agência / Conta');
-          var tipoConta = form.addMultipleChoiceItem().setTitle('Tipo de Conta');
-          tipoConta.setChoices([tipoConta.createChoice('Corrente'), tipoConta.createChoice('Salário'), tipoConta.createChoice('Poupança')]);
-          form.addTextItem().setTitle('Chave PIX');
-          
-          Logger.log('Formulário criado com sucesso!');
-          Logger.log('Link para Editar: ' + form.getEditUrl());
-        }
-        ```
-        4. Clique em **Salvar** (ícone de disquete) e depois em **Executar** (Run). *(Autorize as permissões de acesso ao seu Drive quando solicitado)*.
-        5. **Pronto!** O formulário completo foi criado em seu Google Drive. Acesse-o e, no editor do formulário, **adicione manualmente os campos do tipo "Upload de arquivo"** no final para coletar as fotos dos documentos (RG/CNH, comprovante de residência e dados bancários).
-
-        #### 2. Processamento e Crítica por IA:
-        - Cole as respostas da planilha do formulário e envie as fotos dos documentos enviados pelo colaborador no chat do **ChatGPT** ou **Claude**.
-        - Solicite a auditoria dos dados: 
-          > *"Verifique se os dados digitados coincidem com as fotos dos documentos enviados, se o comprovante de residência tem menos de 90 dias e aponte quaisquer erros."*
-
-        #### 3. Cadastro:
-        - Corrija os alertas pontuados pela IA e preencha os blocos abaixo com as informações 100% corretas.
+        2. **Auditoria por IA**:
+           - Cole as respostas e envie as fotos recebidas no chat do **ChatGPT** ou **Claude**.
+           - Peça para a IA analisar: *"Verifique se o CPF e RG digitados coincidem com as fotos, se o comprovante de residência tem menos de 90 dias e aponte inconsistências."*
+        
+        3. **Revisão e Cadastro**:
+           - Corrija os alertas pontuados pela IA e preencha os blocos correspondentes abaixo com os dados validados.
         """)
         st.divider()
 
