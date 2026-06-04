@@ -17,7 +17,14 @@ st.title("👥 Pessoas e Folha de Pagamento")
 
 df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%'")
 
-tab_cadastro, tab1, tab2, tab3, tab4 = st.tabs(["📝 Cadastro de Colaboradores", "Visão Geral (Quadro)", "Folha de Pagamento", "💎 Central de Comissões", "🖨️ Extrato Mensal do Vendedor"])
+tab_cadastro, tab_aprovacoes, tab1, tab2, tab3, tab4 = st.tabs([
+    "📝 Cadastro de Colaboradores", 
+    "📥 Aprovações", 
+    "Visão Geral (Quadro)", 
+    "Folha de Pagamento", 
+    "💎 Central de Comissões", 
+    "🖨️ Extrato Mensal do Vendedor"
+])
 
 # ======= CADASTRO DE COLABORADORES =======
 with tab_cadastro:
@@ -373,6 +380,161 @@ with tab_cadastro:
                             )
                             st.success("Modificações salvas com sucesso!")
                             import time; time.sleep(1); st.rerun()
+
+# ======= APROVAÇÕES DE PRÉ-CADASTRO =======
+with tab_aprovacoes:
+    st.subheader("📥 Aprovação de Pré-Cadastros de Colaboradores")
+    st.caption("Revise os dados enviados pelos candidatos, preencha as informações contratuais e aprove para inseri-los no quadro de funcionários.")
+    
+    # Busca pré-cadastros com status 'PENDENTE'
+    df_pendentes = fetch_all("SELECT id, nome, criado_em FROM pre_cadastros WHERE status = 'PENDENTE' ORDER BY criado_em DESC")
+    
+    if df_pendentes.empty:
+        st.info("Nenhum pré-cadastro pendente para aprovação no momento.")
+    else:
+        # Dicionário de candidatos para o selectbox
+        cand_opts = {f"{r['nome']} (Enviado em: {pd.to_datetime(r['criado_em']).strftime('%d/%m/%Y %H:%M')})": r['id'] for _, r in df_pendentes.iterrows()}
+        cand_sel = st.selectbox("Selecione o Candidato para Revisão:", list(cand_opts.keys()))
+        cand_id = cand_opts[cand_sel]
+        
+        # Carrega todos os dados do candidato selecionado
+        df_cand_data = fetch_all("SELECT * FROM pre_cadastros WHERE id = ?", (cand_id,))
+        if not df_cand_data.empty:
+            cand = df_cand_data.iloc[0]
+            
+            with st.form("form_aprovar_admissao"):
+                st.markdown("### 👤 1. Dados Pessoais e de Contato (Enviados pelo Candidato)")
+                col1, col2 = st.columns(2)
+                c_nome = col1.text_input("Nome Completo *", value=cand['nome'] or "")
+                c_nascimento = col2.date_input("Data de Nascimento", value=pd.to_datetime(cand['data_nascimento']).date() if cand['data_nascimento'] else date(1995, 1, 1), format="DD/MM/YYYY")
+                
+                col3, col4, col5 = st.columns(3)
+                c_genero = col3.selectbox("Gênero", ["Não Informar", "Masculino", "Feminino", "Outro"], index=["Não Informar", "Masculino", "Feminino", "Outro"].index(cand['genero'] or "Não Informar"))
+                c_estado_civil = col4.selectbox("Estado Civil", ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"], index=["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"].index(cand['estado_civil'] or "Solteiro(a)"))
+                c_nacionalidade = col5.text_input("Nacionalidade / Naturalidade", value=cand['nacionalidade_naturalidade'] or "Brasileira")
+                
+                col6, col7 = st.columns(2)
+                c_nome_mae = col6.text_input("Nome da Mãe", value=cand['nome_mae'] or "")
+                c_nome_pai = col7.text_input("Nome do Pai", value=cand['nome_pai'] or "")
+                
+                col8, col9 = st.columns([3, 1])
+                c_endereco = col8.text_input("Endereço Completo", value=cand['endereco'] or "")
+                c_cep = col9.text_input("CEP", value=cand['cep'] or "")
+                
+                col10, col11, col12 = st.columns(3)
+                c_bairro = col10.text_input("Bairro", value=cand['bairro'] or "")
+                c_cidade_uf = col11.text_input("Cidade - UF", value=cand['cidade_uf'] or "")
+                c_telefone = col12.text_input("Telefone / WhatsApp *", value=cand['telefone'] or "")
+                
+                c_email = st.text_input("E-mail Pessoal *", value=cand['email'] or "")
+                c_contato_emergencia = st.text_input("Contato de Emergência", value=cand['contato_emergencia'] or "")
+                
+                st.markdown("### 📇 2. Documentação e eSocial (Enviados pelo Candidato)")
+                col13, col14, col15 = st.columns(3)
+                c_cnpj_cpf = col13.text_input("CPF *", value=cand['cnpj_cpf'] or "")
+                c_rg = col14.text_input("RG", value=cand['rg'] or "")
+                c_pis_pasep = col15.text_input("PIS / PASEP", value=cand['pis_pasep'] or "")
+                
+                col16, col17, col18 = st.columns(3)
+                c_ctps = col16.text_input("CTPS", value=cand['ctps'] or "")
+                c_titulo_eleitor = col17.text_input("Título de Eleitor", value=cand['titulo_eleitor'] or "")
+                c_cnh = col18.text_input("CNH", value=cand['cnh'] or "")
+                
+                st.markdown("### 💰 3. Dados Bancários e Dependentes (Enviados pelo Candidato)")
+                col19, col20, col21 = st.columns(3)
+                c_dados_bancarios = col19.text_input("Banco, Agência e Conta", value=cand['dados_bancarios'] or "")
+                c_tipo_conta = col20.selectbox("Tipo de Conta", ["Corrente", "Salário", "Poupança"], index=["Corrente", "Salário", "Poupança"].index(cand['tipo_conta'] or "Corrente"))
+                c_chave_pix = col21.text_input("Chave PIX", value=cand['chave_pix'] or "")
+                
+                col22, col23 = st.columns(2)
+                c_dependente1 = col22.text_input("Dependente 1", value=cand['dependente1'] or "")
+                c_dependente2 = col23.text_input("Dependente 2", value=cand['dependente2'] or "")
+                
+                st.markdown("### 👔 4. Dados Contratuais e Benefícios (Preenchido pelo RH)")
+                col24, col25, col26 = st.columns(3)
+                c_cargo = col24.selectbox("Cargo / Função *", ["Operário", "Vendedor", "Gerente", "Administrativo", "Representante Comercial"], key="aprov_cargo")
+                c_departamento = col25.text_input("Departamento / Área", value="Produção", key="aprov_dept").strip()
+                c_regime = col26.selectbox("Regime de Contratação *", ["CLT", "PJ", "Estágio", "Autônomo", "Diarista", "Outro"], key="aprov_regime")
+                
+                col27, col28, col29 = st.columns(3)
+                c_modelo_trabalho = col27.selectbox("Modelo de Trabalho", ["Presencial", "Híbrido", "Remoto"], key="aprov_modelo")
+                c_admissao = col28.date_input("Data de Admissão", value=date.today(), format="DD/MM/YYYY", key="aprov_adm")
+                c_termino = col29.date_input("Data de Término (Opcional)", value=None, format="DD/MM/YYYY", key="aprov_term")
+                
+                col30, col31, col32 = st.columns(3)
+                c_carga_horaria = col30.text_input("Carga Horária Semanal", value="44h", key="aprov_carga")
+                c_horario_trabalho = col31.text_input("Horário de Trabalho", value="08:00 às 18:00", key="aprov_horario")
+                c_escala = col32.text_input("Dias da Semana / Escala", value="Segunda a Sexta", key="aprov_escala")
+                
+                st.markdown("💸 **Remuneração e Benefícios**")
+                col33, col34 = st.columns(2)
+                c_salario = col33.number_input("Remuneração Fixa (R$) *", min_value=0.0, step=100.0, key="aprov_sal")
+                c_adicionais = col34.multiselect("Adicionais Legais", ["Não aplicável", "Periculosidade", "Insalubridade", "Noturno"], default=["Não aplicável"], key="aprov_adicionais")
+                c_adicionais_str = ",".join(c_adicionais)
+                
+                col35, col36 = st.columns(2)
+                c_comissionamento = col35.selectbox("Comissionamento?", ["Não", "Sim"], key="aprov_comiss")
+                c_comissao_regra = col36.text_input("Regra de Comissão (Se Sim)", key="aprov_comregra")
+                
+                col37, col38, col39 = st.columns(3)
+                c_gatilho_com = col37.text_input("Gatilho e Pagamento", key="aprov_gatcom")
+                c_bonus = col38.text_input("Bônus / Premiações", key="aprov_bonus")
+                c_adiantamento = col39.text_input("Política de Adiantamento", key="aprov_valem")
+                
+                col40, col41 = st.columns(2)
+                c_val_transp = col40.number_input("Vale Transporte / Combustível Mensal (R$)", min_value=0.0, step=10.0, key="aprov_vt")
+                c_vt_desc = col41.selectbox("Desconto Vale Transporte", ["Sem desconto", "Com desconto"], key="aprov_vtdesc")
+                
+                col42, col43 = st.columns(2)
+                c_val_refei = col42.number_input("Vale Alimentação / Refeição Diário (R$)", min_value=0.0, step=1.0, key="aprov_vr")
+                c_vr_desc = col43.selectbox("Desconto Refeição / Alimentação", ["Sem desconto", "Com desconto"], key="aprov_vrdesc")
+                
+                c_ajuda_custo = st.number_input("Ajuda de Custo Mensal (R$)", min_value=0.0, step=50.0, key="aprov_ajuda")
+                c_equipamentos = st.multiselect("Equipamentos Fornecidos", ["Notebook", "Celular", "Acesso a ERP/CRM", "Uniforme"], key="aprov_equip")
+                c_equipamentos_str = ",".join(c_equipamentos)
+                
+                col_btn1, col_btn2 = st.columns(2)
+                aprovar = col_btn1.form_submit_button("✔️ APROVAR E CONTRATAR", type="primary", use_container_width=True)
+                rejeitar = col_btn2.form_submit_button("❌ REJEITAR CADASTRO", use_container_width=True)
+                
+                if aprovar:
+                    if not c_nome:
+                        st.error("Por favor, preencha o Nome Completo.")
+                    elif not c_cnpj_cpf:
+                        st.error("Por favor, preencha o CPF.")
+                    elif not c_telefone:
+                        st.error("Por favor, preencha o Telefone.")
+                    elif not c_email:
+                        st.error("Por favor, preencha o E-mail.")
+                    elif c_salario <= 0.0:
+                        st.error("Por favor, preencha a Remuneração Fixa.")
+                    else:
+                        # Insere o colaborador no quadro oficial de funcionários
+                        comiss_int = 1 if c_comissionamento == "Sim" else 0
+                        run_query(
+                            """INSERT INTO funcionarios 
+                               (nome, cargo, salario_base, regime_contratacao, data_admissao, data_nascimento, ajuda_custo, status, data_termino, cnpj_cpf, telefone, email, valor_transporte, valor_refeicao,
+                                genero, estado_civil, nacionalidade_naturalidade, nome_mae, nome_pai, endereco, bairro, cidade_uf, cep, contato_emergencia, rg, pis_pasep, ctps, titulo_eleitor, cnh,
+                                dados_bancarios, tipo_conta, chave_pix, dependente1, dependente2, departamento, modelo_trabalho, carga_horaria_semanal, horario_trabalho, escala_trabalho,
+                                adicionais_legais, comissionamento, comissao_regra, gatilho_pagamento_comissao, bonus_premiacao, politica_adiantamento, vt_desconto, vr_desconto, equipamentos_fornecidos, aceite_lgpd) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?, 'ATIVO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)""",
+                            (c_nome, c_cargo, c_salario, c_regime, c_admissao, c_nascimento, c_ajuda_custo, c_termino, c_cnpj_cpf, c_telefone, c_email, c_val_transp, c_val_refei,
+                             c_genero, c_estado_civil, c_nacionalidade, c_nome_mae, c_nome_pai, c_endereco, c_bairro, c_cidade_uf, c_cep, c_contato_emergencia, c_rg, c_pis_pasep, c_ctps, c_titulo_eleitor, c_cnh,
+                             c_dados_bancarios, c_tipo_conta, c_chave_pix, c_dependente1, c_dependente2, c_departamento, c_modelo_trabalho, c_carga_horaria, c_horario_trabalho, c_escala,
+                             c_adicionais_str, comiss_int, c_comissao_regra, c_gatilho_com, c_bonus, c_adiantamento, c_vt_desc, c_vr_desc, c_equipamentos_str)
+                        )
+                        
+                        # Atualiza o status do pré-cadastro para APROVADO
+                        run_query("UPDATE pre_cadastros SET status = 'APROVADO' WHERE id = ?", (cand_id,))
+                        
+                        st.success(f"Sucesso! {c_nome} foi oficialmente contratado(a) e adicionado(a) ao quadro de funcionários.")
+                        import time; time.sleep(1.5); st.rerun()
+                        
+                if rejeitar:
+                    # Marca o pré-cadastro como REJEITADO
+                    run_query("UPDATE pre_cadastros SET status = 'REJEITADO' WHERE id = ?", (cand_id,))
+                    st.warning("O pré-cadastro selecionado foi rejeitado e arquivado.")
+                    import time; time.sleep(1.5); st.rerun()
 
 # ======= QUADRO DE COLABORADORES =======
 with tab1:

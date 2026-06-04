@@ -195,12 +195,14 @@ def login_form_page():
     """, unsafe_allow_html=True)
 
 
+p_admissao = st.Page("public_pages/Admissao.py", title="Ficha de Admissão", icon="📝")
+
 if not st.session_state['logged_user']:
     if 'just_logged_out' in st.session_state and st.session_state['just_logged_out']:
         from estilo import limpar_session_storage_js
         limpar_session_storage_js()
         st.session_state['just_logged_out'] = False
-    pg = st.navigation([st.Page(login_form_page, title="Login", icon="🔐")])
+    pg = st.navigation([st.Page(login_form_page, title="Login", icon="🔐"), p_admissao])
     pg.run()
     st.stop()
 

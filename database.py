@@ -629,6 +629,41 @@ def _create_tables_internal(conn):
     )
     ''')
     
+    # 27. Pré-cadastro de Colaboradores
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS pre_cadastros (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        data_nascimento DATE,
+        genero TEXT,
+        estado_civil TEXT,
+        nacionalidade_naturalidade TEXT,
+        nome_mae TEXT,
+        nome_pai TEXT,
+        endereco TEXT,
+        bairro TEXT,
+        cidade_uf TEXT,
+        cep TEXT,
+        telefone TEXT,
+        email TEXT,
+        contato_emergencia TEXT,
+        cnpj_cpf TEXT,
+        rg TEXT,
+        pis_pasep TEXT,
+        ctps TEXT,
+        titulo_eleitor TEXT,
+        cnh TEXT,
+        dados_bancarios TEXT,
+        tipo_conta TEXT,
+        chave_pix TEXT,
+        dependente1 TEXT,
+        dependente2 TEXT,
+        status TEXT DEFAULT 'PENDENTE',
+        aceite_lgpd INTEGER DEFAULT 0,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
     # Inserir empresa padrão se não existir
     cursor.execute("SELECT COUNT(*) FROM empresa_config")
     if cursor.fetchone()[0] == 0:
@@ -716,7 +751,8 @@ def _create_tables_internal(conn):
         "ALTER TABLE funcionarios ADD COLUMN vr_desconto TEXT DEFAULT 'Sem desconto'",
         "ALTER TABLE funcionarios ADD COLUMN equipamentos_fornecidos TEXT",
         "ALTER TABLE funcionarios ADD COLUMN aceite_lgpd INTEGER DEFAULT 0",
-        "ALTER TABLE empresa_config ADD COLUMN google_forms_link TEXT"
+        "ALTER TABLE empresa_config ADD COLUMN google_forms_link TEXT",
+        "ALTER TABLE pre_cadastros ADD COLUMN aceite_lgpd INTEGER DEFAULT 0"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)
