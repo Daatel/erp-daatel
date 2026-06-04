@@ -878,7 +878,7 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         backdrop-filter: blur(12px) !important;
         -webkit-backdrop-filter: blur(12px) !important;
         border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        padding: 6px 12px 6px 10px !important;
+        padding: 6px 12px 6px 10px !important; /* Estreito e simétrico, botão será inserido aqui */
         border-radius: 22px !important;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25) !important;
         height: 44px !important;
@@ -917,22 +917,28 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         font-weight: 500 !important;
         text-transform: uppercase !important;
     }}
-    /* Estiliza o botão de logout contido dentro do card flutuante */
-    .user-badge-floating div[data-testid="stButton"] {{
+    /* Oculta o botão na árvore original para evitar desalinhar antes de ser movido */
+    div[data-element-id="logout_btn"] {{
+        display: none !important;
+    }}
+    /* Mostra e estiliza o botão quando ele for movido para dentro da cápsula flutuante */
+    .user-badge-floating div[data-element-id="logout_btn"] {{
+        display: inline-flex !important;
         margin: 0 !important;
         padding: 0 !important;
-        display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
         height: 28px !important;
         flex-shrink: 0 !important;
     }}
-    .user-badge-floating div[data-testid="stButton"] button {{
+    .user-badge-floating div[data-element-id="logout_btn"] button {{
+        width: 100% !important;
+        max-width: 55px !important;
         background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%) !important;
         color: white !important;
         border: 1px solid rgba(255, 255, 255, 0.4) !important;
         border-radius: 20px !important;
-        padding: 0 12px !important;
+        padding: 0 10px !important;
         font-size: 11px !important;
         font-weight: 600 !important;
         height: 28px !important;
@@ -940,16 +946,15 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 4px rgba(2, 132, 199, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 6px rgba(2, 132, 199, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2) !important;
         transition: all 0.2s ease !important;
         box-sizing: border-box !important;
-        width: auto !important;
         margin: 0 !important;
     }}
-    .user-badge-floating div[data-testid="stButton"] button:hover {{
+    .user-badge-floating div[data-element-id="logout_btn"] button:hover {{
         background: linear-gradient(180deg, #0284c7 0%, #025a87 100%) !important;
         transform: translateY(-1px) !important;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 3px 8px rgba(2, 132, 199, 0.4), 0 1px 2px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 10px rgba(2, 132, 199, 0.4), 0 2px 4px rgba(0, 0, 0, 0.15) !important;
         border: 1px solid rgba(255, 255, 255, 0.35) !important;
         color: white !important;
     }}
@@ -961,32 +966,19 @@ def carregar_cabecalho_usuario(logged_user, user_role):
             <span class="user-role">{user_role}</span>
         </div>
     </div>
-    """, unsafe_allow_html=True)
-
-    import streamlit.components.v1 as components
-    components.html("""
-<script>
-(function() {
-    const doc = window.parent.document;
-    function setupLogoutButton() {
-        const badge = doc.querySelector('.user-badge-floating');
-        if (!badge) return;
-
-        const buttons = doc.querySelectorAll('div[data-testid="stButton"] button');
-        for (let btn of buttons) {
-            if (btn.textContent && btn.textContent.trim() === 'Sair') {
-                const wrapper = btn.closest('div[data-testid="stButton"]');
-                if (wrapper && wrapper.parentElement !== badge) {
+    <img src="x" onerror="
+        if (!window._logoutObserverActive) {{
+            window._logoutObserverActive = true;
+            setInterval(function() {{
+                const badge = document.querySelector('.user-badge-floating');
+                const wrapper = document.querySelector('div[data-element-id=\\'logout_btn\\']');
+                if (badge && wrapper && wrapper.parentElement !== badge) {{
                     badge.appendChild(wrapper);
-                }
-            }
-        }
-    }
-    setupLogoutButton();
-    setInterval(setupLogoutButton, 500);
-})();
-</script>
-""", height=0)
+                }}
+            }}, 200);
+        }}
+    " style="display:none;">
+    """, unsafe_allow_html=True)
 
 
 def limpar_session_storage_js():
