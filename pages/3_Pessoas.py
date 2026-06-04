@@ -18,83 +18,16 @@ st.title("👥 Pessoas e Folha de Pagamento")
 df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%'")
 
 tab_cadastro, tab_aprovacoes, tab1, tab2, tab3, tab4 = st.tabs([
-    "📝 Cadastro de Colaboradores", 
-    "📥 Aprovações", 
-    "Visão Geral (Quadro)", 
-    "Folha de Pagamento", 
-    "💎 Central de Comissões", 
+    "📝 Cadastro de Colaboradores",
+    "⚡ Cadastro Rápido",
+    "Visão Geral (Quadro)",
+    "Folha de Pagamento",
+    "💎 Central de Comissões",
     "🖨️ Extrato Mensal do Vendedor"
 ])
 
 # ======= CADASTRO DE COLABORADORES =======
 with tab_cadastro:
-    # Guia de Pré-cadastro simplificado via IA & WhatsApp
-    with st.expander("💡 Dica: Pré-cadastro Rápido via WhatsApp & IA", expanded=False):
-        st.markdown("""
-        ### 🚀 Como funciona o fluxo de admissão integrado
-
-        Este sistema possui uma **página pública de pré-cadastro** própria — sem Google Forms, sem ferramentas externas.
-        O candidato preenche tudo pelo celular e os dados chegam diretamente aqui para revisão do RH.
-
-        ---
-
-        #### 📲 Passo 1 — Envie o link por WhatsApp
-        - Na seção abaixo, insira o **link da página de admissão** (ex: `daatel-erp.streamlit.app/Ficha_de_Admissão`).
-        - Digite o **WhatsApp do candidato** e clique em **"Enviar Convite por WhatsApp"**.
-        - O sistema abre automaticamente o WhatsApp com uma mensagem de boas-vindas já formatada e o link da ficha.
-
-        #### 📝 Passo 2 — Candidato preenche a ficha
-        - O candidato acessa a página pelo celular **sem precisar de login**.
-        - Preenche seus dados pessoais, documentos e informações bancárias.
-        - Ao concluir, os dados ficam **aguardando aprovação** neste sistema.
-
-        #### ✅ Passo 3 — RH revisa e aprova na aba "Aprovações"
-        - Acesse a aba **📥 Aprovações** ao lado.
-        - Selecione o candidato, revise os dados, complete as informações contratuais (cargo, salário, jornada, benefícios).
-        - Clique em **"✔️ APROVAR E CONTRATAR"** para incluí-lo automaticamente no quadro de funcionários ativos.
-        - Ou clique em **"❌ REJEITAR"** para arquivar o cadastro.
-
-        ---
-        > 💬 **Dica extra:** Após o candidato preencher, você pode copiar os dados exibidos na aba Aprovações e colar em um chat de IA (como ChatGPT ou Gemini) pedindo uma análise de consistência antes de aprovar.
-        """)
-        st.divider()
-
-    # Seção de Envio Rápido por WhatsApp
-    st.markdown("#### 📲 Envio de Ficha de Admissão por WhatsApp")
-    st.info("🔗 Link fixo da ficha: **https://daatel-erp.streamlit.app/Ficha_de_Admissão** — Pode enviar para quantos candidatos quiser ao mesmo tempo. Cada um cria um registro separado na aba Aprovações.", icon="ℹ️")
-
-    LINK_ADMISSAO = "https://daatel-erp.streamlit.app/Ficha_de_Admi%C3%A7%C3%A3o"
-
-    col_w1, col_w2 = st.columns(2)
-    nome_candidato = col_w1.text_input("Nome do Candidato (para personalizar a mensagem)", placeholder="Ex: João Silva").strip()
-    tel_candidato = col_w2.text_input("WhatsApp do Candidato (com DDD)", placeholder="Ex: 11999998888").strip()
-
-    import urllib.parse
-    import re
-    saudacao = f"Olá, {nome_candidato}!" if nome_candidato else "Olá! Seja muito bem-vindo(a)!"
-    msg_envio = (
-        f"{saudacao}\n"
-        "Estamos felizes em ter você conosco e pedimos que você preencha seu cadastro.\n"
-        "É bem simples e rápido! Clique no link abaixo:\n"
-        f"🔗 {LINK_ADMISSAO}\n\n"
-        "💡 Tenha em mãos:\n"
-        "- RG, CPF e PIS / PASEP\n"
-        "- Comprovante de Residência recente\n"
-        "- Dados Bancários ou Chave PIX\n\n"
-        "Qualquer dúvida, é só chamar aqui! 😊"
-    )
-    msg_encoded = urllib.parse.quote(msg_envio)
-    tel_limpo = re.sub(r'\D', '', tel_candidato)
-
-    if tel_limpo:
-        if not tel_limpo.startswith('55') and len(tel_limpo) >= 10:
-            tel_limpo = '55' + tel_limpo
-        whatsapp_link = f"https://wa.me/{tel_limpo}/?text={msg_encoded}"
-        st.link_button("👉 Enviar Convite por WhatsApp", url=whatsapp_link, type="primary", use_container_width=True)
-    else:
-        st.button("👉 Enviar Convite por WhatsApp (Digite o telefone)", disabled=True, use_container_width=True)
-
-    st.divider()
 
 
     opc = st.radio("Ação:", ["Cadastrar Novo Colaborador", "Editar Colaborador Cadastrado"], horizontal=True, key="colab_action_radio")
@@ -390,9 +323,47 @@ with tab_cadastro:
                             st.success("Modificações salvas com sucesso!")
                             import time; time.sleep(1); st.rerun()
 
-# ======= APROVAÇÕES DE PRÉ-CADASTRO =======
+# ======= CADASTRO RÁPIDO =======
+import urllib.parse
+import re
+
+LINK_ADMISSAO = "https://daatel-erp.streamlit.app/Ficha_de_Admi%C3%A7%C3%A3o"
+
 with tab_aprovacoes:
-    st.subheader("📥 Aprovação de Pré-Cadastros de Colaboradores")
+    # --- Bloco de envio WhatsApp compacto ---
+    st.markdown("#### 📲 Enviar Ficha de Admissão por WhatsApp")
+    cw1, cw2, cw3 = st.columns([3, 3, 2])
+    _nome_cand = cw1.text_input("Nome do candidato", placeholder="Ex: João Silva", label_visibility="visible", key="cad_rap_nome").strip()
+    _tel_cand  = cw2.text_input("WhatsApp (com DDD)", placeholder="Ex: 11999998888", label_visibility="visible", key="cad_rap_tel").strip()
+
+    _saudacao = f"Olá, {_nome_cand}!" if _nome_cand else "Olá! Seja muito bem-vindo(a)!"
+    _msg = (
+        f"{_saudacao}\n"
+        "Estamos felizes em ter você conosco e pedimos que você preencha seu cadastro.\n"
+        "É bem simples e rápido! Clique no link abaixo:\n"
+        f"🔗 {LINK_ADMISSAO}\n\n"
+        "💡 Tenha em mãos:\n"
+        "- RG, CPF e PIS / PASEP\n"
+        "- Comprovante de Residência recente\n"
+        "- Dados Bancários ou Chave PIX\n\n"
+        "Qualquer dúvida, é só chamar aqui! 😊"
+    )
+    _tel_limpo = re.sub(r'\D', '', _tel_cand)
+    if _tel_limpo and not _tel_limpo.startswith('55') and len(_tel_limpo) >= 10:
+        _tel_limpo = '55' + _tel_limpo
+    _wa_link = f"https://wa.me/{_tel_limpo}/?text={urllib.parse.quote(_msg)}" if _tel_limpo else None
+
+    with cw3:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)  # alinha verticalmente com inputs
+        if _wa_link:
+            st.link_button("📨 Enviar via WhatsApp", url=_wa_link, type="primary", use_container_width=True)
+        else:
+            st.button("📨 Enviar via WhatsApp", disabled=True, use_container_width=True, key="cad_rap_btn_dis")
+
+    st.divider()
+
+    # --- Painel de aprovação de pré-cadastros ---
+    st.subheader("📋 Pré-Cadastros Aguardando Aprovação")
     st.caption("Revise os dados enviados pelos candidatos, preencha as informações contratuais e aprove para inseri-los no quadro de funcionários.")
     
     # Busca pré-cadastros com status 'PENDENTE'
