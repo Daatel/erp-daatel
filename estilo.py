@@ -934,23 +934,21 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         align-items: center !important;
         justify-content: center !important;
         height: 28px !important;
+        width: 36px !important; /* Formato de cápsula pequena */
         flex-shrink: 0 !important;
         box-sizing: border-box !important;
     }}
     .user-badge-floating div[data-element-id="logout_btn"] button,
     .user-badge-floating div[data-testid="stButton"] button {{
-        width: 100% !important;
-        max-width: 55px !important;
+        width: 36px !important;
+        height: 28px !important;
         background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%) !important;
-        color: white !important;
+        color: transparent !important; /* Oculta o texto 'Sair' */
+        font-size: 0 !important; /* Oculta o texto */
         border: 1px solid #0284c7 !important;
         border-bottom: 3px solid #014c73 !important; /* Efeito 3D no Botão */
         border-radius: 14px !important;
-        padding: 0 10px !important;
-        font-size: 11px !important;
-        font-weight: 700 !important;
-        height: 28px !important;
-        line-height: 1 !important;
+        padding: 0 !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -959,16 +957,22 @@ def carregar_cabecalho_usuario(logged_user, user_role):
         box-sizing: border-box !important;
         margin: 0 !important;
         cursor: pointer !important;
+        
+        /* Ícone de Logout (porta e seta) */
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'%3E%3C/path%3E%3Cpolyline points='16 17 21 12 16 7'%3E%3C/polyline%3E%3Cline x1='21' y1='12' x2='9' y2='12'%3E%3C/line%3E%3C/svg%3E") !important;
+        background-repeat: no-repeat !important;
+        background-position: center !important;
+        background-size: 14px !important;
     }}
-    /* Corrige qualquer parágrafo ou markdown interno gerado pelo Streamlit */
+    /* Oculta qualquer texto e corrige parágrafo interno gerado pelo Streamlit */
     .user-badge-floating div[data-element-id="logout_btn"] button *,
     .user-badge-floating div[data-testid="stButton"] button * {{
         margin: 0 !important;
         padding: 0 !important;
-        line-height: 1 !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
+        font-size: 0 !important;
+        color: transparent !important;
+        line-height: 0 !important;
+        display: none !important;
     }}
     .user-badge-floating div[data-element-id="logout_btn"] button:hover,
     .user-badge-floating div[data-testid="stButton"] button:hover {{
@@ -998,12 +1002,12 @@ def carregar_cabecalho_usuario(logged_user, user_role):
                 const badge = document.querySelector('.user-badge-floating');
                 if (!badge) return;
                 
-                let wrapper = document.querySelector('div[data-element-id=\\'logout_btn\\']');
+                let wrapper = document.querySelector('div[data-element-id=logout_btn]');
                 if (!wrapper) {{
-                    const buttons = document.querySelectorAll('div[data-testid=\\'stButton\\'] button');
+                    const buttons = document.querySelectorAll('div[data-testid=stButton] button');
                     for (let btn of buttons) {{
                         if (btn.textContent && btn.textContent.trim() === 'Sair') {{
-                            wrapper = btn.closest('div[data-testid=\\'stButton\\']');
+                            wrapper = btn.closest('div[data-testid=stButton]');
                             break;
                         }}
                     }}
