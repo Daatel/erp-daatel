@@ -151,13 +151,13 @@ def carregar_estilo():
             border-bottom: 1px solid #014c73 !important;
             box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
         }
-        /* --- ESTILO DA LOGO FIXADA NO TOPO DO SIDEBAR --- */
-        section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-logo-container) {
+        /* --- ESTILO DA LOGO E IDENTIFICAÇÃO FIXADAS NO TOPO DO SIDEBAR --- */
+        section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-top-container) {
             position: static !important;
         }
-        .sidebar-logo-container {
+        .sidebar-top-container {
             position: absolute;
-            top: 25px;
+            top: 20px;
             left: 0;
             right: 0;
             text-align: center;
@@ -169,11 +169,28 @@ def carregar_estilo():
             max-width: 100%;
             height: auto;
             object-fit: contain;
-            max-height: 80px;
+            max-height: 75px;
+        }
+        .sidebar-user-id {
+            margin-top: 8px;
+            line-height: 1.3;
+            text-align: center;
+        }
+        .sidebar-user-id .user-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+        .sidebar-user-id .user-role {
+            font-size: 10px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            font-weight: 500;
+            letter-spacing: 0.5px;
         }
         /* Empurra o menu de navegação nativo para baixo */
         section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {
-            padding-top: 105px !important;
+            padding-top: 165px !important;
             background-color: #0f172a !important;
         }
         /* Reduz a margem de cabeçalho (padding-top) em todas as telas em 50% */

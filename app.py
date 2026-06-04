@@ -207,15 +207,23 @@ if not st.session_state['logged_user']:
 # --- ROTEAMENTO COM ST.NAVIGATION (SINGLE TASK) ---
 with st.sidebar:
     logo_path = Path(__file__).parent / "logo.png"
+    encoded_logo = ""
     if logo_path.exists():
         import base64
         with open(logo_path, "rb") as img_file:
             encoded_logo = base64.b64encode(img_file.read()).decode()
-        st.markdown(f"""
-        <div class="sidebar-logo-container">
-            <img src="data:image/png;base64,{encoded_logo}" class="sidebar-logo-img" alt="Logo">
+    
+    logo_html = f'<img src="data:image/png;base64,{encoded_logo}" class="sidebar-logo-img" alt="Logo">' if encoded_logo else ""
+    
+    st.markdown(f"""
+    <div class="sidebar-top-container">
+        {logo_html}
+        <div class="sidebar-user-id">
+            <div class="user-name">{st.session_state.get('logged_user', 'Usuário')}</div>
+            <div class="user-role">{st.session_state.get('user_role', 'CARGO')}</div>
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
 p_dash = st.Page("pages/0_Dashboard.py", title="Painel Executivo", icon="📊", default=True)
 p_cadastros = st.Page("pages/1_Cadastros.py", title="Cadastros Básicos", icon="📝")
@@ -280,12 +288,6 @@ carregar_rastreador_inatividade()
 with st.sidebar:
     st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
     st.markdown("---")
-    st.markdown(f"""
-    <div style="padding: 2px 0px 8px 0px; line-height: 1.3;">
-        <div style="font-size: 13px; font-weight: 600; color: #f1f5f9;">{st.session_state['logged_user']}</div>
-        <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 500; letter-spacing: 0.5px;">{st.session_state['user_role']}</div>
-    </div>
-    """, unsafe_allow_html=True)
     if st.button("Sair", key="logout_btn", use_container_width=True):
         st.session_state['logged_user'] = None
         st.session_state['user_role'] = None
