@@ -57,6 +57,7 @@ def carregar_estilo():
         section[data-testid="stSidebar"] {
             background-color: #0f172a !important; /* Slate 900 */
             border-right: 1px solid #1e293b !important;
+            position: relative !important;
         }
         section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {
             background-color: #0f172a !important;
@@ -149,6 +150,28 @@ def carregar_estilo():
             transform: translateY(1px) !important;
             border-bottom: 1px solid #014c73 !important;
             box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+        }
+        /* --- ESTILO DA LOGO FIXADA NO TOPO DO SIDEBAR --- */
+        .sidebar-logo-container {
+            position: absolute;
+            top: 25px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            padding: 0 20px;
+            z-index: 99;
+            background-color: #0f172a; /* Slate 900 */
+        }
+        .sidebar-logo-img {
+            max-width: 100%;
+            height: auto;
+            object-fit: contain;
+            max-height: 80px;
+        }
+        /* Empurra o menu de navegação nativo para baixo */
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {
+            padding-top: 105px !important;
+            background-color: #0f172a !important;
         }
     </style>
     </div>

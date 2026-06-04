@@ -208,8 +208,14 @@ if not st.session_state['logged_user']:
 with st.sidebar:
     logo_path = Path(__file__).parent / "logo.png"
     if logo_path.exists():
-        st.image(str(logo_path), use_container_width=True)
-        st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+        import base64
+        with open(logo_path, "rb") as img_file:
+            encoded_logo = base64.b64encode(img_file.read()).decode()
+        st.markdown(f"""
+        <div class="sidebar-logo-container">
+            <img src="data:image/png;base64,{encoded_logo}" class="sidebar-logo-img" alt="Logo">
+        </div>
+        """, unsafe_allow_html=True)
 
 p_dash = st.Page("pages/0_Dashboard.py", title="Painel Executivo", icon="📊", default=True)
 p_cadastros = st.Page("pages/1_Cadastros.py", title="Cadastros Básicos", icon="📝")
