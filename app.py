@@ -195,7 +195,7 @@ def login_form_page():
     """, unsafe_allow_html=True)
 
 
-p_admissao = st.Page("public_pages/Admissao.py", title="Ficha de Admissão", icon="📝")
+p_admissao = st.Page("public_pages/Admissao.py", title="Ficha de Admissao", icon="📝")
 
 if not st.session_state['logged_user']:
     if 'just_logged_out' in st.session_state and st.session_state['just_logged_out']:

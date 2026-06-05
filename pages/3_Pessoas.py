@@ -357,7 +357,7 @@ with tab_cadastro:
 import urllib.parse
 import re
 
-LINK_ADMISSAO = "https://daatel-erp.streamlit.app/Ficha_de_Admi%C3%A7%C3%A3o"
+LINK_ADMISSAO = "https://daatel-erp.streamlit.app/Ficha_de_Admissao"
 
 with tab_aprovacoes:
     # --- Bloco de envio WhatsApp compacto ---
@@ -586,7 +586,7 @@ with tab1:
         st.info("Nenhum colaborador encontrado com este filtro.")
 
 # ======= HELPER: CÁLCULOS DE FOLHA =======
-def _calc_folha(sal_base, ajuda, outros, vt_bruto, vt_desc_flag, vr_diario, vr_desc_flag, dias, regime, faltas=0):
+def _calc_folha(sal_base, ajuda, outros, vt_bruto, vt_desc_flag, vr_diario, vr_desc_flag, dias, regime, faltas=0, adiantamento=0.0):
     desc_faltas = round((sal_base / 30.0) * faltas, 2)
     desc_dsr = round((sal_base / 30.0) * faltas, 2) if regime == 'CLT' else 0.0
     bruto = max(0.0, sal_base - desc_faltas - desc_dsr + ajuda + outros)
@@ -621,13 +621,13 @@ def _calc_folha(sal_base, ajuda, outros, vt_bruto, vt_desc_flag, vr_diario, vr_d
     vr_liq   = max(0.0, vr_bruto - desc_vr)
     
     encargo  = round(0.28 * bruto, 2) if regime == 'CLT' else 0.0
-    liq_func = max(0.0, bruto - inss - irrf - desc_vt - desc_vr)
-    custo    = round(liq_func + vt_bruto + vr_bruto + encargo, 2)
+    liq_func = max(0.0, bruto - inss - irrf - desc_vt - desc_vr - adiantamento)
+    custo    = round(liq_func + adiantamento + vt_bruto + vr_bruto + encargo, 2)
     return dict(bruto=round(bruto,2), inss=round(inss,2), irrf=round(irrf,2),
                 desc_vt=round(desc_vt,2), vt_liq=round(vt_liq,2),
                 desc_vr=round(desc_vr,2), vr_liq=round(vr_liq,2), vr_bruto=round(vr_bruto,2),
                 encargo=round(encargo,2), liquido_func=round(liq_func,2), custo_empresa=custo,
-                desconto_faltas=desc_faltas, desconto_dsr=desc_dsr)
+                desconto_faltas=desc_faltas, desconto_dsr=desc_dsr, adiantamento=round(adiantamento,2))
 
 # ======= PAGAMENTO =======
 with tab2:
@@ -637,7 +637,8 @@ with tab2:
     df_func2 = fetch_all("""
         SELECT id, nome, salario_base, ajuda_custo, outros_valor,
                regime_contratacao, valor_transporte, valor_refeicao,
-               vt_desconto, vr_desconto, cnpj_cpf, dados_bancarios, chave_pix
+               vt_desconto, vr_desconto, cnpj_cpf, dados_bancarios, chave_pix,
+               politica_adiantamento
         FROM funcionarios
         WHERE status='ATIVO' AND regime_contratacao NOT IN ('PJ', 'Autônomo')
     """)
@@ -680,16 +681,18 @@ with tab2:
                 dias_trab = col_days.number_input("Dias Previstos", min_value=1, max_value=31, value=22, step=1)
                 faltas = col_faltas.number_input("Faltas (Dias)", min_value=0, max_value=31, value=0, step=1)
                 
-                # Recalcula com valores provisórios/editados da tela
-                _f_calc = _calc_folha(sal_base, ajuda, outros, base_vt, db_vt_desc, base_vr_d, db_vr_desc, dias_trab, emp_regime, faltas)
+                # Recalcula com valores provisórios/editados da tela (adiantamento inicial = 0.0)
+                _f_calc = _calc_folha(sal_base, ajuda, outros, base_vt, db_vt_desc, base_vr_d, db_vr_desc, dias_trab, emp_regime, faltas, 0.0)
                 
-                col_vt, col_vr, col_enc = st.columns(3)
-                vt_pago    = col_vt.number_input("Vale Transporte / Combustível (R$)", min_value=0.0, value=_f_calc['vt_liq'], step=10.0)
-                vr_pago    = col_vr.number_input("Vale Refeição / Alimentação (R$)", min_value=0.0, value=_f_calc['vr_bruto'], step=10.0)
+                col_vt, col_vr, col_adiant, col_enc = st.columns(4)
+                vt_pago    = col_vt.number_input("Vale Transporte (R$)", min_value=0.0, value=_f_calc['vt_liq'], step=10.0)
+                vr_pago    = col_vr.number_input("Vale Refeição (R$)", min_value=0.0, value=_f_calc['vr_bruto'], step=10.0)
+                adiant_pago = col_adiant.number_input("Adiantamento (Vale) (R$)", min_value=0.0, value=0.0, step=50.0)
                 custo_previ= col_enc.number_input("Encargo Patronal (R$)", min_value=0.0, value=_f_calc['encargo'], step=10.0)
                 
-                # O total desembolsado pela empresa desconta as faltas, DSR e os descontos de VT/VR recolhidos em folha
-                valor_total = max(0.0, sal_base - _f_calc['desconto_faltas'] - _f_calc['desconto_dsr'] - _f_calc['desc_vt'] - _f_calc['desc_vr']) + ajuda + outros + vt_pago + vr_pago + custo_previ
+                # O total desembolsado pela empresa desconta as faltas, DSR, descontos de VT/VR recolhidos em folha e desconta o adiantamento (pois já foi pago no meio do mês)
+                _f_calc = _calc_folha(sal_base, ajuda, outros, vt_pago, db_vt_desc, base_vr_d, db_vr_desc, dias_trab, emp_regime, faltas, adiant_pago)
+                valor_total = max(0.0, sal_base - _f_calc['desconto_faltas'] - _f_calc['desconto_dsr'] - _f_calc['desc_vt'] - _f_calc['desc_vr'] - adiant_pago) + ajuda + outros + vt_pago + vr_pago + custo_previ + adiant_pago
                 if emp_regime == 'CLT':
                     st.info(
                         f"**Demonstrativo do Colaborador (CLT):**\n"
@@ -701,28 +704,29 @@ with tab2:
                         f"- Desconto IRRF: -R$ {_f_calc['irrf']:,.2f}\n"
                         f"- Desconto VT (6%): -R$ {_f_calc['desc_vt']:,.2f}\n"
                         f"- Desconto VR (20%): -R$ {_f_calc['desc_vr']:,.2f}\n"
+                        f"- Desconto Adiantamento (Vale): -R$ {_f_calc['adiantamento']:,.2f}\n"
                         f"**Salário Líquido Estimado a Receber:** R$ {_f_calc['liquido_func']:,.2f}"
                     )
-                st.info(f"**Total Desembolsado pelo Caixa da Empresa:** R$ {valor_total:,.2f}")
+                st.info(f"**Total Desembolsado pelo Caixa da Empresa (Fechamento):** R$ {valor_total:,.2f}")
                 if st.form_submit_button("Registrar Pagamento"):
                     if valor_total > 0:
-                        _f_final = _calc_folha(sal_base, ajuda, outros, vt_pago, db_vt_desc, base_vr_d, db_vr_desc, dias_trab, emp_regime, faltas)
+                        _f_final = _calc_folha(sal_base, ajuda, outros, vt_pago, db_vt_desc, base_vr_d, db_vr_desc, dias_trab, emp_regime, faltas, adiant_pago)
                         run_query(
                             """INSERT INTO rh_pagamentos
                                (funcionario_id, data_pagamento, mes_referencia, salario_base_pago,
                                 passagem, refeicao, custo_previdenciario, valor_total_pago,
-                                desc_inss, desc_irrf, desc_vt, desc_vr, valor_liquido_funcionario, tipo_fechamento,
-                                faltas, desconto_faltas, desconto_dsr)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INDIVIDUAL', ?, ?, ?)""",
+                                desc_inss, desc_irrf, desc_vt, desc_vr, valor_liquido_funcionario,
+                                tipo_fechamento, faltas, desconto_faltas, desconto_dsr, adiantamento)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INDIVIDUAL', ?, ?, ?, ?)""",
                             (func_dict[nome_pgto], data_pgto, mes_ref, sal_base,
                              vt_pago + ajuda + outros, vr_pago, custo_previ, valor_total,
                              _f_final['inss'], _f_final['irrf'], _f_final['desc_vt'], _f_final['desc_vr'], _f_final['liquido_func'],
-                             faltas, _f_final['desconto_faltas'], _f_final['desconto_dsr'])
+                             faltas, _f_final['desconto_faltas'], _f_final['desconto_dsr'], _f_final['adiantamento'])
                         )
                         run_query(
                             "INSERT INTO fluxo_caixa (data, tipo, categoria, valor, descricao) VALUES (?, ?, ?, ?, ?)",
                             (data_pgto, "Saída", "Folha de Pagamento", valor_total,
-                             f"Pagamento Rem. Fixa e Benefícios ({mes_ref}) - {nome_pgto} ({faltas} faltas)")
+                             f"Pagamento Rem. Fixa e Benefícios ({mes_ref}) - {nome_pgto} ({faltas} faltas, {adiant_pago} vale)")
                         )
                         st.success("Pagamento lançado com sucesso e adicionado ao fluxo de caixa!")
                         import time; time.sleep(1); st.rerun()
@@ -737,6 +741,7 @@ with tab2:
                        COALESCE(p.desconto_dsr, 0.0) as "Dedução DSR (R$)",
                        COALESCE(p.desc_vt, 0.0) as "Desc. VT (R$)",
                        COALESCE(p.desc_vr, 0.0) as "Desc. VR (R$)",
+                       COALESCE(p.adiantamento, 0.0) as "Vale (Adiant.) (R$)",
                        p.passagem as "Ajuda/Outros", p.refeicao as "Refeicao",
                        p.custo_previdenciario as "Encargos", p.valor_total_pago as "Total Pago (R$)",
                        COALESCE(p.tipo_fechamento, 'INDIVIDUAL') as "Tipo"
@@ -754,6 +759,24 @@ with tab2:
     with subtab_lote:
         st.markdown("#### 📊 Fechamento Mensal em Lote")
         st.caption("Calcule a folha de todos os colaboradores ativos, ajuste o que precisar e feche o mês com um clique.")
+
+        def _get_default_adiantamento(sal_base, politica):
+            if not politica:
+                return 0.0
+            p_str = str(politica).strip().lower()
+            if '40%' in p_str or '40' in p_str:
+                return round(sal_base * 0.40, 2)
+            import re
+            numeros = re.findall(r'\d+(?:\.\d+)?', p_str.replace(',', '.'))
+            if numeros:
+                try:
+                    val = float(numeros[0])
+                    if val < 1.0:
+                        return round(sal_base * val, 2)
+                    return val
+                except ValueError:
+                    pass
+            return 0.0
 
         if df_func2.empty:
             st.warning("Nenhum colaborador CLT ou Diarista ativo cadastrado.")
@@ -774,6 +797,9 @@ with tab2:
                 _data = st.session_state['lote_data_pgto']
                 _dias = st.session_state['lote_dias_pad']
 
+                df_exist = fetch_all("SELECT 1 FROM rh_pagamentos WHERE mes_referencia = ? LIMIT 1", (_mes,))
+                ja_fechado = not df_exist.empty
+
                 # Monta dados da folha
                 rows = []
                 for _, r in df_func2.iterrows():
@@ -785,8 +811,10 @@ with tab2:
                     vtf = str(r['vt_desconto'] or 'Sem desconto')
                     vrf = str(r['vr_desconto'] or 'Sem desconto')
                     reg = str(r['regime_contratacao'] or 'CLT')
+                    politica = r.get('politica_adiantamento', '') or ''
+                    adiant_padrao = _get_default_adiantamento(sal, politica)
                     # Faltas padrão inicial = 0
-                    f   = _calc_folha(sal, ajd, out, vtb, vtf, vrd, vrf, _dias, reg, 0)
+                    f   = _calc_folha(sal, ajd, out, vtb, vtf, vrd, vrf, _dias, reg, 0, adiant_padrao)
                     rows.append({
                         '_id':          int(r['id']),
                         'Nome':         str(r['nome']),
@@ -796,6 +824,7 @@ with tab2:
                         'Chave PIX':    str(r['chave_pix']     or ''),
                         'Dias':         _dias,
                         'Faltas':       0,
+                        'Vale':         adiant_padrao,
                         'DSR Desc.':    f['desconto_dsr'],
                         'Desc. VT':     f['desc_vt'],
                         'Desc. VR':     f['desc_vr'],
@@ -813,10 +842,11 @@ with tab2:
                         '_vr_desc':     vrf,
                         '_vt_bruto':    vtb,
                         '_vr_diario':   vrd,
+                        '_politica_adiant': politica,
                     })
 
                 df_lote = pd.DataFrame(rows)
-                col_edit = ['Dias', 'Faltas', 'Rem. Fixa', 'Ajuda Custo', 'VT Liq.', 'VR']
+                col_edit = ['Dias', 'Faltas', 'Rem. Fixa', 'Ajuda Custo', 'Vale', 'VT Liq.', 'VR']
                 col_calc = ['DSR Desc.', 'Desc. VT', 'Desc. VR', 'Bruto', 'INSS', 'IRRF', 'Liq. Func.', 'Enc. Patronal', 'Custo Empresa']
                 col_info = ['Nome', 'Regime', 'CPF', 'Banco/Ag/Cc', 'Chave PIX']
 
@@ -828,14 +858,15 @@ with tab2:
                 col_cfg['Chave PIX']  = st.column_config.TextColumn("Chave PIX", disabled=True)
                 col_cfg['Dias']       = st.column_config.NumberColumn("Dias", min_value=1, max_value=31, step=1, width="small")
                 col_cfg['Faltas']     = st.column_config.NumberColumn("Faltas", min_value=0, max_value=31, step=1, width="small")
+                col_cfg['Vale']       = st.column_config.NumberColumn("Vale", min_value=0.0, format="R$ %.2f")
                 for c in ['Rem. Fixa', 'Ajuda Custo', 'VT Liq.', 'VR']:
                     col_cfg[c] = st.column_config.NumberColumn(c, format="R$ %.2f")
                 for c in col_calc:
                     col_cfg[c] = st.column_config.NumberColumn(c, format="R$ %.2f", disabled=True)
 
-                st.markdown("**✏️ Colunas editáveis:** Dias, Faltas, Rem. Fixa, Ajuda Custo, VT e VR — Desconto de Faltas/DSR/Vales, INSS/IRRF recalculados automaticamente.")
+                st.markdown("**✏️ Colunas editáveis:** Dias, Faltas, Rem. Fixa, Ajuda Custo, Vale, VT e VR — Desconto de Faltas/DSR/Vales, INSS/IRRF recalculados automaticamente.")
                 df_editado = st.data_editor(
-                    df_lote.drop(columns=['_id', '_vt_desc', '_vr_desc', '_vt_bruto', '_vr_diario']),
+                    df_lote.drop(columns=['_id', '_vt_desc', '_vr_desc', '_vt_bruto', '_vr_diario', '_politica_adiant']),
                     column_config=col_cfg,
                     disabled=col_info + col_calc,
                     hide_index=True,
@@ -853,12 +884,13 @@ with tab2:
                     vr_e  = float(row['VR'])
                     dias_e= int(row['Dias'])
                     faltas_e = int(row['Faltas'])
+                    adiant_e = float(row['Vale'])
                     reg_e = str(orig['Regime'])
                     
                     vt_desc_flag = str(orig['_vt_desc'])
                     vr_desc_flag = str(orig['_vr_desc'])
                     
-                    f2    = _calc_folha(sal_e, ajd_e, 0, vt_e, vt_desc_flag, vr_e / max(1, dias_e - faltas_e), vr_desc_flag, dias_e, reg_e, faltas_e)
+                    f2    = _calc_folha(sal_e, ajd_e, 0, vt_e, vt_desc_flag, vr_e / max(1, dias_e - faltas_e), vr_desc_flag, dias_e, reg_e, faltas_e, adiant_e)
                     liq_e = f2['liquido_func']
                     rows_final.append({
                         '_id': int(orig['_id']), 'nome': str(orig['Nome']),
@@ -871,7 +903,8 @@ with tab2:
                         'desc_dsr': f2['desconto_dsr'],
                         'desc_vt': f2['desc_vt'],
                         'desc_vr': f2['desc_vr'],
-                        'bruto': f2['bruto']
+                        'bruto': f2['bruto'],
+                        'adiantamento': adiant_e
                     })
 
                 total_liq   = sum(r['liq']  for r in rows_final)
@@ -896,11 +929,12 @@ with tab2:
                                         salario_base_pago, passagem, refeicao, custo_previdenciario,
                                         valor_total_pago, desc_inss, desc_irrf, desc_vt, desc_vr,
                                         valor_liquido_funcionario, tipo_fechamento,
-                                        faltas, desconto_faltas, desconto_dsr)
-                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'LOTE', ?, ?, ?)""",
+                                        faltas, desconto_faltas, desconto_dsr, adiantamento)
+                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'LOTE', ?, ?, ?, ?)""",
                                     (r['_id'], _data, _mes, r['sal'],
                                      r['vt'] + r['ajuda'], r['vr'], r['enc'], r['custo'],
-                                     r['inss'], r['irrf'], r['desc_vt'], r['desc_vr'], r['liq'], r['faltas'], r['desc_faltas'], r['desc_dsr'])
+                                     r['inss'], r['irrf'], r['desc_vt'], r['desc_vr'], r['liq'],
+                                     r['faltas'], r['desc_faltas'], r['desc_dsr'], r['adiantamento'])
                                 )
                             run_query(
                                 "INSERT INTO fluxo_caixa (data, tipo, categoria, valor, descricao) VALUES (?, ?, ?, ?, ?)",
@@ -919,6 +953,7 @@ with tab2:
                                  'Faltas': r['faltas'],
                                  'Desconto_Faltas_R$': f"{r['desc_faltas']:.2f}".replace('.',','),
                                  'Desconto_DSR_R$':    f"{r['desc_dsr']:.2f}".replace('.',','),
+                                 'Vale_Adiantamento_R$': f"{r['adiantamento']:.2f}".replace('.',','),
                                  'Desconto_VT_R$':     f"{r['desc_vt']:.2f}".replace('.',','),
                                  'Desconto_VR_R$':     f"{r['desc_vr']:.2f}".replace('.',','),
                                  'Bruto_R$':     f"{r['bruto']:.2f}".replace('.',','),
