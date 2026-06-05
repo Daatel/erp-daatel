@@ -752,7 +752,12 @@ def _create_tables_internal(conn):
         "ALTER TABLE funcionarios ADD COLUMN equipamentos_fornecidos TEXT",
         "ALTER TABLE funcionarios ADD COLUMN aceite_lgpd INTEGER DEFAULT 0",
         "ALTER TABLE empresa_config ADD COLUMN google_forms_link TEXT",
-        "ALTER TABLE pre_cadastros ADD COLUMN aceite_lgpd INTEGER DEFAULT 0"
+        "ALTER TABLE pre_cadastros ADD COLUMN aceite_lgpd INTEGER DEFAULT 0",
+        "ALTER TABLE rh_pagamentos ADD COLUMN desc_inss REAL DEFAULT 0.0",
+        "ALTER TABLE rh_pagamentos ADD COLUMN desc_irrf REAL DEFAULT 0.0",
+        "ALTER TABLE rh_pagamentos ADD COLUMN desc_vt REAL DEFAULT 0.0",
+        "ALTER TABLE rh_pagamentos ADD COLUMN valor_liquido_funcionario REAL DEFAULT 0.0",
+        "ALTER TABLE rh_pagamentos ADD COLUMN tipo_fechamento TEXT DEFAULT 'INDIVIDUAL'"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)

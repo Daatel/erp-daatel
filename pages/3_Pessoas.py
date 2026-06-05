@@ -585,166 +585,314 @@ with tab1:
     else:
         st.info("Nenhum colaborador encontrado com este filtro.")
 
+# ======= HELPER: CÁLCULOS DE FOLHA =======
+def _calc_folha(sal_base, ajuda, outros, vt_bruto, vt_desc_flag, vr_diario, dias, regime):
+    bruto = sal_base + ajuda + outros
+    if bruto <= 1621.00:
+        inss = bruto * 0.075
+    elif bruto <= 2902.84:
+        inss = (bruto * 0.09) - 24.32
+    elif bruto <= 4354.27:
+        inss = (bruto * 0.12) - 111.40
+    elif bruto <= 8475.55:
+        inss = (bruto * 0.14) - 198.49
+    else:
+        inss = 988.09
+    base_ir = max(0.0, bruto - inss)
+    if bruto <= 5000.00:
+        irrf = 0.0
+    else:
+        if base_ir <= 2428.80: std = 0.0
+        elif base_ir <= 2826.65: std = (base_ir * 0.075) - 182.16
+        elif base_ir <= 3751.05: std = (base_ir * 0.15)  - 394.16
+        elif base_ir <= 4664.68: std = (base_ir * 0.225) - 675.49
+        else: std = (base_ir * 0.275) - 908.73
+        if bruto <= 7350.00:
+            irrf = max(0.0, std - max(0.0, 978.62 - (0.133145 * base_ir)))
+        else:
+            irrf = std
+    desc_vt  = min(0.06 * sal_base, vt_bruto) if (regime == 'CLT' and vt_desc_flag == 'Com desconto') else 0.0
+    vt_liq   = max(0.0, vt_bruto - desc_vt)
+    vr       = vr_diario * dias
+    encargo  = round(0.28 * bruto, 2) if regime == 'CLT' else 0.0
+    liq_func = max(0.0, bruto - inss - irrf - desc_vt)
+    custo    = round(liq_func + vt_liq + vr + encargo, 2)
+    return dict(bruto=round(bruto,2), inss=round(inss,2), irrf=round(irrf,2),
+                desc_vt=round(desc_vt,2), vt_liq=round(vt_liq,2), vr=round(vr,2),
+                encargo=round(encargo,2), liquido_func=round(liq_func,2), custo_empresa=custo)
+
 # ======= PAGAMENTO =======
 with tab2:
-    st.subheader("Geração de Pagamento (Folha)")
-    
+    st.subheader("Folha de Pagamento")
+    subtab_ind, subtab_lote = st.tabs(["📋 Individual", "📊 Fechamento em Lote"])
+
     df_func2 = fetch_all("""
-        SELECT id, nome, salario_base, ajuda_custo, outros_valor, 
-               regime_contratacao, valor_transporte, valor_refeicao, 
-               vt_desconto, vr_desconto 
-        FROM funcionarios 
+        SELECT id, nome, salario_base, ajuda_custo, outros_valor,
+               regime_contratacao, valor_transporte, valor_refeicao,
+               vt_desconto, vr_desconto, cnpj_cpf, dados_bancarios, chave_pix
+        FROM funcionarios
         WHERE status='ATIVO' AND regime_contratacao NOT IN ('PJ', 'Autônomo')
     """)
-    if df_func2.empty:
-        st.warning("Cadastre colaboradores CLT ou Diaristas ativos primeiro na aba Cadastro.")
-    else:
-        func_dict = dict(zip(df_func2['nome'], df_func2['id']))
-        salario_dict = dict(zip(df_func2['nome'], df_func2['salario_base']))
-        ajuda_dict = dict(zip(df_func2['nome'], df_func2['ajuda_custo']))
-        outros_dict = dict(zip(df_func2['nome'], df_func2['outros_valor']))
-        regime_dict = dict(zip(df_func2['nome'], df_func2['regime_contratacao']))
-        transp_dict = dict(zip(df_func2['nome'], df_func2['valor_transporte']))
-        refeicao_dict = dict(zip(df_func2['nome'], df_func2['valor_refeicao']))
-        vt_desc_dict = dict(zip(df_func2['nome'], df_func2['vt_desconto']))
-        vr_desc_dict = dict(zip(df_func2['nome'], df_func2['vr_desconto']))
-        
-        nome_pgto = st.selectbox("Selecione o Colaborador (Apenas Ativos)", list(func_dict.keys()), key="pgto_func_select")
-        
-        emp_regime = regime_dict.get(nome_pgto, 'CLT')
-        base_sal = float(salario_dict[nome_pgto] or 0.0)
-        base_ajuda = float(ajuda_dict[nome_pgto] or 0.0)
-        base_outros = float(outros_dict[nome_pgto] or 0.0)
-        base_vt = float(transp_dict.get(nome_pgto, 0.0) or 0.0)
-        base_vr_diario = float(refeicao_dict.get(nome_pgto, 0.0) or 0.0)
-        db_vt_desc = vt_desc_dict.get(nome_pgto, 'Sem desconto')
-        db_vr_desc = vr_desc_dict.get(nome_pgto, 'Sem desconto')
 
-        # Se for CLT:
-        # Pre-calcula os descontos para apresentar as estimativas informativas do salário líquido
-        salario_bruto = base_sal + base_ajuda + base_outros
-        
-        # Desconto INSS e IRRF (Para informação no card)
-        # INSS 2026
-        if salario_bruto <= 1621.00:
-            desc_inss = salario_bruto * 0.075
-        elif salario_bruto <= 2902.84:
-            desc_inss = (salario_bruto * 0.09) - 24.32
-        elif salario_bruto <= 4354.27:
-            desc_inss = (salario_bruto * 0.12) - 111.40
-        elif salario_bruto <= 8475.55:
-            desc_inss = (salario_bruto * 0.14) - 198.49
+    # ---- SUB-TAB 1: INDIVIDUAL ----
+    with subtab_ind:
+        if df_func2.empty:
+            st.warning("Cadastre colaboradores CLT ou Diaristas ativos primeiro na aba Cadastro.")
         else:
-            desc_inss = 988.09
-            
-        # IRRF 2026
-        base_irrf = max(0.0, salario_bruto - desc_inss)
-        if salario_bruto <= 5000.00:
-            desc_irrf = 0.0
-        else:
-            if base_irrf <= 2428.80:
-                std_ir = 0.0
-            elif base_irrf <= 2826.65:
-                std_ir = (base_irrf * 0.075) - 182.16
-            elif base_irrf <= 3751.05:
-                std_ir = (base_irrf * 0.15) - 394.16
-            elif base_irrf <= 4664.68:
-                std_ir = (base_irrf * 0.225) - 675.49
-            else:
-                std_ir = (base_irrf * 0.275) - 908.73
-                
-            if salario_bruto <= 7350.00:
-                redutor = 978.62 - (0.133145 * base_irrf)
-                desc_irrf = max(0.0, std_ir - redutor)
-            else:
-                desc_irrf = std_ir
+            func_dict    = dict(zip(df_func2['nome'], df_func2['id']))
+            salario_dict = dict(zip(df_func2['nome'], df_func2['salario_base']))
+            ajuda_dict   = dict(zip(df_func2['nome'], df_func2['ajuda_custo']))
+            outros_dict  = dict(zip(df_func2['nome'], df_func2['outros_valor']))
+            regime_dict  = dict(zip(df_func2['nome'], df_func2['regime_contratacao']))
+            transp_dict  = dict(zip(df_func2['nome'], df_func2['valor_transporte']))
+            refeicao_dict= dict(zip(df_func2['nome'], df_func2['valor_refeicao']))
+            vt_desc_dict = dict(zip(df_func2['nome'], df_func2['vt_desconto']))
 
-        with st.form("form_pagamento", clear_on_submit=False):
-            col1, col2, col3 = st.columns(3)
-            data_pgto = col1.date_input("Data de Pagamento", value=date.today(), format="DD/MM/YYYY")
-            mes_ref = col2.text_input("Mês Referência (Ex: 03/2026)", value=data_pgto.strftime("%m/%Y"))
-            sal_base = col3.number_input("Rem. Fixa (R$)", min_value=0.0, value=base_sal, step=10.0)
-            
-            st.markdown("##### Outras Verbas e Encargos")
-            col4, col5, col_days = st.columns(3)
-            ajuda = col4.number_input("Ajuda de Custo (R$)", min_value=0.0, value=base_ajuda, step=10.0)
-            outros = col5.number_input("Outros Valores (R$)", min_value=0.0, value=base_outros, step=10.0)
-            dias_trabalhados = col_days.number_input("Dias Trabalhados no Mês", min_value=1, max_value=31, value=22, step=1)
-            
-            col_vt, col_vr, col_enc = st.columns(3)
-            
-            # Cálculo de VT
-            if emp_regime == 'CLT' and db_vt_desc == 'Com desconto':
-                desconto_vt = min(0.06 * base_sal, base_vt)
-            else:
-                desconto_vt = 0.0
-            vt_liquido = max(0.0, base_vt - desconto_vt)
-            
-            vt_pago = col_vt.number_input("Vale Transporte / Combustível (R$)", min_value=0.0, value=vt_liquido, step=10.0)
-            
-            # Cálculo de VR
-            vr_calculado = base_vr_diario * dias_trabalhados
-            vr_pago = col_vr.number_input("Vale Refeição / Alimentação (R$)", min_value=0.0, value=vr_calculado, step=10.0)
-            
-            # Custo Previdenciário (Patronal) - 28% para CLT, 0 para outros
-            encargo_patronal = 0.28 * (sal_base + ajuda + outros) if emp_regime == 'CLT' else 0.0
-            custo_previ = col_enc.number_input("Custo Previdenciário Patronal (R$)", min_value=0.0, value=encargo_patronal, step=10.0)
-            
-            valor_total = sal_base + ajuda + outros + vt_pago + vr_pago + custo_previ
-            
-            # Exibir informativos de Deduções e Salário Líquido do Funcionário (Somente CLT)
-            if emp_regime == 'CLT':
-                st.info(
-                    f"**Demonstrativo do Colaborador (CLT):**\n"
-                    f"- Salário Bruto: R$ {salario_bruto:,.2f}\n"
-                    f"- Desconto INSS: -R$ {desc_inss:,.2f}\n"
-                    f"- Desconto IRRF: -R$ {desc_irrf:,.2f}\n"
-                    f"- Desconto VT (6%): -R$ {desconto_vt:,.2f}\n"
-                    f"**Salário Líquido Estimado a Receber:** R$ {max(0.0, salario_bruto - desc_inss - desc_irrf - desconto_vt):,.2f}"
+            nome_pgto  = st.selectbox("Selecione o Colaborador (Apenas Ativos)", list(func_dict.keys()), key="pgto_func_select")
+            emp_regime = regime_dict.get(nome_pgto, 'CLT')
+            base_sal   = float(salario_dict[nome_pgto] or 0.0)
+            base_ajuda = float(ajuda_dict[nome_pgto]   or 0.0)
+            base_outros= float(outros_dict[nome_pgto]  or 0.0)
+            base_vt    = float(transp_dict.get(nome_pgto, 0.0) or 0.0)
+            base_vr_d  = float(refeicao_dict.get(nome_pgto, 0.0) or 0.0)
+            db_vt_desc = vt_desc_dict.get(nome_pgto, 'Sem desconto')
+            _f = _calc_folha(base_sal, base_ajuda, base_outros, base_vt, db_vt_desc, base_vr_d, 22, emp_regime)
+
+            with st.form("form_pagamento", clear_on_submit=False):
+                col1, col2, col3 = st.columns(3)
+                data_pgto = col1.date_input("Data de Pagamento", value=date.today(), format="DD/MM/YYYY")
+                mes_ref   = col2.text_input("Mês Referência (Ex: 03/2026)", value=data_pgto.strftime("%m/%Y"))
+                sal_base  = col3.number_input("Rem. Fixa (R$)", min_value=0.0, value=base_sal, step=10.0)
+                st.markdown("##### Outras Verbas e Encargos")
+                col4, col5, col_days = st.columns(3)
+                ajuda  = col4.number_input("Ajuda de Custo (R$)", min_value=0.0, value=base_ajuda, step=10.0)
+                outros = col5.number_input("Outros Valores (R$)", min_value=0.0, value=base_outros, step=10.0)
+                dias_trab = col_days.number_input("Dias Trabalhados no Mês", min_value=1, max_value=31, value=22, step=1)
+                col_vt, col_vr, col_enc = st.columns(3)
+                vt_pago    = col_vt.number_input("Vale Transporte / Combustível (R$)", min_value=0.0, value=_f['vt_liq'], step=10.0)
+                vr_pago    = col_vr.number_input("Vale Refeição / Alimentação (R$)", min_value=0.0, value=base_vr_d * 22, step=10.0)
+                custo_previ= col_enc.number_input("Encargo Patronal (R$)", min_value=0.0, value=_f['encargo'], step=10.0)
+                valor_total = sal_base + ajuda + outros + vt_pago + vr_pago + custo_previ
+                if emp_regime == 'CLT':
+                    st.info(
+                        f"**Demonstrativo do Colaborador (CLT):**\n"
+                        f"- Salário Bruto: R$ {_f['bruto']:,.2f}\n"
+                        f"- Desconto INSS: -R$ {_f['inss']:,.2f}\n"
+                        f"- Desconto IRRF: -R$ {_f['irrf']:,.2f}\n"
+                        f"- Desconto VT (6%): -R$ {_f['desc_vt']:,.2f}\n"
+                        f"**Salário Líquido Estimado a Receber:** R$ {_f['liquido_func']:,.2f}"
+                    )
+                st.info(f"**Total Desembolsado pelo Caixa da Empresa:** R$ {valor_total:,.2f}")
+                if st.form_submit_button("Registrar Pagamento"):
+                    if valor_total > 0:
+                        run_query(
+                            """INSERT INTO rh_pagamentos
+                               (funcionario_id, data_pagamento, mes_referencia, salario_base_pago,
+                                passagem, refeicao, custo_previdenciario, valor_total_pago,
+                                desc_inss, desc_irrf, desc_vt, valor_liquido_funcionario, tipo_fechamento)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INDIVIDUAL')""",
+                            (func_dict[nome_pgto], data_pgto, mes_ref, sal_base,
+                             vt_pago + ajuda + outros, vr_pago, custo_previ, valor_total,
+                             _f['inss'], _f['irrf'], _f['desc_vt'], _f['liquido_func'])
+                        )
+                        run_query(
+                            "INSERT INTO fluxo_caixa (data, tipo, categoria, valor, descricao) VALUES (?, ?, ?, ?, ?)",
+                            (data_pgto, "Saída", "Folha de Pagamento", valor_total,
+                             f"Pagamento Rem. Fixa e Benefícios ({mes_ref}) - {nome_pgto}")
+                        )
+                        st.success("Pagamento lançado com sucesso e adicionado ao fluxo de caixa!")
+                        import time; time.sleep(1); st.rerun()
+
+            st.markdown("---")
+            st.subheader("Histórico de Pagamentos")
+            df_pgtos = fetch_all('''
+                SELECT p.id as ID, f.nome as Colaborador, p.data_pagamento as "Data Pgto",
+                       p.mes_referencia as "Mes", p.salario_base_pago as "Rem. Fixa",
+                       p.passagem as "Ajuda/Outros", p.refeicao as "Refeicao",
+                       p.custo_previdenciario as "Encargos", p.valor_total_pago as "Total Pago (R$)",
+                       COALESCE(p.tipo_fechamento, 'INDIVIDUAL') as "Tipo"
+                FROM rh_pagamentos p JOIN funcionarios f ON p.funcionario_id = f.id
+                ORDER BY p.data_pagamento DESC
+            ''')
+            if not df_pgtos.empty:
+                df_pgtos['Data Pgto'] = pd.to_datetime(df_pgtos['Data Pgto']).dt.strftime('%d/%m/%Y')
+                st.dataframe(df_pgtos, width="stretch", hide_index=True)
+                st.download_button("📥 Exportar Histórico (CSV)",
+                    data=df_pgtos.to_csv(index=False, sep=';').encode('utf-8-sig'),
+                    file_name='historico_pagamentos.csv', mime='text/csv')
+
+    # ---- SUB-TAB 2: FECHAMENTO EM LOTE ----
+    with subtab_lote:
+        st.markdown("#### 📊 Fechamento Mensal em Lote")
+        st.caption("Calcule a folha de todos os colaboradores ativos, ajuste o que precisar e feche o mês com um clique.")
+
+        if df_func2.empty:
+            st.warning("Nenhum colaborador CLT ou Diarista ativo cadastrado.")
+        else:
+            cl1, cl2, cl3 = st.columns([2, 2, 2])
+            mes_lote  = cl1.text_input("Mês de Referência (MM/AAAA)", value=date.today().strftime("%m/%Y"), key="lote_mes")
+            data_lote = cl2.date_input("Data de Pagamento", value=date.today(), format="DD/MM/YYYY", key="lote_data")
+            dias_pad  = cl3.number_input("Dias trabalhados (padrão)", min_value=1, max_value=31, value=22, step=1, key="lote_dias")
+
+            if st.button("🔄 Calcular Folha do Mês", type="primary", key="lote_calcular"):
+                st.session_state['lote_calculado']  = True
+                st.session_state['lote_mes_ref']    = mes_lote
+                st.session_state['lote_data_pgto']  = str(data_lote)
+                st.session_state['lote_dias_pad']   = int(dias_pad)
+
+            if st.session_state.get('lote_calculado'):
+                _mes  = st.session_state['lote_mes_ref']
+                _data = st.session_state['lote_data_pgto']
+                _dias = st.session_state['lote_dias_pad']
+
+                # Guarda: folha já fechada?
+                df_check = fetch_all(
+                    "SELECT COUNT(*) as cnt FROM rh_pagamentos WHERE mes_referencia = ? AND tipo_fechamento = 'LOTE'",
+                    (_mes,)
                 )
-                
-            st.info(f"**Total Desembolsado pelo Caixa da Empresa:** R$ {valor_total:,.2f}".replace('.',','))
-            
-            if st.form_submit_button("Registrar Pagamento"):
-                if valor_total > 0:
-                    func_id = func_dict[nome_pgto]
-                    run_query(
-                        """INSERT INTO rh_pagamentos 
-                           (funcionario_id, data_pagamento, mes_referencia, salario_base_pago, passagem, refeicao, custo_previdenciario, valor_total_pago) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (func_id, data_pgto, mes_ref, sal_base, vt_pago + ajuda + outros, vr_pago, custo_previ, valor_total)
+                ja_fechado = (not df_check.empty and int(df_check.iloc[0]['cnt']) > 0)
+                if ja_fechado:
+                    st.warning(f"⚠️ A folha de **{_mes}** já foi fechada em lote. Para relançar, exclua os registros do histórico.")
+
+                # Monta dados da folha
+                rows = []
+                for _, r in df_func2.iterrows():
+                    sal = float(r['salario_base'] or 0.0)
+                    ajd = float(r['ajuda_custo']  or 0.0)
+                    out = float(r['outros_valor']  or 0.0)
+                    vtb = float(r['valor_transporte'] or 0.0)
+                    vrd = float(r['valor_refeicao']   or 0.0)
+                    vtf = str(r['vt_desconto'] or 'Sem desconto')
+                    reg = str(r['regime_contratacao'] or 'CLT')
+                    f   = _calc_folha(sal, ajd, out, vtb, vtf, vrd, _dias, reg)
+                    rows.append({
+                        '_id':          int(r['id']),
+                        'Nome':         str(r['nome']),
+                        'Regime':       reg,
+                        'CPF':          str(r['cnpj_cpf']      or ''),
+                        'Banco/Ag/Cc':  str(r['dados_bancarios'] or ''),
+                        'Chave PIX':    str(r['chave_pix']     or ''),
+                        'Dias':         _dias,
+                        'Rem. Fixa':    sal,
+                        'Ajuda Custo':  ajd,
+                        'VT Liq.':      f['vt_liq'],
+                        'VR':           f['vr'],
+                        'Bruto':        f['bruto'],
+                        'INSS':         f['inss'],
+                        'IRRF':         f['irrf'],
+                        'Liq. Func.':   f['liquido_func'],
+                        'Enc. Patronal':f['encargo'],
+                        'Custo Empresa':f['custo_empresa'],
+                    })
+
+                df_lote = pd.DataFrame(rows)
+                col_edit = ['Dias', 'Rem. Fixa', 'Ajuda Custo', 'VT Liq.', 'VR']
+                col_calc = ['Bruto', 'INSS', 'IRRF', 'Liq. Func.', 'Enc. Patronal', 'Custo Empresa']
+                col_info = ['Nome', 'Regime', 'CPF', 'Banco/Ag/Cc', 'Chave PIX']
+
+                col_cfg = {}
+                col_cfg['Nome']       = st.column_config.TextColumn("Nome", disabled=True)
+                col_cfg['Regime']     = st.column_config.TextColumn("Regime", disabled=True, width="small")
+                col_cfg['CPF']        = st.column_config.TextColumn("CPF", disabled=True)
+                col_cfg['Banco/Ag/Cc']= st.column_config.TextColumn("Banco/Ag/Cc", disabled=True)
+                col_cfg['Chave PIX']  = st.column_config.TextColumn("Chave PIX", disabled=True)
+                col_cfg['Dias']       = st.column_config.NumberColumn("Dias", min_value=1, max_value=31, step=1, width="small")
+                for c in ['Rem. Fixa', 'Ajuda Custo', 'VT Liq.', 'VR']:
+                    col_cfg[c] = st.column_config.NumberColumn(c, format="R$ %.2f")
+                for c in col_calc:
+                    col_cfg[c] = st.column_config.NumberColumn(c, format="R$ %.2f", disabled=True)
+
+                st.markdown("**✏️ Colunas editáveis:** Dias, Rem. Fixa, Ajuda Custo, VT e VR — INSS/IRRF recalculados automaticamente ao fechar.")
+                df_editado = st.data_editor(
+                    df_lote.drop(columns=['_id']),
+                    column_config=col_cfg,
+                    disabled=col_info + col_calc,
+                    hide_index=True,
+                    use_container_width=True,
+                    key="lote_editor"
+                )
+
+                # Recalcula com valores editados pelo RH
+                rows_final = []
+                for i, row in df_editado.iterrows():
+                    orig  = df_lote.iloc[i]
+                    sal_e = float(row['Rem. Fixa'])
+                    ajd_e = float(row['Ajuda Custo'])
+                    vt_e  = float(row['VT Liq.'])
+                    vr_e  = float(row['VR'])
+                    dias_e= int(row['Dias'])
+                    reg_e = str(orig['Regime'])
+                    f2    = _calc_folha(sal_e, ajd_e, 0, 0, 'Sem desconto', 0, dias_e, reg_e)
+                    liq_e = max(0.0, (sal_e + ajd_e) - f2['inss'] - f2['irrf'])
+                    rows_final.append({
+                        '_id': int(orig['_id']), 'nome': str(orig['Nome']),
+                        'cpf': str(orig['CPF']), 'banco': str(orig['Banco/Ag/Cc']),
+                        'pix': str(orig['Chave PIX']), 'regime': reg_e,
+                        'sal': sal_e, 'ajuda': ajd_e, 'vt': vt_e, 'vr': vr_e,
+                        'inss': f2['inss'], 'irrf': f2['irrf'], 'enc': f2['encargo'],
+                        'liq': liq_e, 'custo': round(liq_e + vt_e + vr_e + f2['encargo'], 2),
+                    })
+
+                total_liq   = sum(r['liq']  for r in rows_final)
+                total_folha = sum(r['custo'] for r in rows_final)
+
+                mc1, mc2, mc3 = st.columns(3)
+                mc1.metric("👥 Colaboradores", len(rows_final))
+                mc2.metric("💳 Total Líquido (Funcionários)", f"R$ {total_liq:,.2f}")
+                mc3.metric("🏭 Custo Total Empresa", f"R$ {total_folha:,.2f}")
+
+                st.markdown("---")
+                bc1, bc2 = st.columns(2)
+
+                with bc1:
+                    if not ja_fechado:
+                        if st.button("✅ Fechar Folha do Mês", type="primary", use_container_width=True, key="lote_fechar"):
+                            import time as _t
+                            for r in rows_final:
+                                run_query(
+                                    """INSERT INTO rh_pagamentos
+                                       (funcionario_id, data_pagamento, mes_referencia,
+                                        salario_base_pago, passagem, refeicao, custo_previdenciario,
+                                        valor_total_pago, desc_inss, desc_irrf, desc_vt,
+                                        valor_liquido_funcionario, tipo_fechamento)
+                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'LOTE')""",
+                                    (r['_id'], _data, _mes, r['sal'],
+                                     r['vt'] + r['ajuda'], r['vr'], r['enc'], r['custo'],
+                                     r['inss'], r['irrf'], r['liq'])
+                                )
+                            run_query(
+                                "INSERT INTO fluxo_caixa (data, tipo, categoria, valor, descricao) VALUES (?, ?, ?, ?, ?)",
+                                (_data, "Saída", "Folha de Pagamento", total_folha,
+                                 f"Fechamento de Folha em Lote — {_mes} ({len(rows_final)} colaboradores)")
+                            )
+                            st.success(f"✅ Folha de {_mes} fechada! {len(rows_final)} colaboradores — Total: R$ {total_folha:,.2f}")
+                            st.session_state['lote_calculado'] = False
+                            _t.sleep(1.5); st.rerun()
+                    else:
+                        st.button("✅ Folha já fechada para este mês", disabled=True, use_container_width=True)
+
+                with bc2:
+                    csv_rows = [{'Nome': r['nome'], 'CPF': r['cpf'], 'Banco_Ag_Cc': r['banco'],
+                                 'Chave_PIX': r['pix'], 'Regime': r['regime'], 'Mes_Ref': _mes,
+                                 'Bruto_R$':     f"{(r['sal']+r['ajuda']):.2f}".replace('.',','),
+                                 'INSS_R$':      f"{r['inss']:.2f}".replace('.',','),
+                                 'IRRF_R$':      f"{r['irrf']:.2f}".replace('.',','),
+                                 'Liquido_Func_R$': f"{r['liq']:.2f}".replace('.',','),
+                                 'VT_R$':        f"{r['vt']:.2f}".replace('.',','),
+                                 'VR_R$':        f"{r['vr']:.2f}".replace('.',','),
+                                 'Enc_Patronal_R$': f"{r['enc']:.2f}".replace('.',','),
+                                 'Custo_Empresa_R$': f"{r['custo']:.2f}".replace('.',',')}
+                                for r in rows_final]
+                    csv_banco = pd.DataFrame(csv_rows).to_csv(index=False, sep=';').encode('utf-8-sig')
+                    st.download_button(
+                        "📥 Exportar CSV para Banco",
+                        data=csv_banco,
+                        file_name=f"folha_{_mes.replace('/','_')}.csv",
+                        mime='text/csv',
+                        use_container_width=True,
+                        key="lote_csv"
                     )
-                    
-                    desc = f"Pagamento Rem. Fixa e Benefícios ({mes_ref}) - {nome_pgto}"
-                    run_query(
-                        "INSERT INTO fluxo_caixa (data, tipo, categoria, valor, descricao) VALUES (?, ?, ?, ?, ?)",
-                        (data_pgto, "Saída", "Folha de Pagamento", valor_total, desc)
-                    )
-                    st.success(f"Pagamento lançado com sucesso e adicionado ao fluxo de caixa!")
-                    import time; time.sleep(1); st.rerun()
-                    
-        st.markdown("---")
-        st.subheader("Histórico de Pagamentos")
-        query_pgtos = '''
-        SELECT p.id as ID, f.nome as Colaborador, p.data_pagamento as 'Data Pgto', p.mes_referencia as 'Mês',
-               p.salario_base_pago as 'Rem. Fixa', p.passagem as 'Ajuda/Outros', p.refeicao as 'Refeição', 
-               p.custo_previdenciario as 'Encargos', p.valor_total_pago as 'Total Pago (R$)'
-        FROM rh_pagamentos p
-        JOIN funcionarios f ON p.funcionario_id = f.id
-        ORDER BY p.data_pagamento DESC
-        '''
-        df_pgtos = fetch_all(query_pgtos)
-        if not df_pgtos.empty:
-            df_pgtos['Data Pgto'] = pd.to_datetime(df_pgtos['Data Pgto']).dt.strftime('%d/%m/%Y')
-            st.dataframe(df_pgtos, width="stretch", hide_index=True)
-            
-            csv2 = df_pgtos.to_csv(index=False, sep=';').encode('utf-8-sig')
-            st.download_button(
-                label="📥 Exportar Histórico (CSV)",
-                data=csv2,
-                file_name='historico_pagamentos.csv',
-                mime='text/csv',
-            )
+
 
 # ======= 3. COMISSÕES =======
 with tab3:
