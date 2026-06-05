@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Ponto — ERP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0f1a;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --border: rgba(255,255,255,0.08);
+    --text: #f0f4ff;
+    --muted: #6b7a99;
+    --accent: #3b82f6;
+    --green: #10b981;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    font-family: var(--font);
+    color: var(--text);
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* ── LAYOUT ── */
+  #app {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: 100vh;
+    padding: 24px;
+    gap: 20px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .brand {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .brand span {
+    color: var(--accent);
+  }
+
+  #clock {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  #date-label {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: right;
+    margin-top: 2px;
+  }
+
+  /* ── MAIN ── */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: stretch;
+  }
+
+  /* Camera panel */
+  .cam-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .cam-panel canvas#qr-canvas {
+    display: none;
+  }
+
+  #cam-video {
+    width: 100%;
+    flex: 1;
+    object-fit: cover;
+    display: block;
+  }
+
+  .cam-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .scan-frame {
+    width: 180px;
+    height: 180px;
+    position: relative;
+  }
+
+  .scan-frame::before,
+  .scan-frame::after,
+  .scan-frame .c3,
+  .scan-frame .c4 {
+    content: '';
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    border-color: var(--accent);
+    border-style: solid;
+    opacity: 0.9;
+  }
+  .scan-frame::before  { top:0; left:0;  border-width: 3px 0 0 3px; border-radius: 6px 0 0 0; }
+  .scan-frame::after   { top:0; right:0; border-width: 3px 3px 0 0; border-radius: 0 6px 0 0; }
+  .scan-frame .c3      { bottom:0; left:0;  border-width: 0 0 3px 3px; border-radius: 0 0 0 6px; }
+  .scan-frame .c4      { bottom:0; right:0; border-width: 0 3px 3px 0; border-radius: 0 0 6px 0; }
+
+  @keyframes scan-line {
+    0%   { top: 12px; opacity: 1; }
+    50%  { opacity: 0.4; }
+    100% { top: calc(100% - 14px); opacity: 1; }
+  }
+  .scan-line {
+    position: absolute;
+    left: 12px; right: 12px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+    animation: scan-line 2s ease-in-out infinite alternate;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  .cam-label {
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* PIN panel */
+  .pin-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .pin-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .pin-display {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    padding: 8px 0;
+  }
+
+  .pin-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent;
+    transition: all 0.15s ease;
+  }
+  .pin-dot.filled {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(59,130,246,0.5);
+  }
+
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    flex: 1;
+  }
+
+  .key {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 56px;
+    transition: background 0.1s, transform 0.08s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .key:active, .key.pressed {
+    background: var(--accent);
+    transform: scale(0.94);
+  }
+
+  .key.del {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .key.del:active { background: var(--red); color: #fff; }
+
+  /* ── FEEDBACK OVERLAY ── */
+  #feedback {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  #feedback.visible { opacity: 1; pointer-events: all; }
+
+  #feedback-bg {
+    position: absolute;
+    inset: 0;
+    opacity: 0.96;
+  }
+
+  #feedback-icon {
+    font-size: 72px;
+    position: relative;
+    z-index: 1;
+    line-height: 1;
+  }
+
+  #feedback-name {
+    font-size: 36px;
+    font-weight: 600;
+    position: relative;
+    z-index: 1;
+    letter-spacing: -0.02em;
+  }
+
+  #feedback-type {
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    position: relative;
+    z-index: 1;
+    opacity: 0.8;
+  }
+
+  #feedback-time {
+    font-family: var(--mono);
+    font-size: 48px;
+    font-weight: 400;
+    position: relative;
+    z-index: 1;
+    letter-spacing: -0.02em;
+    margin-top: 8px;
+  }
+
+  #feedback-msg {
+    font-size: 15px;
+    color: rgba(255,255,255,0.5);
+    position: relative;
+    z-index: 1;
+  }
+
+  #feedback-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 4px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+    z-index: 1;
+    transition: width linear;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 4px;
+  }
+
+  .footer-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+  }
+  .status-dot.offline { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+  #last-reg {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  /* PIN error shake */
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
+  }
+  .shake { animation: shake 0.4s ease; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <div class="brand">ERP <span>•</span> Controle de Ponto</div>
+    </div>
+    <div style="text-align:right">
+      <div id="clock">--:--:--</div>
+      <div id="date-label">--</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- QR Code -->
+    <div class="cam-panel">
+      <video id="cam-video" autoplay muted playsinline></video>
+      <canvas id="qr-canvas"></canvas>
+      <div class="cam-overlay">
+        <div class="scan-frame">
+          <div class="c3"></div><div class="c4"></div>
+          <div class="scan-line"></div>
+        </div>
+      </div>
+      <div class="cam-label">Aproxime o cartão QR Code</div>
+    </div>
+
+    <!-- PIN -->
+    <div class="pin-panel">
+      <div class="pin-label">Ou digite seu PIN</div>
+      <div class="pin-display">
+        <div class="pin-dot" id="d0"></div>
+        <div class="pin-dot" id="d1"></div>
+        <div class="pin-dot" id="d2"></div>
+        <div class="pin-dot" id="d3"></div>
+      </div>
+      <div class="numpad" id="numpad">
+        <button class="key" data-n="1">1</button>
+        <button class="key" data-n="2">2</button>
+        <button class="key" data-n="3">3</button>
+        <button class="key" data-n="4">4</button>
+        <button class="key" data-n="5">5</button>
+        <button class="key" data-n="6">6</button>
+        <button class="key" data-n="7">7</button>
+        <button class="key" data-n="8">8</button>
+        <button class="key" data-n="9">9</button>
+        <button class="key del" data-n="del">⌫</button>
+        <button class="key" data-n="0">0</button>
+        <button class="key del" data-n="ok" style="font-size:13px;color:var(--green);">OK</button>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Conectado</span>
+    </div>
+    <div id="last-reg">Aguardando registro...</div>
+  </footer>
+</div>
+
+<!-- Feedback overlay -->
+<div id="feedback">
+  <div id="feedback-bg"></div>
+  <div id="feedback-icon"></div>
+  <div id="feedback-name"></div>
+  <div id="feedback-type"></div>
+  <div id="feedback-time"></div>
+  <div id="feedback-msg"></div>
+  <div id="feedback-bar"></div>
+</div>
+
+<script>
+// ── CONFIG ─────────────────────────────────────────────
+const API_URL = '/api/ponto/registrar';   // ajuste para seu servidor
+const TABLET_ID = 'TABLET_01';
+const FEEDBACK_DURATION = 4000;           // ms
+
+// ── CLOCK ──────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  const ss = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${hh}:${mm}:${ss}`;
+  document.getElementById('date-label').textContent =
+    now.toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long' });
+}
+setInterval(updateClock, 500);
+updateClock();
+
+// ── QR CODE SCAN ───────────────────────────────────────
+const video = document.getElementById('cam-video');
+const canvas = document.getElementById('qr-canvas');
+const ctx = canvas.getContext('2d');
+let scanning = true;
+let lastScan = 0;
+
+navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+  .then(stream => { video.srcObject = stream; requestAnimationFrame(scanLoop); })
+  .catch(() => console.warn('Câmera indisponível — use PIN'));
+
+function scanLoop() {
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+    if (code && scanning && Date.now() - lastScan > 3000) {
+      lastScan = Date.now();
+      registrar({ token_qr: code.data });
+    }
+  }
+  requestAnimationFrame(scanLoop);
+}
+
+// ── PIN ────────────────────────────────────────────────
+let pin = '';
+
+document.getElementById('numpad').addEventListener('click', e => {
+  const key = e.target.closest('.key');
+  if (!key) return;
+  const n = key.dataset.n;
+
+  key.classList.add('pressed');
+  setTimeout(() => key.classList.remove('pressed'), 120);
+
+  if (n === 'del') { pin = pin.slice(0, -1); }
+  else if (n === 'ok') { if (pin.length === 4) registrar({ pin }); }
+  else if (pin.length < 4) { pin += n; }
+
+  updateDots();
+});
+
+function updateDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById(`d${i}`).classList.toggle('filled', i < pin.length);
+  }
+}
+
+// ── REGISTRAR ──────────────────────────────────────────
+let processing = false;
+
+async function registrar(payload) {
+  if (processing) return;
+  processing = true;
+  scanning = false;
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, tablet_id: TABLET_ID })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      showFeedback(data, true);
+    } else if (res.status === 401) {
+      showErro('QR Code ou PIN inválido');
+    } else {
+      showErro('Erro no servidor. Tente novamente.');
+    }
+  } catch {
+    // Modo offline: registra localmente e sincroniza depois
+    const local = { ...payload, tablet_id: TABLET_ID, dt: new Date().toISOString(), offline: true };
+    const fila = JSON.parse(localStorage.getItem('ponto_offline') || '[]');
+    fila.push(local);
+    localStorage.setItem('ponto_offline', JSON.stringify(fila));
+    showFeedback({ nome: 'Registrado offline', tipo: 'ENTRADA', horario: new Date().toLocaleTimeString('pt-BR') }, true, true);
+    setStatus(false);
+  }
+}
+
+async function syncOffline() {
+  const fila = JSON.parse(localStorage.getItem('ponto_offline') || '[]');
+  if (!fila.length) return;
+  const enviados = [];
+  for (const item of fila) {
+    try {
+      const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+      if (res.ok) enviados.push(item);
+    } catch { break; }
+  }
+  if (enviados.length) {
+    const restante = fila.filter(i => !enviados.includes(i));
+    localStorage.setItem('ponto_offline', JSON.stringify(restante));
+    setStatus(true);
+  }
+}
+setInterval(syncOffline, 30000);
+
+// ── FEEDBACK VISUAL ────────────────────────────────────
+function showFeedback(data, ok, offline = false) {
+  const fb = document.getElementById('feedback');
+  const isEntrada = (data.tipo || '').toUpperCase().includes('ENTRADA');
+
+  document.getElementById('feedback-bg').style.background = isEntrada
+    ? 'linear-gradient(135deg, #064e3b 0%, #0a0f1a 100%)'
+    : 'linear-gradient(135deg, #78350f 0%, #0a0f1a 100%)';
+
+  document.getElementById('feedback-icon').textContent = isEntrada ? '👋' : '✅';
+  document.getElementById('feedback-name').textContent  = data.nome || '—';
+  document.getElementById('feedback-type').textContent  = isEntrada ? 'Entrada registrada' : 'Saída registrada';
+  document.getElementById('feedback-time').textContent  = data.horario || new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+  document.getElementById('feedback-msg').textContent   = offline
+    ? 'Registro salvo localmente (sem conexão)'
+    : (isEntrada ? 'Bom trabalho!' : data.horas_hoje ? `Hoje: ${data.horas_hoje}` : '');
+
+  const bar = document.getElementById('feedback-bar');
+  bar.style.width = '100%';
+  bar.style.transition = 'none';
+
+  fb.classList.add('visible');
+
+  document.getElementById('last-reg').textContent =
+    `Último: ${data.nome} — ${data.tipo} ${data.horario}`;
+
+  setTimeout(() => {
+    bar.style.transition = `width ${FEEDBACK_DURATION}ms linear`;
+    bar.style.width = '0%';
+  }, 50);
+
+  setTimeout(() => {
+    fb.classList.remove('visible');
+    pin = '';
+    updateDots();
+    processing = false;
+    scanning = true;
+  }, FEEDBACK_DURATION);
+}
+
+function showErro(msg) {
+  const pinDisplay = document.querySelector('.pin-display');
+  pinDisplay.classList.add('shake');
+  setTimeout(() => pinDisplay.classList.remove('shake'), 400);
+  pin = '';
+  updateDots();
+  processing = false;
+  scanning = true;
+}
+
+function setStatus(online) {
+  document.getElementById('status-dot').classList.toggle('offline', !online);
+  document.getElementById('status-text').textContent = online ? 'Conectado' : 'Offline — sincronizando';
+}
+
+// Previne zoom e menu de contexto no tablet
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+</script>
+</body>
+</html>

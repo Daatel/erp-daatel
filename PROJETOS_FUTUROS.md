@@ -53,3 +53,14 @@ Este documento registra as ideias, necessidades e módulos planejados para futur
   * **Tabelas Fiscais Dinâmicas:** Migração das faixas e alíquotas de INSS, IRRF e salário mínimo para tabelas do banco de dados, permitindo a atualização anual de tributos via tela administrativa do gestor, sem necessidade de deploy de código.
 * **Público-alvo:** Perfis `ADMIN` e `FINANCEIRO` (Recursos Humanos e Diretoria).
 
+---
+
+## ⏰ 6. Módulo de Controle de Ponto Eletrônico (Portaria 671/2021)
+* **Objetivo:** Integrar um sistema de controle de ponto eletrônico digital e homologado para os colaboradores da fábrica.
+* **Escopo:**
+  * **API de Ponto (FastAPI):** Registro de batidas com detecção inteligente de tipo (Entrada, Saída, Intervalo), cálculo em tempo real de horas trabalhadas no dia e suporte a registros temporários offline.
+  * **Terminal de Batida Kiosk (Tablet):** Interface web otimizada para tablets na recepção da fábrica, permitindo bater ponto instantaneamente aproximando o QR Code do crachá do funcionário (leitor de câmera integrado com jsQR) ou digitando um PIN numérico individual de 4 dígitos.
+  * **Relatório de Espelho de Ponto:** Geração automática e exportação do histórico mensal detalhado ("espelho de ponto") para assinatura do colaborador, em conformidade com as diretrizes do Ministério do Trabalho e Emprego (MTE).
+* **Público-alvo:** Todos os colaboradores (CLT e Diaristas) e equipe de Recursos Humanos/Diretoria.
+
+
