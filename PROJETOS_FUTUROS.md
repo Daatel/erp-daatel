@@ -28,6 +28,8 @@ Este documento registra as ideias, necessidades e módulos planejados para futur
 * **Escopo:**
   * Agregar os dados consolidados de todas as áreas (DRE, Rentabilidade Geral, EBITDA, Margem de Contribuição, Evolução de Estoque Ativo, Lucratividade Líquida e Comissões a Pagar).
   * Exclusividade de acesso: Apenas o perfil `ADMIN` terá acesso a este painel altamente sensível e estratégico.
+* **Conceito Visual Desenvolvido:**
+  ![Conceitos do BI Painel Executivo](PAINEL%20EXECUTIVO.png)
 * **Público-alvo:** Perfil de acesso `ADMIN` (Diretoria / Gestão Geral).
 
 ---
