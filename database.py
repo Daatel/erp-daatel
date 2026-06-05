@@ -297,6 +297,7 @@ def _create_tables_internal(conn):
         tipo_fechamento TEXT DEFAULT 'INDIVIDUAL',
         faltas INTEGER DEFAULT 0,
         desconto_faltas REAL DEFAULT 0.0,
+        desconto_dsr REAL DEFAULT 0.0,
         FOREIGN KEY(funcionario_id) REFERENCES funcionarios(id)
     )
     ''')
@@ -766,7 +767,8 @@ def _create_tables_internal(conn):
         "ALTER TABLE rh_pagamentos ADD COLUMN valor_liquido_funcionario REAL DEFAULT 0.0",
         "ALTER TABLE rh_pagamentos ADD COLUMN tipo_fechamento TEXT DEFAULT 'INDIVIDUAL'",
         "ALTER TABLE rh_pagamentos ADD COLUMN faltas INTEGER DEFAULT 0",
-        "ALTER TABLE rh_pagamentos ADD COLUMN desconto_faltas REAL DEFAULT 0.0"
+        "ALTER TABLE rh_pagamentos ADD COLUMN desconto_faltas REAL DEFAULT 0.0",
+        "ALTER TABLE rh_pagamentos ADD COLUMN desconto_dsr REAL DEFAULT 0.0"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)

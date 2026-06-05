@@ -588,7 +588,8 @@ with tab1:
 # ======= HELPER: CÁLCULOS DE FOLHA =======
 def _calc_folha(sal_base, ajuda, outros, vt_bruto, vt_desc_flag, vr_diario, dias, regime, faltas=0):
     desc_faltas = round((sal_base / 30.0) * faltas, 2)
-    bruto = max(0.0, sal_base - desc_faltas + ajuda + outros)
+    desc_dsr = round((sal_base / 30.0) * faltas, 2) if regime == 'CLT' else 0.0
+    bruto = max(0.0, sal_base - desc_faltas - desc_dsr + ajuda + outros)
     if bruto <= 1621.00:
         inss = bruto * 0.075
     elif bruto <= 2902.84:
@@ -621,7 +622,7 @@ def _calc_folha(sal_base, ajuda, outros, vt_bruto, vt_desc_flag, vr_diario, dias
     return dict(bruto=round(bruto,2), inss=round(inss,2), irrf=round(irrf,2),
                 desc_vt=round(desc_vt,2), vt_liq=round(vt_liq,2), vr=round(vr,2),
                 encargo=round(encargo,2), liquido_func=round(liq_func,2), custo_empresa=custo,
-                desconto_faltas=desc_faltas)
+                desconto_faltas=desc_faltas, desconto_dsr=desc_dsr)
 
 # ======= PAGAMENTO =======
 with tab2:
@@ -680,12 +681,13 @@ with tab2:
                 vr_pago    = col_vr.number_input("Vale Refeição / Alimentação (R$)", min_value=0.0, value=_f_calc['vr'], step=10.0)
                 custo_previ= col_enc.number_input("Encargo Patronal (R$)", min_value=0.0, value=_f_calc['encargo'], step=10.0)
                 
-                valor_total = max(0.0, sal_base - _f_calc['desconto_faltas']) + ajuda + outros + vt_pago + vr_pago + custo_previ
+                valor_total = max(0.0, sal_base - _f_calc['desconto_faltas'] - _f_calc['desconto_dsr']) + ajuda + outros + vt_pago + vr_pago + custo_previ
                 if emp_regime == 'CLT':
                     st.info(
                         f"**Demonstrativo do Colaborador (CLT):**\n"
                         f"- Salário Base: R$ {sal_base:,.2f}\n"
                         f"- Desconto Faltas ({faltas} dias): -R$ {_f_calc['desconto_faltas']:,.2f}\n"
+                        f"- Desconto DSR s/ Faltas: -R$ {_f_calc['desconto_dsr']:,.2f}\n"
                         f"- Salário Bruto: R$ {_f_calc['bruto']:,.2f}\n"
                         f"- Desconto INSS: -R$ {_f_calc['inss']:,.2f}\n"
                         f"- Desconto IRRF: -R$ {_f_calc['irrf']:,.2f}\n"
@@ -701,12 +703,12 @@ with tab2:
                                (funcionario_id, data_pagamento, mes_referencia, salario_base_pago,
                                 passagem, refeicao, custo_previdenciario, valor_total_pago,
                                 desc_inss, desc_irrf, desc_vt, valor_liquido_funcionario, tipo_fechamento,
-                                faltas, desconto_faltas)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INDIVIDUAL', ?, ?)""",
+                                faltas, desconto_faltas, desconto_dsr)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INDIVIDUAL', ?, ?, ?)""",
                             (func_dict[nome_pgto], data_pgto, mes_ref, sal_base,
                              vt_pago + ajuda + outros, vr_pago, custo_previ, valor_total,
                              _f_final['inss'], _f_final['irrf'], _f_final['desc_vt'], _f_final['liquido_func'],
-                             faltas, _f_final['desconto_faltas'])
+                             faltas, _f_final['desconto_faltas'], _f_final['desconto_dsr'])
                         )
                         run_query(
                             "INSERT INTO fluxo_caixa (data, tipo, categoria, valor, descricao) VALUES (?, ?, ?, ?, ?)",
@@ -723,6 +725,7 @@ with tab2:
                        p.mes_referencia as "Mes", p.salario_base_pago as "Rem. Fixa",
                        COALESCE(p.faltas, 0) as "Faltas",
                        COALESCE(p.desconto_faltas, 0.0) as "Dedução Faltas (R$)",
+                       COALESCE(p.desconto_dsr, 0.0) as "Dedução DSR (R$)",
                        p.passagem as "Ajuda/Outros", p.refeicao as "Refeicao",
                        p.custo_previdenciario as "Encargos", p.valor_total_pago as "Total Pago (R$)",
                        COALESCE(p.tipo_fechamento, 'INDIVIDUAL') as "Tipo"
@@ -790,6 +793,7 @@ with tab2:
                         'Chave PIX':    str(r['chave_pix']     or ''),
                         'Dias':         _dias,
                         'Faltas':       0,
+                        'DSR Desc.':    f['desconto_dsr'],
                         'Rem. Fixa':    sal,
                         'Ajuda Custo':  ajd,
                         'VT Liq.':      f['vt_liq'],
@@ -804,7 +808,7 @@ with tab2:
 
                 df_lote = pd.DataFrame(rows)
                 col_edit = ['Dias', 'Faltas', 'Rem. Fixa', 'Ajuda Custo', 'VT Liq.', 'VR']
-                col_calc = ['Bruto', 'INSS', 'IRRF', 'Liq. Func.', 'Enc. Patronal', 'Custo Empresa']
+                col_calc = ['DSR Desc.', 'Bruto', 'INSS', 'IRRF', 'Liq. Func.', 'Enc. Patronal', 'Custo Empresa']
                 col_info = ['Nome', 'Regime', 'CPF', 'Banco/Ag/Cc', 'Chave PIX']
 
                 col_cfg = {}
@@ -820,7 +824,7 @@ with tab2:
                 for c in col_calc:
                     col_cfg[c] = st.column_config.NumberColumn(c, format="R$ %.2f", disabled=True)
 
-                st.markdown("**✏️ Colunas editáveis:** Dias, Faltas, Rem. Fixa, Ajuda Custo, VT e VR — Desconto de Faltas, INSS/IRRF recalculados automaticamente.")
+                st.markdown("**✏️ Colunas editáveis:** Dias, Faltas, Rem. Fixa, Ajuda Custo, VT e VR — Desconto de Faltas/DSR, INSS/IRRF recalculados automaticamente.")
                 df_editado = st.data_editor(
                     df_lote.drop(columns=['_id']),
                     column_config=col_cfg,
@@ -852,6 +856,7 @@ with tab2:
                         'inss': f2['inss'], 'irrf': f2['irrf'], 'enc': f2['encargo'],
                         'liq': liq_e, 'custo': round(liq_e + vt_e + vr_e + f2['encargo'], 2),
                         'faltas': faltas_e, 'desc_faltas': f2['desconto_faltas'],
+                        'desc_dsr': f2['desconto_dsr'],
                         'bruto': f2['bruto']
                     })
 
@@ -877,11 +882,11 @@ with tab2:
                                         salario_base_pago, passagem, refeicao, custo_previdenciario,
                                         valor_total_pago, desc_inss, desc_irrf, desc_vt,
                                         valor_liquido_funcionario, tipo_fechamento,
-                                        faltas, desconto_faltas)
-                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'LOTE', ?, ?)""",
+                                        faltas, desconto_faltas, desconto_dsr)
+                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'LOTE', ?, ?, ?)""",
                                     (r['_id'], _data, _mes, r['sal'],
                                      r['vt'] + r['ajuda'], r['vr'], r['enc'], r['custo'],
-                                     r['inss'], r['irrf'], r['liq'], r['faltas'], r['desc_faltas'])
+                                     r['inss'], r['irrf'], r['liq'], r['faltas'], r['desc_faltas'], r['desc_dsr'])
                                 )
                             run_query(
                                 "INSERT INTO fluxo_caixa (data, tipo, categoria, valor, descricao) VALUES (?, ?, ?, ?, ?)",
@@ -899,6 +904,7 @@ with tab2:
                                  'Chave_PIX': r['pix'], 'Regime': r['regime'], 'Mes_Ref': _mes,
                                  'Faltas': r['faltas'],
                                  'Desconto_Faltas_R$': f"{r['desc_faltas']:.2f}".replace('.',','),
+                                 'Desconto_DSR_R$':    f"{r['desc_dsr']:.2f}".replace('.',','),
                                  'Bruto_R$':     f"{r['bruto']:.2f}".replace('.',','),
                                  'INSS_R$':      f"{r['inss']:.2f}".replace('.',','),
                                  'IRRF_R$':      f"{r['irrf']:.2f}".replace('.',','),
