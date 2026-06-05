@@ -272,6 +272,7 @@ with tab1:
                 st.rerun()
 
 # ======= 1.2. REMESSA DE DEGUSTAÇÃO & AMOSTRAS =======
+with tab_deg:
     st.subheader("🍇 Lançamento de Amostras e Ações de Degustação")
     st.markdown("Esta tela realiza a saída física imediata de mercadorias para ações de degustação ou amostras em clientes, calculando o custo via FIFO e debitando-o automaticamente no caixa na conta `2.2.1 Custo de Degustações e Amostras` vinculando o CNPJ.")
 
