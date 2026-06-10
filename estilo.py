@@ -221,6 +221,15 @@ display: none !important;
 footer {{ 
 visibility: hidden !important; 
 }}
+section[data-testid="stSidebar"] {{
+display: none !important;
+}}
+[data-testid="collapsedControl"] {{
+display: none !important;
+}}
+[data-testid="collapsedSidebar"] {{
+display: none !important;
+}}
 div[data-testid="stForm"] {{
 position: absolute !important;
 left: -9999px !important;
