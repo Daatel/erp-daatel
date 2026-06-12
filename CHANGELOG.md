@@ -2,7 +2,30 @@
 
 ---
 
-## v1.5 — 2026-05-16 (Sessão: Go-Live Nuvem, PostgreSQL e SaaS MVP)
+## v1.6 — 2026-06-12 (Sessão: Integridade Financeira e Paridade NF × DAV)
+
+### ✅ Inteligência de Baixa no Financeiro (`9_Financeiro.py`)
+- **Descontos automáticos:** Quando o valor pago é inferior ao título original, o sistema lança automaticamente a diferença como **"Descontos Concedidos"** no fluxo de caixa, preservando o valor original da venda no DRE.
+- **Acréscimos/Juros automáticos:** Quando o valor pago excede o título, a diferença é lançada como entrada adicional na categoria **"outros"** (juros/mora).
+- **Restrição de edição direta:** Recebíveis vinculados a vendas (`venda_id NOT NULL`) não podem ter o valor alterado diretamente — a tela orienta para o módulo de Baixa ou Faturamento.
+- **Bloqueio de exclusão:** Recebíveis ligados a vendas não podem ser excluídos/cancelados; a reversão deve ser feita pelo estorno de faturamento.
+
+### ✅ DRE atualizado (`10_DRE.py`)
+- Regex de deduções expandido para incluir `desconto` e `abatimento`, garantindo que descontos concedidos sejam corretamente abatidos da Receita Líquida.
+
+### ✅ Paridade de Documento NF × DAV (`7_Faturamento.py`, `8_Logistica.py`)
+- **Aviso contextual na Fila de Faturamento:** Ao selecionar o tipo de documento, exibe imediatamente o impacto no fluxo:
+  - **DAV** → número gerado automaticamente, embarque liberado imediatamente.
+  - **NF** → alerta de que o embarque ficará retido até o número SEFAZ ser registrado, com sugestão de usar DAV para embarque imediato.
+- **Painel de dados de NF na Reimpressão:** Substituída a mensagem vazia por painel com todos os dados do registro (número, data, cliente, CNPJ/CPF, produto, quantidade, valor, lote e validade), além de estado do número SEFAZ com orientação contextual.
+- **Mensagem orientativa na Logística:** Erro de embarque bloqueado por NF sem número SEFAZ agora lista as notas afetadas e oferece **2 caminhos claros**: registrar o número no Gerador Fiscal ou estornar e refaturar como DAV.
+
+### 🗄️ Banco de Dados — sem alterações de schema
+Todas as melhorias desta versão são de lógica de negócio e UX; nenhuma migração de banco foi necessária.
+
+---
+
+
 
 ### 🚀 Banco de Dados Cloud (Supabase / PostgreSQL)
 - **Migração Total:** Arquitetura do sistema refatorada de SQLite (local) para PostgreSQL via Supabase.
