@@ -903,7 +903,7 @@ try:
                          venda_id = rec_data['venda_id']
 
                          if pd.notna(venda_id):
-                             st.warning(f"⚠️ **Atenção:** Este recebível está vinculado à **Venda #{int(venda_id)}**. Alterações diretas aqui podem causar divergências entre o Comercial e o Financeiro. Se precisar alterar dados da venda ou do faturamento, use a tela de **Faturamento** para estornar.")
+                             st.warning(f"⚠️ **Atenção:** Este recebível está vinculado à **Venda #{int(venda_id)}**.")
 
                          acao_rec = st.radio("O que deseja fazer?", ["Alterar Vencimento/Valor", "Aplicar Juros / Desconto", "Reparcelar", "Excluir/Cancelar"], horizontal=True, key="acao_rec")
 
@@ -911,7 +911,13 @@ try:
                              with st.form("form_edit_rec"):
                                  ed1, ed2 = st.columns(2)
                                  novo_venc = ed1.date_input("Novo Vencimento", value=pd.to_datetime(rec_data['data_vencimento']).date())
-                                 novo_valor = ed2.number_input("Novo Valor (R$)", value=valor_original, min_value=0.01)
+                                 
+                                 if pd.notna(venda_id):
+                                     st.info("ℹ️ Para títulos de vendas, a alteração de valor é bloqueada aqui para evitar descompasso. Edite o valor pago diretamente na tabela de Baixa (recebimento) para lançar descontos/acréscimos no DRE.")
+                                     novo_valor = st.number_input("Valor Original (R$)", value=valor_original, disabled=True, key="dis_val_rec")
+                                 else:
+                                     novo_valor = ed2.number_input("Novo Valor (R$)", value=valor_original, min_value=0.01)
+                                     
                                  nova_desc = st.text_input("Descrição", value=rec_data['descricao'])
                                  if st.form_submit_button("Salvar Alteração"):
                                      run_query("UPDATE contas_a_receber SET data_vencimento=?, valor=?, descricao=? WHERE id=?",
@@ -920,26 +926,29 @@ try:
                                      import time; time.sleep(1); st.rerun()
 
                          elif acao_rec == "Aplicar Juros / Desconto":
-                             st.markdown(f"**Valor original:** R$ {valor_original:,.2f}")
-                             jd1, jd2, jd3 = st.columns(3)
-                             juros_pct = jd1.number_input("Juros (%)", min_value=0.0, value=0.0, step=0.5, key="rec_juros_pct")
-                             desconto_rs = jd2.number_input("Desconto (R$)", min_value=0.0, value=0.0, step=0.01, key="rec_desconto_rs")
-                             valor_juros = valor_original * (juros_pct / 100)
-                             valor_final = valor_original + valor_juros - desconto_rs
-                             jd3.metric("Valor Final", f"R$ {valor_final:,.2f}")
-
-                             if valor_final <= 0:
-                                 st.error("O valor final não pode ser zero ou negativo.")
+                             if pd.notna(venda_id):
+                                 st.warning("⚠️ Esta duplicata está vinculada a uma Venda. Para aplicar descontos ou juros em títulos de vendas comerciais de forma que conste no DRE, digite o valor final pago diretamente na tabela de recebimento (Lote) ao confirmar o pagamento.")
                              else:
-                                 novo_venc_jd = st.date_input("Novo Vencimento", value=pd.to_datetime(rec_data['data_vencimento']).date(), key="rec_venc_jd")
-                                 obs_juros = f" [Juros {juros_pct}%: +R${valor_juros:,.2f}]" if juros_pct > 0 else ""
-                                 obs_desc = f" [Desc: -R${desconto_rs:,.2f}]" if desconto_rs > 0 else ""
-                                 if st.button("Aplicar Juros/Desconto", type="primary", key="btn_rec_jd"):
-                                     nova_descricao = rec_data['descricao'] + obs_juros + obs_desc
-                                     run_query("UPDATE contas_a_receber SET data_vencimento=?, valor=?, descricao=? WHERE id=?",
-                                               (novo_venc_jd.strftime("%Y-%m-%d"), valor_final, nova_descricao, rec_id))
-                                     st.success(f"Recebível atualizado! Novo valor: R$ {valor_final:,.2f}")
-                                     import time; time.sleep(1); st.rerun()
+                                 st.markdown(f"**Valor original:** R$ {valor_original:,.2f}")
+                                 jd1, jd2, jd3 = st.columns(3)
+                                 juros_pct = jd1.number_input("Juros (%)", min_value=0.0, value=0.0, step=0.5, key="rec_juros_pct")
+                                 desconto_rs = jd2.number_input("Desconto (R$)", min_value=0.0, value=0.0, step=0.01, key="rec_desconto_rs")
+                                 valor_juros = valor_original * (juros_pct / 100)
+                                 valor_final = valor_original + valor_juros - desconto_rs
+                                 jd3.metric("Valor Final", f"R$ {valor_final:,.2f}")
+
+                                 if valor_final <= 0:
+                                     st.error("O valor final não pode ser zero ou negativo.")
+                                 else:
+                                     novo_venc_jd = st.date_input("Novo Vencimento", value=pd.to_datetime(rec_data['data_vencimento']).date(), key="rec_venc_jd")
+                                     obs_juros = f" [Juros {juros_pct}%: +R${valor_juros:,.2f}]" if juros_pct > 0 else ""
+                                     obs_desc = f" [Desc: -R${desconto_rs:,.2f}]" if desconto_rs > 0 else ""
+                                     if st.button("Aplicar Juros/Desconto", type="primary", key="btn_rec_jd"):
+                                         nova_descricao = rec_data['descricao'] + obs_juros + obs_desc
+                                         run_query("UPDATE contas_a_receber SET data_vencimento=?, valor=?, descricao=? WHERE id=?",
+                                                   (novo_venc_jd.strftime("%Y-%m-%d"), valor_final, nova_descricao, rec_id))
+                                         st.success(f"Recebível atualizado! Novo valor: R$ {valor_final:,.2f}")
+                                         import time; time.sleep(1); st.rerun()
 
                          elif acao_rec == "Reparcelar":
                              st.markdown(f"**Valor original a reparcelar:** R$ {valor_original:,.2f}")
@@ -973,12 +982,15 @@ try:
                                  import time; time.sleep(1); st.rerun()
 
                          elif acao_rec == "Excluir/Cancelar":
-                             st.markdown("⚠️ **Tem certeza que deseja cancelar/excluir este recebível?**")
-                             st.markdown("Esta ação mudará o status do recebível para `'CANCELADO'` e ele não aparecerá mais nos recebimentos pendentes.")
-                             if st.button("Confirmar Cancelamento/Exclusão", type="primary", key="btn_rec_del"):
-                                 run_query("UPDATE contas_a_receber SET status='CANCELADO', descricao = descricao || ' [CANCELADO]' WHERE id=?", (rec_id,))
-                                 st.success("Recebível cancelado com sucesso!")
-                                 import time; time.sleep(1); st.rerun()
+                             if pd.notna(venda_id):
+                                 st.error("❌ Não é permitido cancelar/excluir recebíveis de vendas faturadas por aqui. Para excluir, você deve desfazer o faturamento do pedido correspondente na tela de Faturamento.")
+                             else:
+                                 st.markdown("⚠️ **Tem certeza que deseja cancelar/excluir este recebível?**")
+                                 st.markdown("Esta ação mudará o status do recebível para `'CANCELADO'` e ele não aparecerá mais nos recebimentos pendentes.")
+                                 if st.button("Confirmar Cancelamento/Exclusão", type="primary", key="btn_rec_del"):
+                                     run_query("UPDATE contas_a_receber SET status='CANCELADO', descricao = descricao || ' [CANCELADO]' WHERE id=?", (rec_id,))
+                                     st.success("Recebível cancelado com sucesso!")
+                                     import time; time.sleep(1); st.rerun()
 
     # ------------------ ABA 4: CONCILIAÇÃO BANCÁRIA ------------------
     with tab4:

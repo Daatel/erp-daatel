@@ -34,9 +34,9 @@ if not df_fluxo_gerencial.empty:
     rb_mes = float(df_mes[df_mes['tipo'] == 'Entrada']['valor'].sum())
     rb_90 = float(df_90d[df_90d['tipo'] == 'Entrada']['valor'].sum()) / 3
     
-    # Nível 2: Deduções (Devoluções e Impostos sobre Venda)
-    dev_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'].str.contains('devolução|reembolso|estorno|logística reversa', case=False, na=False))]['valor'].sum())
-    dev_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'].str.contains('devolução|reembolso|estorno|logística reversa', case=False, na=False))]['valor'].sum()) / 3
+    # Nível 2: Deduções (Devoluções, Abatimentos e Impostos sobre Venda)
+    dev_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & (df_mes['categoria'].str.contains('devolução|reembolso|estorno|logística reversa|desconto|abatimento', case=False, na=False))]['valor'].sum())
+    dev_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & (df_90d['categoria'].str.contains('devolução|reembolso|estorno|logística reversa|desconto|abatimento', case=False, na=False))]['valor'].sum()) / 3
     
     imp_venda_mes = float(df_mes[(df_mes['tipo'] == 'Saída') & ((df_mes['codigo'] == '2.1.3') | (df_mes['categoria'].str.contains('imposto.*venda|simples|icms|pis|cofins|das', case=False, na=False)))][ 'valor'].sum())
     imp_venda_90 = float(df_90d[(df_90d['tipo'] == 'Saída') & ((df_90d['codigo'] == '2.1.3') | (df_90d['categoria'].str.contains('imposto.*venda|simples|icms|pis|cofins|das', case=False, na=False)))][ 'valor'].sum()) / 3
