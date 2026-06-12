@@ -871,7 +871,6 @@ try:
                                  if not df_v.empty and pd.notna(df_v.iloc[0]['venda_id']):
                                      vid = int(df_v.iloc[0]['venda_id'])
                                      gerar_comissao_se_necessario(vid, 'LIQUIDAÇÃO', cli)
-                                 
                                  desc_final = f"REC. Cliente {cli}: {fat}"
                                  run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, TRUE)",
                                            (dt_rec.strftime("%Y-%m-%d"), desc_final, v_base, rr_id, bCid))
@@ -879,11 +878,111 @@ try:
                              st.success(f"✔️ {len(selec_rec)} recebimentos injetados no Fluxo do banco {banco_destino}!")
                              import time; time.sleep(2); st.rerun()
 
+             # --- RENEGOCIAÇÃO / EDIÇÃO DE RECEBÍVEL ---
+             with st.expander("✏️ Renegociar / Editar Recebível"):
+                 df_rec_edit = fetch_all("""
+                     SELECT c.id, cl.nome as cliente_nome, c.descricao, c.valor, c.data_vencimento, c.status, c.venda_id 
+                     FROM contas_a_receber c 
+                     LEFT JOIN clientes cl ON c.cliente_id = cl.id 
+                     WHERE c.status='PENDENTE' ORDER BY c.data_vencimento
+                 """)
+                 if df_rec_edit.empty:
+                     st.info("Nenhuma duplicata a receber pendente para editar.")
+                 else:
+                     opts_edit_rec = {}
+                     for _, r in df_rec_edit.iterrows():
+                         cli_lbl = r['cliente_nome'] if pd.notna(r['cliente_nome']) else "Genérico/Sem Cliente"
+                         lbl = f"#{r['id']} | {cli_lbl} | {r['descricao']} | R$ {r['valor']:,.2f} | Venc: {pd.to_datetime(r['data_vencimento']).strftime('%d/%m/%Y')}"
+                         opts_edit_rec[lbl] = r['id']
+                     
+                     sel_edit_rec = st.selectbox("Selecione o recebível:", list(opts_edit_rec.keys()), key="edit_rec_sel")
+                     if sel_edit_rec:
+                         rec_id = opts_edit_rec[sel_edit_rec]
+                         rec_data = fetch_all("SELECT * FROM contas_a_receber WHERE id=?", (rec_id,)).iloc[0]
+                         valor_original = float(rec_data['valor'])
+                         venda_id = rec_data['venda_id']
+
+                         if pd.notna(venda_id):
+                             st.warning(f"⚠️ **Atenção:** Este recebível está vinculado à **Venda #{int(venda_id)}**. Alterações diretas aqui podem causar divergências entre o Comercial e o Financeiro. Se precisar alterar dados da venda ou do faturamento, use a tela de **Faturamento** para estornar.")
+
+                         acao_rec = st.radio("O que deseja fazer?", ["Alterar Vencimento/Valor", "Aplicar Juros / Desconto", "Reparcelar", "Excluir/Cancelar"], horizontal=True, key="acao_rec")
+
+                         if acao_rec == "Alterar Vencimento/Valor":
+                             with st.form("form_edit_rec"):
+                                 ed1, ed2 = st.columns(2)
+                                 novo_venc = ed1.date_input("Novo Vencimento", value=pd.to_datetime(rec_data['data_vencimento']).date())
+                                 novo_valor = ed2.number_input("Novo Valor (R$)", value=valor_original, min_value=0.01)
+                                 nova_desc = st.text_input("Descrição", value=rec_data['descricao'])
+                                 if st.form_submit_button("Salvar Alteração"):
+                                     run_query("UPDATE contas_a_receber SET data_vencimento=?, valor=?, descricao=? WHERE id=?",
+                                               (novo_venc.strftime("%Y-%m-%d"), novo_valor, nova_desc, rec_id))
+                                     st.success("Recebível atualizado!")
+                                     import time; time.sleep(1); st.rerun()
+
+                         elif acao_rec == "Aplicar Juros / Desconto":
+                             st.markdown(f"**Valor original:** R$ {valor_original:,.2f}")
+                             jd1, jd2, jd3 = st.columns(3)
+                             juros_pct = jd1.number_input("Juros (%)", min_value=0.0, value=0.0, step=0.5, key="rec_juros_pct")
+                             desconto_rs = jd2.number_input("Desconto (R$)", min_value=0.0, value=0.0, step=0.01, key="rec_desconto_rs")
+                             valor_juros = valor_original * (juros_pct / 100)
+                             valor_final = valor_original + valor_juros - desconto_rs
+                             jd3.metric("Valor Final", f"R$ {valor_final:,.2f}")
+
+                             if valor_final <= 0:
+                                 st.error("O valor final não pode ser zero ou negativo.")
+                             else:
+                                 novo_venc_jd = st.date_input("Novo Vencimento", value=pd.to_datetime(rec_data['data_vencimento']).date(), key="rec_venc_jd")
+                                 obs_juros = f" [Juros {juros_pct}%: +R${valor_juros:,.2f}]" if juros_pct > 0 else ""
+                                 obs_desc = f" [Desc: -R${desconto_rs:,.2f}]" if desconto_rs > 0 else ""
+                                 if st.button("Aplicar Juros/Desconto", type="primary", key="btn_rec_jd"):
+                                     nova_descricao = rec_data['descricao'] + obs_juros + obs_desc
+                                     run_query("UPDATE contas_a_receber SET data_vencimento=?, valor=?, descricao=? WHERE id=?",
+                                               (novo_venc_jd.strftime("%Y-%m-%d"), valor_final, nova_descricao, rec_id))
+                                     st.success(f"Recebível atualizado! Novo valor: R$ {valor_final:,.2f}")
+                                     import time; time.sleep(1); st.rerun()
+
+                         elif acao_rec == "Reparcelar":
+                             st.markdown(f"**Valor original a reparcelar:** R$ {valor_original:,.2f}")
+                             rp1, rp2 = st.columns(2)
+                             n_parc = rp1.number_input("Nº de Parcelas", min_value=2, value=2, step=1, key="rec_n_repar")
+                             dias_entre = rp2.number_input("Dias entre Parcelas", min_value=1, value=30, step=1, key="rec_dias_repar")
+                             data_inicio = st.date_input("Data da 1ª Parcela", value=date.today(), key="rec_dt_repar")
+
+                             valor_parc = round(valor_original / n_parc, 2)
+                             diff_parc = round(valor_original - valor_parc * n_parc, 2)
+                             preview = []
+                             for i in range(n_parc):
+                                 v = valor_parc + (diff_parc if i == n_parc - 1 else 0)
+                                 d = data_inicio + timedelta(days=dias_entre * i)
+                                 preview.append({"Parcela": f"{i+1}/{n_parc}", "Vencimento": d.strftime("%d/%m/%Y"), "Valor": f"R$ {v:,.2f}"})
+                             st.dataframe(pd.DataFrame(preview), hide_index=True, use_container_width=True)
+
+                             if st.button("Confirmar Reparcelamento", type="primary", key="btn_rec_rep"):
+                                 run_query("UPDATE contas_a_receber SET status='CANCELADO', descricao = descricao || ' [REPARCELADO]' WHERE id=?", (rec_id,))
+                                 for i in range(n_parc):
+                                     v = valor_parc + (diff_parc if i == n_parc - 1 else 0)
+                                     d = data_inicio + timedelta(days=dias_entre * i)
+                                     nova_desc_rp = f"{rec_data['descricao']} (Repar. {i+1}/{n_parc})"
+                                     run_query(
+                                         "INSERT INTO contas_a_receber (cliente_id, venda_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                                         (int(rec_data['cliente_id']) if pd.notna(rec_data['cliente_id']) else None,
+                                          int(rec_data['venda_id']) if pd.notna(rec_data['venda_id']) else None,
+                                          int(rec_data['plano_conta_id']) if pd.notna(rec_data['plano_conta_id']) else None,
+                                          nova_desc_rp, v, d.strftime("%Y-%m-%d")))
+                                 st.success(f"Reparcelamento concluído! {n_parc} novos recebíveis criados.")
+                                 import time; time.sleep(1); st.rerun()
+
+                         elif acao_rec == "Excluir/Cancelar":
+                             st.markdown("⚠️ **Tem certeza que deseja cancelar/excluir este recebível?**")
+                             st.markdown("Esta ação mudará o status do recebível para `'CANCELADO'` e ele não aparecerá mais nos recebimentos pendentes.")
+                             if st.button("Confirmar Cancelamento/Exclusão", type="primary", key="btn_rec_del"):
+                                 run_query("UPDATE contas_a_receber SET status='CANCELADO', descricao = descricao || ' [CANCELADO]' WHERE id=?", (rec_id,))
+                                 st.success("Recebível cancelado com sucesso!")
+                                 import time; time.sleep(1); st.rerun()
+
     # ------------------ ABA 4: CONCILIAÇÃO BANCÁRIA ------------------
     with tab4:
         st.subheader("Auditoria e Conciliação Financeira c/ Inteligência de Dados")
-        st.markdown("O Livro Mestre: Cruze as linhas daqui com o Extrato do Aplicativo do Banco real.")
-        
         # Filtros de Conta
         conta_con = st.selectbox("Filtrar para verificar:", ["TODAS AS CONTAS"] + list(opcoes_bancos.keys()))
         
