@@ -91,6 +91,17 @@ with tab1:
             col_f1, col_f2, col_f3 = st.columns(3)
             
             tipo_doc = col_f1.selectbox("Tipo de Documento", ["Nota Fiscal (NF)", "DAV (Documento Auxiliar de Venda)"])
+            
+            # Aviso contextual por tipo de documento
+            if "DAV" in tipo_doc:
+                col_f1.success("✅ **DAV:** Número gerado automaticamente. Embarque liberado imediatamente após o faturamento.")
+            else:
+                col_f1.warning(
+                    "⏳ **Nota Fiscal:** O embarque na Logística ficará **retido** até o número "
+                    "oficial da SEFAZ ser registrado na aba *Gerador Fiscal*. "
+                    "Se precisar embarcar imediatamente, use a DAV."
+                )
+            
             sobrescrever = col_f2.checkbox("Sobrescrever Vencimento do Cliente?")
             venc_boleto_override = col_f2.date_input("Vencimento Forçado", value=date.today() + timedelta(days=30)) if sobrescrever else None
             
@@ -263,7 +274,49 @@ with tab1:
                         html_dav = gerar_html_dav(venda_info)
                         components.html(html_dav, height=800, scrolling=True)
                     elif venda_info:
-                        st.info("Documento selecionado não é um DAV. Documentos fiscais (NF) são impressos via Emissor SEFAZ externo.")
+                        # Painel de dados para NF (sem XML, mas com todas as informações do registro)
+                        st.markdown("#### 🧾 Dados da Nota Fiscal Registrada")
+                        df_nf_detail = fetch_all("""
+                            SELECT v.id, v.data, v.numero_documento, v.tipo_documento,
+                                   v.valor_total, v.quantidade, v.lote_impresso, v.validade_impressa,
+                                   c.nome as cliente, c.cnpj_cpf, c.cidade, c.uf,
+                                   p.nome as produto, f.nome as vendedor
+                            FROM vendas v
+                            JOIN clientes c ON v.cliente_id = c.id
+                            JOIN produtos p ON v.produto_id = p.id
+                            LEFT JOIN funcionarios f ON v.vendedor_id = f.id
+                            WHERE v.id = ?
+                        """, (vid,))
+                        if not df_nf_detail.empty:
+                            nf = df_nf_detail.iloc[0]
+                            num_nf = nf['numero_documento'] or "(Aguardando número SEFAZ)"
+                            data_fat = pd.to_datetime(nf['data']).strftime('%d/%m/%Y') if pd.notna(nf['data']) else "-"
+                            
+                            info_col1, info_col2, info_col3 = st.columns(3)
+                            info_col1.metric("Nº do Documento", num_nf)
+                            info_col1.metric("Data de Faturamento", data_fat)
+                            info_col1.metric("Tipo", nf['tipo_documento'])
+                            
+                            info_col2.metric("Cliente", nf['cliente'])
+                            info_col2.metric("CNPJ/CPF", nf['cnpj_cpf'] or "(não informado)")
+                            info_col2.metric("Cidade/UF", f"{nf['cidade'] or '-'} / {nf['uf'] or '-'}")
+                            
+                            info_col3.metric("Produto", nf['produto'])
+                            info_col3.metric("Quantidade", f"{nf['quantidade']:,.2f}")
+                            info_col3.metric("Valor Total", format_brl(nf['valor_total']))
+                            
+                            st.markdown("---")
+                            det_col1, det_col2 = st.columns(2)
+                            det_col1.info(f"📦 **Lote Impresso:** {nf['lote_impresso'] or '(não informado)'}")
+                            det_col2.info(f"📅 **Validade Impressa:** {nf['validade_impressa'] or '(não informada)'}")
+                            
+                            if not num_nf or num_nf == "(Aguardando número SEFAZ)":
+                                st.warning(
+                                    "⏳ Esta NF ainda não possui número SEFAZ registrado. "
+                                    "Registre o número na aba **Gerador Fiscal (SEFAZ/Emissor)** para liberar o embarque."
+                                )
+                            else:
+                                st.success(f"✅ NF autorizada. Para reimprimir o DANFE, utilize seu Emissor SEFAZ com o número **{num_nf}**.")
             else:
                 st.info("Nenhuma venda faturada encontrada.")
 

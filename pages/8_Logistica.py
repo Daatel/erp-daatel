@@ -112,7 +112,18 @@ with tab1:
             if not notas_selecionadas:
                 st.error("Selecione no mínimo 1 faturamento para viajar!")
             elif nfs_sem_numero:
-                st.error(f"🛑 **Erro de Expedição:** O caminhão não pode ser liberado! As seguintes Notas Fiscais estão pendentes do número oficial do SEFAZ: {', '.join(nfs_sem_numero)}. Favor registrar as numerações no módulo de Faturamento primeiro.")
+                st.error("🛑 **Embarque bloqueado — NF(s) sem número SEFAZ**")
+                for nf_label in nfs_sem_numero:
+                    st.markdown(f"- **{nf_label}**")
+                st.markdown(
+                    """
+**O que fazer?**
+
+→ **Opção 1 — Já emitiu a nota no SEFAZ:** vá em 📦 *Faturamento → Gerador Fiscal* e registre o número oficial. Volte aqui e libere o caminhão normalmente.
+
+→ **Opção 2 — Quer embarcar agora sem NF:** vá em 📦 *Faturamento → Reimpressão*, estorne o faturamento das notas acima e refature como **DAV**. A DAV libera o embarque imediatamente.
+                    """
+                )
             elif custo_frete == 0.0:
                 st.warning("Tem certeza que este frete será grátis (0 R$)? O custo para calcular a margem precisa ser real.")
             else:
