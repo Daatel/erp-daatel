@@ -406,6 +406,12 @@ try:
         
         # Action button using the same standard green buttons as ERP (from estilo.py)
         if st.button("📊 Gerar Relatório de Clientes / Fornecedores", type="primary", use_container_width=False):
+            # Clear previous report preview immediately to avoid displaying stale data on empty results
+            if 'relatorio_preview' in st.session_state:
+                del st.session_state['relatorio_preview']
+            if 'relatorio_filtros' in st.session_state:
+                del st.session_state['relatorio_filtros']
+                
             # Fetch all possible receivables and payables in the period
             df_recs_rep = pd.DataFrame()
             df_pags_rep = pd.DataFrame()
