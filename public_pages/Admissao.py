@@ -123,7 +123,7 @@ with st.form("form_pre_cadastro", clear_on_submit=True):
         col18, col19, col20 = st.columns(3)
         dados_bancarios = col18.text_input("Banco, Agência e Conta").strip()
         tipo_conta = col19.selectbox("Tipo de Conta", ["Corrente", "Salário", "Poupança"])
-        chave_pix = col20.text_input("Chave PIX").strip()
+        chave_pix = col20.text_input("Código Pix").strip()
         
         col21, col22 = st.columns(2)
         dependente1 = col21.text_input("Dependente 1 (Nome, CPF, Nascimento)").strip()

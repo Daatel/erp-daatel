@@ -238,6 +238,7 @@ def _create_tables_internal(conn):
         prazo_pagamento_dias INTEGER DEFAULT 30,
         representante_id INTEGER,
         data_nascimento DATE,
+        chave_pix TEXT,
         FOREIGN KEY(representante_id) REFERENCES funcionarios(id)
     )
     ''')
@@ -259,7 +260,8 @@ def _create_tables_internal(conn):
         email TEXT,
         plano_de_contas TEXT,
         status TEXT,
-        prazo_pagamento TEXT
+        prazo_pagamento TEXT,
+        chave_pix TEXT
     )
     ''')
     
@@ -773,7 +775,9 @@ def _create_tables_internal(conn):
         "ALTER TABLE rh_pagamentos ADD COLUMN desconto_faltas REAL DEFAULT 0.0",
         "ALTER TABLE rh_pagamentos ADD COLUMN desconto_dsr REAL DEFAULT 0.0",
         "ALTER TABLE rh_pagamentos ADD COLUMN desc_vr REAL DEFAULT 0.0",
-        "ALTER TABLE rh_pagamentos ADD COLUMN adiantamento REAL DEFAULT 0.0"
+        "ALTER TABLE rh_pagamentos ADD COLUMN adiantamento REAL DEFAULT 0.0",
+        "ALTER TABLE clientes ADD COLUMN chave_pix TEXT",
+        "ALTER TABLE fornecedores ADD COLUMN chave_pix TEXT"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)

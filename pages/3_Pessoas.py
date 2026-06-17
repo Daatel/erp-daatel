@@ -103,7 +103,7 @@ with tab_cadastro:
                 col1, col2, col3 = st.columns(3)
                 dados_bancarios = col1.text_input("Banco / Agência / Conta", key="reg_banco")
                 tipo_conta = col2.selectbox("Tipo de Conta", ["Corrente", "Salário", "Poupança"], key="reg_tconta")
-                chave_pix = col3.text_input("Chave PIX (Opcional)", key="reg_pix")
+                chave_pix = col3.text_input("Código Pix (Opcional)", key="reg_pix")
                 col4, col5 = st.columns(2)
                 dependente1 = col4.text_input("Dependente 1 (Nome / CPF / Nasc.)", key="reg_dep1")
                 dependente2 = col5.text_input("Dependente 2 (Nome / CPF / Nasc.)", key="reg_dep2")
@@ -249,7 +249,7 @@ with tab_cadastro:
                         db_tc = f_data.get('tipo_conta', 'Corrente')
                         if db_tc not in tc_opts: db_tc = "Corrente"
                         ef_tipo_conta = col2.selectbox("Tipo de Conta", tc_opts, index=tc_opts.index(db_tc))
-                        ef_pix = col3.text_input("Chave PIX (Opcional)", f_data.get('chave_pix', '') or '')
+                        ef_pix = col3.text_input("Código Pix (Opcional)", f_data.get('chave_pix', '') or '')
                         col4, col5 = st.columns(2)
                         ef_dep1 = col4.text_input("Dependente 1 (Nome / CPF / Nasc.)", f_data.get('dependente1', '') or '')
                         ef_dep2 = col5.text_input("Dependente 2 (Nome / CPF / Nasc.)", f_data.get('dependente2', '') or '')
@@ -375,7 +375,7 @@ with tab_aprovacoes:
         "💡 Tenha em mãos:\n"
         "- RG, CPF e PIS / PASEP\n"
         "- Comprovante de Residência recente\n"
-        "- Dados Bancários ou Chave PIX\n\n"
+        "- Dados Bancários ou Código Pix\n\n"
         "Qualquer dúvida, é só chamar aqui! 😊"
     )
     _tel_limpo = re.sub(r'\D', '', _tel_cand)
@@ -454,7 +454,7 @@ with tab_aprovacoes:
                 col19, col20, col21 = st.columns(3)
                 c_dados_bancarios = col19.text_input("Banco, Agência e Conta", value=cand['dados_bancarios'] or "")
                 c_tipo_conta = col20.selectbox("Tipo de Conta", ["Corrente", "Salário", "Poupança"], index=["Corrente", "Salário", "Poupança"].index(cand['tipo_conta'] or "Corrente"))
-                c_chave_pix = col21.text_input("Chave PIX", value=cand['chave_pix'] or "")
+                c_chave_pix = col21.text_input("Código Pix", value=cand['chave_pix'] or "")
                 
                 col22, col23 = st.columns(2)
                 c_dependente1 = col22.text_input("Dependente 1", value=cand['dependente1'] or "")

@@ -379,6 +379,7 @@ with tab2:
                                     rede_val = row.get('Rede de Clientes', '')
                                     grupo_val = row.get('Grupo de Lojas', '')
                                     prazo_pag = row.get('PRAZO DE PAGAMENTO', '')
+                                    chave_pix_val = row.get('Código Pix', row.get('Chave Pix', ''))
                                     
                                     rep_nome = row.get('Representante', '')
                                     rep_id = rep_id_map.get(rep_nome, None) if rep_nome else None
@@ -386,13 +387,13 @@ with tab2:
                                     query_insert = """INSERT INTO clientes 
                                                (nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual, 
                                                 bairro, cep, cidade, uf, email, observacoes, status, rede_clientes, 
-                                                grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga) 
-                                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                                                grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix) 
+                                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
                                     
                                     run_query(query_insert, (
                                         razao, telefone, endereco, nome_fantasia, cnpj, insc_estadual,
                                         bairro, cep, cidade, uf, email, observacoes, status_val, rede_val,
-                                        grupo_val, prazo_pag, rep_id, None, 30, 0.0, ""
+                                        grupo_val, prazo_pag, rep_id, None, 30, 0.0, "", chave_pix_val
                                     ))
                                     imported_count += 1
                                     
@@ -437,10 +438,11 @@ with tab2:
         cidade = c9.text_input("Cidade")
         uf = c10.text_input("UF")
         
-        c11, c12, c13 = st.columns(3)
+        c11, c12, c13, c_pix = st.columns(4)
         cep = c11.text_input("CEP")
         grupo_lojas = c12.selectbox("2. Grupo (Sub-rede)", grupos_opts)
         status = c13.selectbox("Status", ["ATIVO", "INATIVO"])
+        chave_pix = c_pix.text_input("Código Pix")
         
         c14, c15, c16, c17 = st.columns(4)
         prazo_pagamento = c14.text_input("Prazo Pagt. Texto (Ex: 30/60)")
@@ -448,7 +450,7 @@ with tab2:
         rep_nome = c16.selectbox("Representante Responsável", rep_options)
         observacoes = c17.text_input("Observações")
         
-        st.info(f"Rede Vinculada a este cliente: **{rede_dinamica}**")
+        st.info(f"Rede Vinculada a este client: **{rede_dinamica}**")
         
         st.markdown("##### Logística e Descarga")
         c18, c19 = st.columns([1, 3])
@@ -464,13 +466,13 @@ with tab2:
                 query = """INSERT INTO clientes 
                            (nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual, 
                             bairro, cep, cidade, uf, email, observacoes, status, rede_clientes, 
-                            grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                            grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
                 
                 run_query(query, (
                     nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual,
                     bairro, cep, cidade, uf, email, observacoes, status, rede_val,
-                    grupo_val, prazo_pagamento, req_id, nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga
+                    grupo_val, prazo_pagamento, req_id, nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix
                 ))
                 st.success("Cliente cadastrado com sucesso!")
             else:
@@ -481,7 +483,7 @@ with tab2:
     df_clientes = fetch_all("""
         SELECT c.id, c.nome as 'Razão Social', c.cnpj_cpf as 'CNPJ/CPF', c.cidade as 'Cidade', c.uf as 'UF', 
                c.rede_clientes as 'Rede', c.grupo_lojas as 'Grupo', c.status as 'Status', f.nome as 'Representante',
-               c.taxa_descarga as 'Taxa Descarga (R$)', c.regras_descarga as 'Regras Descarga'
+               c.taxa_descarga as 'Taxa Descarga (R$)', c.regras_descarga as 'Regras Descarga', c.chave_pix as 'Código Pix'
         FROM clientes c
         LEFT JOIN funcionarios f ON c.representante_id = f.id
     """)
@@ -507,13 +509,14 @@ with tab2:
                         edoc = ec2.text_input("CNPJ/CPF", cb['cnpj_cpf'] if cb['cnpj_cpf'] else "")
                         erede = ec3.text_input("Rede", cb['rede_clientes'] if cb['rede_clientes'] else "")
                         
-                        ec4, ec5, ec_dias = st.columns(3)
+                        ec4, ec5, ec_dias, ec_pix = st.columns(4)
                         eprazo = ec4.text_input("Prazo Padrão", cb['prazo_pagamento'] if cb.get('prazo_pagamento') else "")
                         eprazo_dias = ec_dias.number_input("Prazo Faturamento (Dias)", value=int(cb.get('prazo_pagamento_dias', 30)) if 'prazo_pagamento_dias' in cb and pd.notnull(cb['prazo_pagamento_dias']) else 30)
                         
                         c_stts = ["ATIVO", "INATIVO"]
                         d_stts = cb['status'] if cb['status'] in c_stts else "ATIVO"
                         estatus = ec5.selectbox("Status da Conta", c_stts, index=c_stts.index(d_stts))
+                        echave_pix = ec_pix.text_input("Código Pix", cb.get('chave_pix', '') if cb.get('chave_pix') else "")
                         
                         st.markdown("##### Logística e Descarga")
                         ec_l1, ec_l2 = st.columns([1, 3])
@@ -521,8 +524,8 @@ with tab2:
                         eregras = ec_l2.text_input("Regras/Horários de Descarga", cb.get('regras_descarga', '') if cb.get('regras_descarga') else "")
                         
                         if st.form_submit_button("Salvar Cliente"):
-                            run_query("UPDATE clientes SET nome=?, cnpj_cpf=?, rede_clientes=?, prazo_pagamento=?, status=?, prazo_pagamento_dias=?, taxa_descarga=?, regras_descarga=? WHERE id=?", 
-                                      (enome, edoc, erede, eprazo, estatus, eprazo_dias, etaxa, eregras, cid))
+                            run_query("UPDATE clientes SET nome=?, cnpj_cpf=?, rede_clientes=?, prazo_pagamento=?, status=?, prazo_pagamento_dias=?, taxa_descarga=?, regras_descarga=?, chave_pix=? WHERE id=?", 
+                                      (enome, edoc, erede, eprazo, estatus, eprazo_dias, etaxa, eregras, echave_pix, cid))
                             st.success("Cliente alterado!")
                             import time; time.sleep(1); st.rerun()
 
@@ -559,7 +562,9 @@ with tab3:
         else:
             plano_de_contas = c13.text_input("Plano de Contas")
             
-        prazo_pagamento = st.text_input("Condição/Prazo Pagamento Padrão (Ex: A Vista, 30/60, etc)")
+        col_prazo, col_pix = st.columns(2)
+        prazo_pagamento = col_prazo.text_input("Condição/Prazo Pagamento Padrão (Ex: A Vista, 30/60, etc)")
+        chave_pix = col_pix.text_input("Código Pix")
             
         if st.form_submit_button("Cadastrar Fornecedor"):
             if plano_de_contas == "(Nenhum/Outro)":
@@ -568,12 +573,12 @@ with tab3:
             if nome and nome_fantasia:
                 query = """INSERT INTO fornecedores 
                            (nome, telefone, cnpj_cpf, nome_fantasia, inscricao_estadual,
-                            endereco, bairro, cep, cidade, uf, email, plano_de_contas, status, prazo_pagamento) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                            endereco, bairro, cep, cidade, uf, email, plano_de_contas, status, prazo_pagamento, chave_pix) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
                 
                 run_query(query, (
                     nome, telefone, cnpj_cpf, nome_fantasia, inscricao_estadual,
-                    endereco, bairro, cep, cidade, uf, email, plano_de_contas, status, prazo_pagamento
+                    endereco, bairro, cep, cidade, uf, email, plano_de_contas, status, prazo_pagamento, chave_pix
                 ))
                 st.success("Fornecedor cadastrado com sucesso!")
             else:
@@ -581,7 +586,7 @@ with tab3:
                 
     st.markdown("---")
     st.subheader("Fornecedores Cadastrados")
-    df_fornecedores = fetch_all("SELECT id, nome as 'Razão Social', nome_fantasia as 'Nome Fantasia', cnpj_cpf as 'CNPJ', prazo_pagamento as 'Prazo Padrão', status as 'Status' FROM fornecedores")
+    df_fornecedores = fetch_all("SELECT id, nome as 'Razão Social', nome_fantasia as 'Nome Fantasia', cnpj_cpf as 'CNPJ', prazo_pagamento as 'Prazo Padrão', status as 'Status', chave_pix as 'Código Pix' FROM fornecedores")
     if not df_fornecedores.empty:
         export_btn(df_fornecedores, 'fornecedores.csv')
         st.dataframe(df_fornecedores, width="stretch", hide_index=True)
@@ -629,7 +634,9 @@ with tab3:
                         else:
                             eplano_de_contas = ef13.text_input("Plano de Contas", fb.get('plano_de_contas', '') if fb.get('plano_de_contas') else "")
                             
-                        eprazo = st.text_input("Condição/Prazo Pagamento Padrão", fb.get('prazo_pagamento', '') if fb.get('prazo_pagamento') else "")
+                        col_eprazo, col_epix = st.columns(2)
+                        eprazo = col_eprazo.text_input("Condição/Prazo Pagamento Padrão", fb.get('prazo_pagamento', '') if fb.get('prazo_pagamento') else "")
+                        echave_pix = col_epix.text_input("Código Pix", fb.get('chave_pix', '') if fb.get('chave_pix') else "")
                         
                         if st.form_submit_button("Salvar Fornecedor"):
                             if eplano_de_contas == "(Nenhum/Outro)":
@@ -639,9 +646,9 @@ with tab3:
                                 run_query("""
                                     UPDATE fornecedores 
                                     SET nome=?, nome_fantasia=?, cnpj_cpf=?, inscricao_estadual=?, telefone=?, email=?,
-                                        endereco=?, bairro=?, cidade=?, uf=?, cep=?, status=?, plano_de_contas=?, prazo_pagamento=? 
+                                        endereco=?, bairro=?, cidade=?, uf=?, cep=?, status=?, plano_de_contas=?, prazo_pagamento=?, chave_pix=? 
                                     WHERE id=?
-                                """, (enome, efantasia, edoc, eie, etelefone, eemail, eendereco, ebairro, ecidade, euf, ecep, estatus, eplano_de_contas, eprazo, fid))
+                                """, (enome, efantasia, edoc, eie, etelefone, eemail, eendereco, ebairro, ecidade, euf, ecep, estatus, eplano_de_contas, eprazo, echave_pix, fid))
                                 st.success("Fornecedor atualizado com sucesso!")
                                 import time; time.sleep(1); st.rerun()
                             else:
