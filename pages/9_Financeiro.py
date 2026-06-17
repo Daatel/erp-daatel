@@ -115,7 +115,7 @@ try:
 
     # ================== GUIAS ==================
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-        "📊 Dashboard 30 Dias", 
+        "📊 Painel Executivo", 
         "🔻 Contas a Pagar (Saída)", 
         "🟢 Contas a Receber (Entrada)", 
         "🏦 Conciliação Bancária",
