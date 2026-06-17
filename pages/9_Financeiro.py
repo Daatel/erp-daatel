@@ -415,7 +415,7 @@ try:
                 for _, r in df_cli.iterrows():
                     op_cli[f"{r['nome']} ({r['cnpj_cpf']})"] = r['id']
                     
-            with st.form("lancar_pagar_manual"):
+            with st.form("lancar_pagar_manual", clear_on_submit=True):
                 col_m1, col_m2 = st.columns(2)
                 forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()) if op_forn else ["Nenhum Fornecedor Cadastrado"])
                 pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()) if op_pc else ["Nenhum Plano Cadastrado"])
@@ -732,7 +732,7 @@ try:
             if not df_planos.empty:
                 for _,r in df_planos.iterrows(): op_plan[r['nome']] = r['id']
                 
-            with st.form("lancar_receber"):
+            with st.form("lancar_receber", clear_on_submit=True):
                 c1, c2 = st.columns(2)
                 cli_nome = c1.selectbox("Cliente", list(op_cli.keys()))
                 venc = c2.date_input("Vencimento", date.today() + timedelta(days=15))
@@ -1129,7 +1129,7 @@ try:
         Isso registrará automaticamente um lançamento de saída na conta de origem e um lançamento de entrada na conta de destino.
         """)
         
-        with st.form("form_transferencia_contas"):
+        with st.form("form_transferencia_contas", clear_on_submit=True):
             col_t1, col_t2 = st.columns(2)
             
             # Conta Origem

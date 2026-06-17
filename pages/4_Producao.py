@@ -38,7 +38,7 @@ tab1, tab2 = st.tabs(["🏭 Apontamento de Novo Lote", "📜 Histórico de Produ
 # TAB 1: APONTAMENTO E CUSTEIO
 # =========================================================
 with tab1:
-    with st.form("form_producao", clear_on_submit=False):
+    with st.form("form_producao", clear_on_submit=True):
         st.subheader("⏱️ 1. Setup de Lote e Temporalidade")
         st.markdown("A duração da máquina ligada definirá o rateio de custo de Overhead (Energia, Salários, etc).")
         

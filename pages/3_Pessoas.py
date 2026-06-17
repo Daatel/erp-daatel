@@ -669,7 +669,7 @@ with tab2:
             db_vr_desc = vr_desc_dict.get(nome_pgto, 'Sem desconto')
             _f = _calc_folha(base_sal, base_ajuda, base_outros, base_vt, db_vt_desc, base_vr_d, db_vr_desc, 22, emp_regime)
 
-            with st.form("form_pagamento", clear_on_submit=False):
+            with st.form("form_pagamento", clear_on_submit=True):
                 col1, col2, col3 = st.columns(3)
                 data_pgto = col1.date_input("Data de Pagamento", value=date.today(), format="DD/MM/YYYY")
                 mes_ref   = col2.text_input("Mês Referência (Ex: 03/2026)", value=data_pgto.strftime("%m/%Y"))

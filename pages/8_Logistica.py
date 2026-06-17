@@ -30,7 +30,7 @@ with tab1:
        ORDER BY v.data DESC
     ''')
     
-    with st.form("form_manifesto"):
+    with st.form("form_manifesto", clear_on_submit=True):
         col1, col2, col3 = st.columns(3)
         dt_saida = col1.date_input("Data Oficial de Despacho", value=date.today())
         tipo_frota = col2.selectbox("Natureza do Veículo", ["Frota Própria", "Frete Terceirizado"])

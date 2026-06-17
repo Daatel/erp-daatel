@@ -425,7 +425,7 @@ with tab3:
     st.subheader("Processamento de Devoluções e Revalidação")
     st.markdown("Mercadoria que chegou podre no destino ou venceu na gôndola. Isso abaterá o imposto lá no DRE (como Logística Reversa).")
     
-    with st.form("form_devol"):
+    with st.form("form_devol", clear_on_submit=True):
         d1, d2 = st.columns(2)
         dt_dev = d1.date_input("Data do Ocorrido")
         

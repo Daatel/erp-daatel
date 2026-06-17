@@ -134,7 +134,7 @@ with tab1:
     elif df_clientes.empty:
         st.warning("⚠️ Nenhum cliente cadastrado.")
     else:
-        with st.form("form_comodato"):
+        with st.form("form_comodato", clear_on_submit=True):
             c_cli, c_maq = st.columns(2)
             
             cli_dict = {f"{r['nome']} - CNPJ: {r['cnpj']}": r['id'] for _, r in df_clientes.iterrows()}
