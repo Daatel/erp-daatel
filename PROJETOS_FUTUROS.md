@@ -102,6 +102,21 @@ Este documento registra as ideias, necessidades e módulos planejados para futura
 
 ---
 
+### 6. Provisionamento Recorrente (Provisório vs. Efetivo)
+
+* **Objetivo:** Lançar previsões de despesas ou receitas recorrentes de valor estimado (Ex: Luz, Água, Telefone) para até 12 meses, permitindo uma projeção de fluxo de caixa muito mais realista.
+* **Escopo:**
+  * Criação de botão/opção "Lançamento Recorrente (Provisório)" nas telas de Contas a Pagar e Receber.
+  * Geração automática em lote de até 12 parcelas com data de vencimento incremental e valor fixo/estimado.
+  * Atribuição de uma tag/flag de status: `PROVISÓRIO` (para estimativas) e `EFETIVO` (para quando o valor real da fatura chega).
+  * Possibilidade de editar o valor e mudar o status para `EFETIVO` de forma rápida ao receber a conta real.
+  * Integração dos provisionamentos provisórios na visualização e nos gráficos de Projeção de Fluxo de Caixa (com opção de ativá-los/desativá-los no gráfico).
+* **Impacto:** Muito Alto - Fornece previsibilidade real para o fluxo de caixa, evitando surpresas com contas recorrentes que ainda não foram faturadas.
+* **Complexidade:** Baixa-Média
+* **Público-alvo:** Perfil `FINANCEIRO` e `ADMIN`.
+
+---
+
 ---
 
 ## P2 — Inteligência Operacional
@@ -121,7 +136,7 @@ Este documento registra as ideias, necessidades e módulos planejados para futura
 
 ---
 
-### ?? 7. Painel Financeiro (BI Financeiro Operacional)
+### [CONCLUIDO] 7. Painel Financeiro (BI Financeiro Operacional)
 
 * **Objetivo:** Criar um ambiente de Business Intelligence focado na operação financeira diária e fluxo de caixa.
 * **Escopo:**
@@ -133,7 +148,7 @@ Este documento registra as ideias, necessidades e módulos planejados para futura
 
 ---
 
-### ?? 8. Reforma do Painel Executivo (CEO Cockpit)
+### [CONCLUIDO] 8. Reforma do Painel Executivo (CEO Cockpit)
 
 * **Objetivo:** Transformar o atual Dashboard em uma central de inteligência estratégica para o gestor geral / CEO.
 * **Escopo:**
