@@ -4,7 +4,8 @@ from datetime import date, timedelta
 from database import (
     run_query, fetch_all, gerar_comissao_se_necessario,
     db_transaction, run_query_tx, fetch_all_tx,
-    consumir_estoque_fifo_tx, gerar_comissao_se_necessario_tx
+    consumir_estoque_fifo_tx, gerar_comissao_se_necessario_tx,
+    get_clientes_ativos_cached, get_produtos_cached
 )
 from estilo import carregar_estilo
 
@@ -19,8 +20,8 @@ def format_brl(val):
         return "R$ 0,00"
     return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-df_clientes = fetch_all("SELECT id, nome, uf FROM clientes WHERE status='ATIVO'")
-df_produtos = fetch_all("SELECT id, nome, preco_venda_base FROM produtos")
+df_clientes = get_clientes_ativos_cached()
+df_produtos = get_produtos_cached()
 
 tab1, tab2, tab3 = st.tabs(["🚀 Fila de Faturamento (Em Lote)", "📂 Gerador Fiscal (SEFAZ/Emissor)", "🔄 Logística Reversa (Devoluções)"])
 
@@ -539,6 +540,7 @@ with tab3:
                               (dt_dev, p_id, 'Entrada', qtd_dev, 'Devolução de Cliente', f"Motivo: {motivo} (Cliente: {cli_dev})"))
     
                     st.error(f"Devolução Homologada! Mercadoria retornou ao estoque com custo R$0,00. Custo médio do produto caiu para R$ {novo_custo_medio:.2f}. Impacto DRE: R$ -{valor_abatido:,.2f}")
+                    st.cache_data.clear()
                     import time; time.sleep(4); st.rerun()
             
     st.markdown("---")

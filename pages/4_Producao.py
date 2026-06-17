@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, datetime, timedelta
-from database import run_query, fetch_all, db_transaction, run_query_tx, fetch_all_tx
+from database import run_query, fetch_all, db_transaction, run_query_tx, fetch_all_tx, get_produtos_cached
 from estilo import carregar_estilo
 
 st.set_page_config(page_title="Produção e Custeio", page_icon="🏭", layout="wide")
@@ -14,7 +14,7 @@ st.markdown("Aponte Lotes de Fabricação, controle as perdas da esteira e apure
 if 'num_insumos' not in st.session_state:
     st.session_state['num_insumos'] = 3
 
-df_produtos = fetch_all("SELECT id, nome, is_materia_prima, custo_unidade FROM produtos")
+df_produtos = get_produtos_cached()
 if df_produtos.empty:
     st.warning("Cadastre produtos primeiro na aba de Cadastros.")
     st.stop()

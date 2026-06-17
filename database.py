@@ -4,6 +4,14 @@ import os
 import streamlit as st
 import hashlib
 import secrets
+import logging
+
+# Configuração de Logger Estruturado (Fase 5)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger("erp-alho")
 
 DB_NAME = "erp_fabrica.db"
 
@@ -18,8 +26,7 @@ def verify_password(stored_password: str, provided_password: str) -> bool:
     if not stored_password or not provided_password:
         return False
     if not stored_password.startswith("sha256$"):
-        # Retrocompatibilidade com senhas antigas em texto plano
-        return stored_password == provided_password
+        return False
     try:
         parts = stored_password.split("$")
         if len(parts) != 3:
@@ -138,9 +145,32 @@ def create_tables():
     finally:
         release_connection(conn)
 
+def migrar_senhas_usuarios(conn):
+    """
+    Migra qualquer senha de usuário em texto plano para SHA256 com Salt.
+    """
+    cursor = conn.cursor()
+    cursor.execute(format_pg("SELECT id, senha FROM usuarios"))
+    rows = cursor.fetchall()
+    migrados = 0
+    for row in rows:
+        uid, senha = row[0], row[1]
+        if senha and not senha.startswith("sha256$"):
+            hashed = hash_password(senha)
+            cursor.execute(format_pg("UPDATE usuarios SET senha = ? WHERE id = ?"), (hashed, uid))
+            migrados += 1
+    if migrados > 0:
+        conn.commit()
+        print(f"[MIGRAÇÃO] {migrados} senhas legadas criptografadas com sucesso!")
+
 @st.cache_resource
 def initialize_database():
     create_tables()
+    conn = get_connection()
+    try:
+        migrar_senhas_usuarios(conn)
+    finally:
+        release_connection(conn)
     return True
 
 def _create_tables_internal(conn):
@@ -711,6 +741,12 @@ def _create_tables_internal(conn):
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO empresa_config (razao_social, nome_fantasia, cnpj, endereco_completo) VALUES ('Empório do Alho LTDA', 'Empório do Alho', '00.000.000/0001-00', 'Rua Principal, 123 - Centro')")
 
+    # Criar índices de desempenho para otimização de consultas (Fase 1)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_mov_produto ON estoque_movimentos(produto_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_mov_lote ON estoque_movimentos(lote_origem_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_vendas_cliente ON vendas(cliente_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_contas_receber_venda ON contas_a_receber(venda_id)")
+
     conn.commit() # Salva as tabelas base antes das migrações de coluna
 
     # Migração: Adicionar colunas se não existirem
@@ -859,10 +895,18 @@ def clean_params(params):
 
 def run_query(query, params=()):
     params = clean_params(params)
-    with db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(format_pg(query), params)
-        conn.commit()
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(format_pg(query), params)
+            conn.commit()
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
+    except Exception as e:
+        logger.error(f"Erro no run_query: {e} | Query: {query}")
+        raise e
 
 def fetch_all(query, params=()):
     params = clean_params(params)
@@ -882,12 +926,17 @@ def fetch_all(query, params=()):
             cursor.close()
             return df
     except Exception as e:
+        logger.error(f"Erro no fetch_all: {e} | Query: {query}")
         st.error(f"Erro no fetch_all: {e}")
         return pd.DataFrame()
 
 def run_query_tx(cursor, query, params=()):
     params = clean_params(params)
     cursor.execute(format_pg(query), params)
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
 
 def fetch_all_tx(cursor, query, params=()):
     params = clean_params(params)
@@ -1342,6 +1391,26 @@ def enviar_relatorio_resumo_executivo() -> tuple[bool, str]:
         return enviar_mensagem_telegram(msg)
     except Exception as e:
         return False, f"Erro ao gerar resumo executivo: {str(e)}"
+
+@st.cache_data(ttl=600)
+def get_clientes_ativos_cached():
+    return fetch_all("SELECT * FROM clientes WHERE status='ATIVO'")
+
+@st.cache_data(ttl=600)
+def get_produtos_cached():
+    return fetch_all("SELECT * FROM produtos")
+
+@st.cache_data(ttl=600)
+def get_fornecedores_ativos_cached():
+    return fetch_all("SELECT * FROM fornecedores WHERE status='ATIVO'")
+
+def enviar_relatorio_profilaxia_async():
+    import threading
+    threading.Thread(target=enviar_relatorio_profilaxia, daemon=True).start()
+
+def enviar_relatorio_resumo_executivo_async():
+    import threading
+    threading.Thread(target=enviar_relatorio_resumo_executivo, daemon=True).start()
 
 if __name__ == "__main__":
     create_tables()
