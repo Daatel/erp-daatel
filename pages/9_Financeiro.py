@@ -349,9 +349,29 @@ try:
         if 'rep_dt_fim' not in st.session_state:
             st.session_state['rep_dt_fim'] = date.today() + timedelta(days=30)
             
-        col_r1, col_r2 = st.columns(2)
-        r_dt_inicio = col_r1.date_input("Data de Início", value=st.session_state['rep_dt_inicio'], key="rep_start_date")
-        r_dt_fim = col_r2.date_input("Data de Fim", value=st.session_state['rep_dt_fim'], key="rep_end_date")
+        st.markdown("##### 📅 Filtro por Período de Vencimento")
+        col_rf1, col_rf2, col_rf3, col_rf4, col_rf5 = st.columns([1, 1.3, 1.3, 2, 2])
+        
+        col_rf1.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+        if col_rf1.button("📅 Hoje", use_container_width=True, key="btn_rep_hoje"):
+            st.session_state['rep_dt_inicio'] = date.today()
+            st.session_state['rep_dt_fim'] = date.today()
+            st.rerun()
+            
+        col_rf2.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+        if col_rf2.button("📅 Últimos 7 Dias", use_container_width=True, key="btn_rep_7d"):
+            st.session_state['rep_dt_inicio'] = date.today() - timedelta(days=7)
+            st.session_state['rep_dt_fim'] = date.today()
+            st.rerun()
+            
+        col_rf3.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+        if col_rf3.button("📅 Últimos 30 Dias", use_container_width=True, key="btn_rep_30d"):
+            st.session_state['rep_dt_inicio'] = date.today() - timedelta(days=30)
+            st.session_state['rep_dt_fim'] = date.today()
+            st.rerun()
+            
+        r_dt_inicio = col_rf4.date_input("Data de Início", value=st.session_state['rep_dt_inicio'], key="rep_start_date_input")
+        r_dt_fim = col_rf5.date_input("Data de Fim", value=st.session_state['rep_dt_fim'], key="rep_end_date_input")
         
         # Update session states
         st.session_state['rep_dt_inicio'] = r_dt_inicio
@@ -385,7 +405,7 @@ try:
         st.markdown("<br>", unsafe_allow_html=True)
         
         # Action button using the same standard green buttons as ERP (from estilo.py)
-        if st.button("📊 Gerar Relatório de Clientes / Fornecedores", type="primary", use_container_width=True):
+        if st.button("📊 Gerar Relatório de Clientes / Fornecedores", type="primary", use_container_width=False):
             # Fetch all possible receivables and payables in the period
             df_recs_rep = pd.DataFrame()
             df_pags_rep = pd.DataFrame()
