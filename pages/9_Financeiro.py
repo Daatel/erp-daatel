@@ -126,7 +126,7 @@ try:
     # ------------------ ABA 1: DASHBOARD E PROJEÇÃO 30D ------------------
     with tab1:
         # 1. Verification of Last Reconciliation (Tolerance D-1)
-        df_max_conc = fetch_all("SELECT MAX(data) as max_data FROM fluxo_caixa WHERE conciliado = TRUE OR conciliado = 1")
+        df_max_conc = fetch_all("SELECT MAX(data) as max_data FROM fluxo_caixa WHERE conciliado = TRUE")
         last_conc_date = None
         out_of_tolerance = False
         if not df_max_conc.empty and pd.notna(df_max_conc.iloc[0]['max_data']):
