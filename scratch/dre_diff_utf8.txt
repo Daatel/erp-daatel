@@ -1,0 +1,598 @@
+﻿diff --git a/pages/10_DRE.py b/pages/10_DRE.py
+index 8b22fbf..c2caced 100644
+--- a/pages/10_DRE.py
++++ b/pages/10_DRE.py
+@@ -11,293 +11,333 @@ st.title("­ƒÅø´©Å Demonstrativo do Resultado do Exerc├¡cio (DRE)")
+ st.markdown("A Verdade Nua e Crua: Sua f├íbrica d├í lucro ou preju├¡zo faturando o que fatura hoje?")
+ 
+ def f_br(valor):
+-    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+-
+-# 1. Puxar Dados Brutos (Caixa) com Plano de Contas Hier├írquico
+-df_fluxo_gerencial = fetch_all("""
+-    SELECT fc.data, fc.tipo, fc.valor, fc.categoria, pc.codigo, pc.categoria as pc_cat, pc.nome as pc_nome
+-    FROM fluxo_caixa fc
+-    LEFT JOIN planos_de_contas pc ON fc.categoria = pc.nome
+-""")
+-hoje = pd.to_datetime('today')
+-
+-if not df_fluxo_gerencial.empty:
+-    df_fluxo_gerencial['data'] = pd.to_datetime(df_fluxo_gerencial['data'], errors='coerce')
++    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").repla# 1. Filtro de Calend├írio no Topo
++import calendar
++from datetime import date
++
++hoje = date.today()
++meses_nomes = ["Janeiro", "Fevereiro", "Mar├ºo", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
++
++opcoes_meses = []
++for ano in [hoje.year - 1, hoje.year, hoje.year + 1]:
++    for m in range(1, 13):
++        opcoes_meses.append(f"{meses_nomes[m-1]}/{ano}")
++
++default_label = f"{meses_nomes[hoje.month-1]}/{hoje.year}"
++default_idx = opcoes_meses.index(default_label) if default_label in opcoes_meses else len(opcoes_meses) // 2
++
++sel_mes_ano = st.selectbox("Selecione o M├¬s/Ano de Refer├¬ncia do DRE:", opcoes_meses, index=default_idx)
++
++nome_mes, ano_sel = sel_mes_ano.split("/")
++ano_sel = int(ano_sel)
++mes_sel = meses_nomes.index(nome_mes) + 1
++
++# Datas de in├¡cio e fim do m├¬s de refer├¬ncia (M)
++dt_inicio = date(ano_sel, mes_sel, 1)
++dt_fim = date(ano_sel, mes_sel, calendar.monthrange(ano_sel, mes_sel)[1])
++
++# Datas de in├¡cio e fim do m├¬s seguinte (M+1) - para vencimento das despesas fixas
++if mes_sel == 12:
++    mes_next = 1
++    ano_next = ano_sel + 1
++else:
++    mes_next = mes_sel + 1
++    ano_next = ano_sel
++dt_next_inicio = date(ano_next, mes_next, 1)
++dt_next_fim = date(ano_next, mes_next, calendar.monthrange(ano_next, mes_next)[1])
++
++# Janela de 90 dias (M-2, M-1, M)
++if mes_sel == 1:
++    mes_prev2 = 11
++    ano_prev2 = ano_sel - 1
++elif mes_sel == 2:
++    mes_prev2 = 12
++    ano_prev2 = ano_sel - 1
++else:
++    mes_prev2 = mes_sel - 2
++    ano_prev2 = ano_sel
++dt_90d_inicio = date(ano_prev2, mes_prev2, 1)
++
++# --- QUERY DAS VENDAS (M├¬s Atual e 90 dias) ---
++df_vd_mes = fetch_all("""
++    SELECT valor_total, quantidade, custo_frete_rateado, comissao_valor, custo_acordos_rede, custo_descarga, custo_cmv_real
++    FROM vendas
++    WHERE status = 'FATURADO' AND data >= ? AND data <= ?
++""", (dt_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")))
++
++df_vd_90 = fetch_all("""
++    SELECT valor_total, quantidade, custo_frete_rateado, comissao_valor, custo_acordos_rede, custo_descarga, custo_cmv_real
++    FROM vendas
++    WHERE status = 'FATURADO' AND data >= ? AND data <= ?
++""", (dt_90d_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")))
++
++# --- QUERY DE DEVOLU├ç├òES (M├¬s Atual e 90 dias) ---
++df_devol_mes = fetch_all("""
++    SELECT valor_financeiro_abatido FROM devolucoes WHERE data >= ? AND data <= ?
++""", (dt_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")))
++
++df_devol_90 = fetch_all("""
++    SELECT valor_financeiro_abatido FROM devolucoes WHERE data >= ? AND data <= ?
++""", (dt_90d_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")))
++
++# --- QUERY DO CONTAS A PAGAR (M├¬s de Compet├¬ncia = Vencimento em M+1) ---
++df_cap_mes = fetch_all("""
++    SELECT c.valor, pc.codigo, pc.categoria as pc_cat, pc.nome as pc_nome
++    FROM contas_a_pagar c
++    JOIN planos_de_contas pc ON c.plano_conta_id = pc.id
++    WHERE c.data_vencimento >= ? AND c.data_vencimento <= ?
++""", (dt_next_inicio.strftime("%Y-%m-%d"), dt_next_fim.strftime("%Y-%m-%d")))
++
++# Para a m├®dia de 90 dias de despesas, pegamos vencimentos em [M-1, M, M+1]
++if mes_sel == 1:
++    mes_v90_ini = 12
++    ano_v90_ini = ano_sel - 1
++else:
++    mes_v90_ini = mes_sel - 1
++    ano_v90_ini = ano_sel
++dt_v90_inicio = date(ano_v90_ini, mes_v90_ini, 1)
++
++df_cap_90 = fetch_all("""
++    SELECT c.valor, pc.codigo, pc.categoria as pc_cat, pc.nome as pc_nome
++    FROM contas_a_pagar c
++    JOIN planos_de_contas pc ON c.plano_conta_id = pc.id
++    WHERE c.data_vencimento >= ? AND c.data_vencimento <= ?
++""", (dt_v90_inicio.strftime("%Y-%m-%d"), dt_next_fim.strftime("%Y-%m-%d")))
++
++# --- CALCULADORA CONT├üBIL (REGIME DE COMPET├èNCIA) ---
++
++# N├¡vel 1: Receita Operacional Bruta
++rb_mes = float(df_vd_mes['valor_total'].sum()) if not df_vd_mes.empty else 0.0
++rb_90 = float(df_vd_90['valor_total'].sum() / 3) if not df_vd_90.empty else 0.0
++
++# N├¡vel 2: Dedu├º├Áes (Devolu├º├Áes e Impostos sobre Venda)
++dev_mes = float(df_devol_mes['valor_financeiro_abatido'].sum()) if not df_devol_mes.empty else 0.0
++dev_90 = float(df_devol_90['valor_financeiro_abatido'].sum() / 3) if not df_devol_90.empty else 0.0
++
++imp_venda_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.1.3', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
++imp_venda_90 = float(df_cap_90[df_cap_90['codigo'].str.startswith('2.1.3', na=False)]['valor'].sum() / 3) if not df_cap_90.empty else 0.0
++
++rl_mes = rb_mes - dev_mes - imp_venda_mes
++rl_90 = rb_90 - dev_90 - imp_venda_90
++
++# N├¡vel CMV
++cv_mes = float(df_vd_mes['custo_cmv_real'].sum()) if not df_vd_mes.empty else 0.0
++cv_90 = float(df_vd_90['custo_cmv_real'].sum() / 3) if not df_vd_90.empty else 0.0
++
++# Despesas Comerciais Vari├íveis
++frete_mes = float(df_vd_mes['custo_frete_rateado'].sum()) if not df_vd_mes.empty else 0.0
++frete_90 = float(df_vd_90['custo_frete_rateado'].sum() / 3) if not df_vd_90.empty else 0.0
++
++comi_mes = float(df_vd_mes['comissao_valor'].sum()) if not df_vd_mes.empty else 0.0
++comi_90 = float(df_vd_90['comissao_valor'].sum() / 3) if not df_vd_90.empty else 0.0
++
++acordos_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.2.2', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
++acordos_90 = float(df_cap_90[df_cap_90['codigo'].str.startswith('2.2.2', na=False)]['valor'].sum() / 3) if not df_cap_90.empty else 0.0
++
++descarga_mes = float(df_vd_mes['custo_descarga'].sum()) if not df_vd_mes.empty else 0.0
++descarga_90 = float(df_vd_90['custo_descarga'].sum() / 3) if not df_vd_90.empty else 0.0
++
++degust_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.2.1', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
++degust_90 = float(df_cap_90[df_cap_90['codigo'].str.startswith('2.2.1', na=False)]['valor'].sum() / 3) if not df_cap_90.empty else 0.0
++
++promotores_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.2.4', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
++promotores_90 = float(df_cap_90[df_cap_90['codigo'].str.startswith('2.2.4', na=False)]['valor'].sum() / 3) if not df_cap_90.empty else 0.0
++
++desp_com_mes = frete_mes + comi_mes + acordos_mes + descarga_mes + degust_mes + promotores_mes
++desp_com_90 = frete_90 + comi_90 + acordos_90 + descarga_90 + degust_90 + promotores_90
++
++# Margem de Contribui├º├úo
++mc_mes = rl_mes - cv_mes - desp_com_mes
++mc_90 = rl_90 - cv_90 - desp_com_90
++mc_perc = (mc_mes / rl_mes * 100) if rl_mes > 0 else 0.0
++
++# Despesas Fixas (plano de contas 2.3 e 3.1 com vencimento em M+1)
++df_mes_val = float(df_cap_mes[df_cap_mes['codigo'].str.startswith(('2.3.', '3.1.'), na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
++df_90 = float(df_cap_90[df_cap_90['codigo'].str.startswith(('2.3.', '3.1.'), na=False)]['valor'].sum() / 3) if not df_cap_90.empty else 0.0
++
++# Pr├│-Labore (3.1.4)
++pro_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('3.1.4', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
++pro_90 = float(df_cap_90[df_cap_90['codigo'].str.startswith('3.1.4', na=False)]['valor'].sum() / 3) if not df_cap_90.empty else 0.0
++
++# Resultado Operacional (EBITDA)
++ebitda_mes = mc_mes - df_mes_val
++ebitda_90 = mc_90 - df_90
++ebitda_perc = (ebitda_mes / rl_mes * 100) if rl_mes > 0 else 0.0
++
++# Fatores N├úo-Operacionais e Financeiros (Vencimento em M+1)
++depr_mes = float(df_cap_mes[df_cap_mes['pc_nome'].str.contains('Deprecia├º├úo', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
++depr_90 = float(df_cap_90[df_cap_90['pc_nome'].str.contains('Deprecia├º├úo', case=False, na=False)]['valor'].sum() / 3) if not df_cap_90.empty else 0.0
++
++imp_lucro_mes = float(df_cap_mes[df_cap_mes['pc_nome'].str.contains('Impostos sobre Lucro|IRPJ|CSLL', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
++imp_lucro_90 = float(df_cap_90[df_cap_90['pc_nome'].str.contains('Impostos sobre Lucro|IRPJ|CSLL', case=False, na=False)]['valor'].sum() / 3) if not df_cap_90.empty else 0.0
++
++finan_mes = float(df_cap_mes[(df_cap_mes['codigo'] == '3.2.1') | (df_cap_mes['pc_nome'].str.contains('Financiamento|Empr├®stimo|Juros|Despesas Financeiras', case=False, na=False))]['valor'].sum()) if not df_cap_mes.empty else 0.0
++finan_90 = float(df_cap_90[(df_cap_90['codigo'] == '3.2.1') | (df_cap_90['pc_nome'].str.contains('Financiamento|Empr├®stimo|Juros|Despesas Financeiras', case=False, na=False))]['valor'].sum() / 3) if not df_cap_90.empty else 0.0
++
++jcp_mes = float(df_cap_mes[df_cap_mes['pc_nome'].str.contains('JCP|Juros sobre Capital Pr├│prio', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
++jcp_90 = float(df_cap_90[df_cap_90['pc_nome'].str.contains('JCP|Juros sobre Capital Pr├│prio', case=False, na=False)]['valor'].sum() / 3) if not df_cap_90.empty else 0.0
++
++# Lucro L├¡quido
++lucro_mes = ebitda_mes - depr_mes - imp_lucro_mes - finan_mes - jcp_mes
++lucro_90 = ebitda_90 - depr_90 - imp_lucro_90 - finan_90 - jcp_90
++lucro_perc = (lucro_mes / rl_mes * 100) if rl_mes > 0 else 0.0
++
++div_mes = float(df_cap_mes[df_cap_mes['pc_nome'].str.contains('Dividendos|Distribui├º├úo de Lucro', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
++div_90 = float(df_cap_90[df_cap_90['pc_nome'].str.contains('Dividendos|Distribui├º├úo de Lucro', case=False, na=False)]['valor'].sum() / 3) if not df_cap_90.empty else 0.0
++
++retido_mes = lucro_mes - div_mes
++retido_90 = lucro_90 - div_90
++
++# Ponto de Equil├¡brio
++break_even = (df_mes_val / (mc_perc / 100)) if mc_perc > 0 else 0.0
++
++# Renderiza├º├úo do painel cont├íbil
++tab1, tab2 = st.tabs(["­ƒù║´©Å DRE T├ítico de F├íbrica", "­ƒôè Ponto de Equil├¡brio (Break-Even)"])
++
++with tab1:
++    st.subheader("I. Faturamento Bruto (Tra├º├úo)")
++    c1, c2, c3 = st.columns([2, 1, 1])
++    c1.markdown(f"**1. Receita Operacional Bruta (Entradas Totais de {sel_mes_ano})**")
++    c2.metric("M├¬s Atual", f_br(rb_mes))
++    c3.metric("M├®dia ├Ült. 90 Dias", f_br(rb_90), delta=f"{(rb_mes - rb_90)/rb_90*100:.1f}%" if rb_90>0 else "0%")
+     
+-    # Corte Temporal
+-    df_mes = df_fluxo_gerencial[df_fluxo_gerencial['data'] >= (hoje - timedelta(days=30))]
+-    df_90d = df_fluxo_gerencial[df_fluxo_gerencial['data'] >= (hoje - timedelta(days=90))]
++    c4, c5, c6 = st.columns([2, 1, 1])
++    c4.markdown("**2. (-) Devolu├º├Áes / Abatimentos**")
++    c5.metric(" ", f_br(dev_mes), label_visibility="collapsed")
++    c6.metric(" ", f_br(dev_90), label_visibility="collapsed")
+     
+-    # --- CALCULADORA CONT├üBIL ---
++    c_imp1, c_imp2, c_imp3 = st.columns([2, 1, 1])
++    c_imp1.markdown("**3. (-) Impostos sobre Venda (Vencimento no M├¬s Seguinte)**")
++    c_imp2.metric(" ", f_br(imp_venda_mes), label_visibility="collapsed")
++    c_imp3.metric(" ", f_br(imp_venda_90), label_visibility="collapsed")
+     
+-    # N├¡vel 1: Bruto (Receita Operacional Bruta - Entradas Totais de Caixa)
+-    rb_mes = float(df_mes[df_mes['tipo'] == 'Entrada']['valor'].sum())
+-    rb_90 = float(df_90d[df_90d['tipo'] == 'Entrada']['valor'].sum()) / 3
++    c7, c8, c9 = st.columns([2, 1, 1])
++    c7.markdown("#### (=) Receita L├¡quida Real")
++    c8.markdown(f"#### {f_br(rl_mes)}")
++    c9.markdown(f"#### {f_br(rl_90)}")
+     
+-    # N├¡vel 2: Dedu├º├Áes (Devolu├º├Áes, Abatimentos e Impostos sobre Venda)
+-    dev_mes = float(df_mes[(df_mes['tipo'] == 'Sa├¡da') & (df_mes['categoria'].str.contains('devolu├º├úo|reembolso|estorno|log├¡stica reversa|desconto|abatimento', case=False, na=False))]['valor'].sum())
+-    dev_90 = float(df_90d[(df_90d['tipo'] == 'Sa├¡da') & (df_90d['categoria'].str.contains('devolu├º├úo|reembolso|estorno|log├¡stica reversa|desconto|abatimento', case=False, na=False))]['valor'].sum()) / 3
++    st.markdown("---")
++    st.subheader("II. Motores de Custo Vari├ível (O Ch├úo de F├íbrica)")
+     
+-    imp_venda_mes = float(df_mes[(df_mes['tipo'] == 'Sa├¡da') & ((df_mes['codigo'] == '2.1.3') | (df_mes['categoria'].str.contains('imposto.*venda|simples|icms|pis|cofins|das', case=False, na=False)))][ 'valor'].sum())
+-    imp_venda_90 = float(df_90d[(df_90d['tipo'] == 'Sa├¡da') & ((df_90d['codigo'] == '2.1.3') | (df_90d['categoria'].str.contains('imposto.*venda|simples|icms|pis|cofins|das', case=False, na=False)))][ 'valor'].sum()) / 3
++    ca, cb, cc = st.columns([2, 1, 1])
++    ca.markdown("**4. (-) Custo de Mercadorias Vendidas (CMV FIFO Real)**")
++    cb.metric("M├¬s Atual", f_br(cv_mes), delta="Sa├¡da", delta_color="inverse")
++    cc.metric("M├®dia Trimestral", f_br(cv_90), delta="Base", delta_color="off")
+     
+-    rl_mes = rb_mes - dev_mes - imp_venda_mes
+-    rl_90 = rb_90 - dev_90 - imp_venda_90
++    c_c1, c_c2, c_c3 = st.columns([2, 1, 1])
++    c_c1.markdown("**5. (-) Despesas Comerciais Vari├íveis** *(Comiss├Áes & Log├¡stica/Fretes)*")
++    c_c2.metric(" ", f_br(frete_mes + comi_mes), label_visibility="collapsed")
++    c_c3.metric(" ", f_br(frete_90 + comi_90), label_visibility="collapsed")
+     
+-    # N├¡vel 2: Custo Vari├ível - CMV FIFO Real (soma de custo_cmv_real das vendas faturadas no per├¡odo)
+-    df_vd_fat = fetch_all("SELECT data, custo_cmv_real FROM vendas WHERE status='FATURADO'")
+-    if not df_vd_fat.empty:
+-        df_vd_fat['data'] = pd.to_datetime(df_vd_fat['data'], errors='coerce')
+-        df_vdf_mes = df_vd_fat[df_vd_fat['data'] >= (hoje - timedelta(days=30))]
+-        df_vdf_90 = df_vd_fat[df_vd_fat['data'] >= (hoje - timedelta(days=90))]
+-        
+-        cv_mes = float(df_vdf_mes['custo_cmv_real'].sum())
+-        cv_90 = float(df_vdf_90['custo_cmv_real'].sum()) / 3
+-    else:
+-        cv_mes = 0.0
+-        cv_90 = 0.0
++    c_a1, c_a2, c_a3 = st.columns([2, 1, 1])
++    c_a1.markdown("**5.1 (-) Contratos Comerciais & Rebates (Acordos de Rede - 2.2.2)**")
++    c_a2.metric(" ", f_br(acordos_mes), label_visibility="collapsed")
++    c_a3.metric(" ", f_br(acordos_90), label_visibility="collapsed")
+     
+-    # N├¡vel 2.5: Despesas Comerciais Vari├íveis (Comiss├Áes, Log├¡stica, Acordos, Descargas, Degusta├º├Áes e Promotores)
+-    df_vd = fetch_all("SELECT data, custo_frete_rateado, comissao_valor, custo_acordos_rede, custo_descarga FROM vendas WHERE status='FATURADO'")
+-    df_vd['data'] = pd.to_datetime(df_vd['data'], errors='coerce')
+-    df_vd_mes = df_vd[df_vd['data'] >= (hoje - timedelta(days=30))]
+-    df_vd_90 = df_vd[df_vd['data'] >= (hoje - timedelta(days=90))]
++    c_d1, c_d2, c_d3 = st.columns([2, 1, 1])
++    c_d1.markdown("**5.2 (-) Taxas de Descarga (CD/Redes)**")
++    c_d2.metric(" ", f_br(descarga_mes), label_visibility="collapsed")
++    c_d3.metric(" ", f_br(descarga_90), label_visibility="collapsed")
+     
+-    frete_mes = df_vd_mes['custo_frete_rateado'].sum() if not df_vd_mes.empty else 0.0
+-    frete_90 = (df_vd_90['custo_frete_rateado'].sum() / 3) if not df_vd_90.empty else 0.0
++    c_deg1, c_deg2, c_deg3 = st.columns([2, 1, 1])
++    c_deg1.markdown("**5.3 (-) Degusta├º├Áes e Amostras (A├º├Áes Comerciais - 2.2.1)**")
++    c_deg2.metric(" ", f_br(degust_mes), label_visibility="collapsed")
++    c_deg3.metric(" ", f_br(degust_90), label_visibility="collapsed")
+     
+-    comi_mes = df_vd_mes['comissao_valor'].sum() if not df_vd_mes.empty else 0.0
+-    comi_90 = (df_vd_90['comissao_valor'].sum() / 3) if not df_vd_90.empty else 0.0
++    c_prm1, c_prm2, c_prm3 = st.columns([2, 1, 1])
++    c_prm1.markdown("**5.4 (-) Custos de Promotores de Vendas (Servi├ºos - 2.2.4)**")
++    c_prm2.metric(" ", f_br(promotores_mes), label_visibility="collapsed")
++    c_prm3.metric(" ", f_br(promotores_90), label_visibility="collapsed")
+     
+-    df_saidas_mes = df_mes[df_mes['tipo'] == 'Sa├¡da'].copy()
+-    df_saidas_90 = df_90d[df_90d['tipo'] == 'Sa├¡da'].copy()
++    cd, ce, cf = st.columns([2, 1, 1])
++    cd.markdown(f"#### (=) MARGEM DE CONTRIBUI├ç├âO L├ìQUIDA   ­ƒøí´©Å `{mc_perc:.1f}%`")
++    ce.markdown(f"#### {f_br(mc_mes)}")
++    cf.markdown(f"#### {f_br(mc_90)}")
+     
+-    # 2.2.2 Contratos Comerciais (Listing Fee / Enxovais / Acordos)
+-    acordos_mes = float(df_saidas_mes[(df_saidas_mes['codigo'] == '2.2.2') | (df_saidas_mes['categoria'].str.contains('acordo|contrato|listing|rapel|enxoval', case=False, na=False))]['valor'].sum())
+-    acordos_90 = float(df_saidas_90[(df_saidas_90['codigo'] == '2.2.2') | (df_saidas_90['categoria'].str.contains('acordo|contrato|listing|rapel|enxoval', case=False, na=False))]['valor'].sum()) / 3
++    st.markdown("---")
++    st.subheader("III. O Peso Existencial (Despesas Engessadas)")
+     
+-    descarga_mes = df_vd_mes['custo_descarga'].sum() if not df_vd_mes.empty else 0.0
+-    descarga_90 = (df_vd_90['custo_descarga'].sum() / 3) if not df_vd_90.empty else 0.0
++    cg, ch, ci = st.columns([2, 1, 1])
++    cg.markdown("**6. (-) Desp. Fixas Totais (Vencimento no M├¬s Seguinte)**")
++    ch.metric("M├¬s Atual", f_br(df_mes_val), delta="Sa├¡da", delta_color="inverse")
++    ci.metric("M├®dia Trimestral", f_br(df_90), delta="Base", delta_color="off")
+     
+-    # 2.2.1 Custo de Degusta├º├Áes e Amostras
+-    degust_mes = float(df_saidas_mes[(df_saidas_mes['codigo'] == '2.2.1') | (df_saidas_mes['categoria'].str.contains('degusta├º├úo|amostra', case=False, na=False))]['valor'].sum())
+-    degust_90 = float(df_saidas_90[(df_saidas_90['codigo'] == '2.2.1') | (df_saidas_90['categoria'].str.contains('degusta├º├úo|amostra', case=False, na=False))]['valor'].sum()) / 3
++    c_pro1, c_pro2, c_pro3 = st.columns([2, 1, 1])
++    c_pro1.markdown(">*Dessa Fila: (-) Pr├│-Labore (Sal├írio S├│cio)*")
++    c_pro2.markdown(f">*{f_br(pro_mes)}*")
++    c_pro3.markdown(f">*{f_br(pro_90)}*")
+     
+-    # 2.2.4 Custos de Promotores de Vendas
+-    promotores_mes = float(df_saidas_mes[(df_saidas_mes['codigo'] == '2.2.4') | (df_saidas_mes['categoria'].str.contains('promotor', case=False, na=False))]['valor'].sum())
+-    promotores_90 = float(df_saidas_90[(df_saidas_90['codigo'] == '2.2.4') | (df_saidas_90['categoria'].str.contains('promotor', case=False, na=False))]['valor'].sum()) / 3
++    st.markdown("---")
++    st.subheader("IV. Resultado Operacional (EBITDA)")
++    cj, ck, cl = st.columns([2, 1, 1])
++    cj.markdown(f"### ­ƒøí´©Å EBITDA `{ebitda_perc:.1f}%`")
++    if ebitda_mes < 0:
++        str_ebitda = f"­ƒøæ {f_br(ebitda_mes)}"
++    else:
++        str_ebitda = f"Ô£ö´©Å {f_br(ebitda_mes)}"
++    ck.markdown(f"### {str_ebitda}")
++    cl.markdown(f"### {f_br(ebitda_90)}")
+     
+-    desp_com_mes = frete_mes + comi_mes + acordos_mes + descarga_mes + degust_mes + promotores_mes
+-    desp_com_90 = frete_90 + comi_90 + acordos_90 + descarga_90 + degust_90 + promotores_90
++    st.markdown("---")
++    st.subheader("V. Fatores N├úo-Operacionais e Financeiros")
+     
+-    # N├¡vel 3: Margem de Contribui├º├úo
+-    mc_mes = rl_mes - cv_mes - desp_com_mes
+-    mc_90 = rl_90 - cv_90 - desp_com_90
+-    mc_perc = (mc_mes / rl_mes * 100) if rl_mes > 0 else 0.0
++    cm1, cm2, cm3 = st.columns([2, 1, 1])
++    cm1.markdown("**7. (-) Deprecia├º├úo / Amortiza├º├úo**")
++    cm2.metric(" ", f_br(depr_mes), label_visibility="collapsed")
++    cm3.metric(" ", f_br(depr_90), label_visibility="collapsed")
+     
+-    # N├¡vel 4: Despesas Fixas (C├│digos 2.3 e 3.1)
+-    df_fixas_mes = df_saidas_mes[df_saidas_mes['codigo'].str.startswith(('2.3.', '3.1.'), na=False)]
+-    if df_fixas_mes.empty:
+-        chaves_cmv = ['Fornecedor', 'Fornecedores', 'Insumos', 'Mat├®ria Prima', 'Mat├®rias Primas', 'Compras', 'Materia Prima']
+-        chaves_abaixo_ebitda = ['Deprecia├º├úo', 'Impostos sobre Lucro', 'IRPJ', 'CSLL', 'Financiamento', 'Empr├®stimos', 'Juros', 'Despesas Financeiras', 'JCP', 'Juros sobre Capital Pr├│prio', 'Dividendos', 'Distribui├º├úo de Lucros', 'Distribui├º├úo de Lucro']
+-        regex_comercial = 'frete|log├¡stica|transporte|comiss├úo|comissoes|venda|degusta├º├úo|amostra|promotor|contrato|acordo'
+-        df_s1 = df_saidas_mes[~df_saidas_mes['categoria'].isin(chaves_cmv + chaves_abaixo_ebitda)]
+-        df_fixas_mes = df_s1[~df_s1['categoria'].str.contains(regex_comercial, case=False, na=False)]
+-        df_mes_val = float(df_fixas_mes['valor'].sum())
+-        
+-        df_s90 = df_saidas_90[~df_saidas_90['categoria'].isin(chaves_cmv + chaves_abaixo_ebitda)]
+-        df_fixas_90 = df_s90[~df_s90['categoria'].str.contains(regex_comercial, case=False, na=False)]
+-        df_90 = float(df_fixas_90['valor'].sum()) / 3
+-    else:
+-        df_mes_val = float(df_fixas_mes['valor'].sum())
+-        df_fixas_90 = df_saidas_90[df_saidas_90['codigo'].str.startswith(('2.3.', '3.1.'), na=False)]
+-        df_90 = float(df_fixas_90['valor'].sum()) / 3
+-        
+-    # Pr├│-Labore (3.1.4)
+-    pro_mes = float(df_saidas_mes[(df_saidas_mes['codigo'] == '3.1.4') | (df_saidas_mes['categoria'] == 'Pr├│-Labore')]['valor'].sum())
+-    pro_90 = float(df_saidas_90[(df_saidas_90['codigo'] == '3.1.4') | (df_saidas_90['categoria'] == 'Pr├│-Labore')]['valor'].sum()) / 3
+-
+-    # N├¡vel 5: Resultado Operacional (EBITDA)
+-    ebitda_mes = mc_mes - df_mes_val
+-    ebitda_90 = mc_90 - df_90
+-    ebitda_perc = (ebitda_mes / rl_mes * 100) if rl_mes > 0 else 0.0
++    cn1, cn2, cn3 = st.columns([2, 1, 1])
++    cn1.markdown("**8. (-) Impostos sobre Lucro (IRPJ/CSLL)**")
++    cn2.metric(" ", f_br(imp_lucro_mes), label_visibility="collapsed")
++    cn3.metric(" ", f_br(imp_lucro_90), label_visibility="collapsed")
+     
+-    # N├¡vel 6: Deprecia├º├úo, Impostos, Financiamentos
+-    depr_mes = float(df_saidas_mes[df_saidas_mes['categoria'] == 'Deprecia├º├úo']['valor'].sum())
+-    depr_90 = float(df_saidas_90[df_saidas_90['categoria'] == 'Deprecia├º├úo']['valor'].sum()) / 3
++    co1, co2, co3 = st.columns([2, 1, 1])
++    co1.markdown("**9. (-) Juros e Financiamentos**")
++    co2.metric(" ", f_br(finan_mes), label_visibility="collapsed")
++    co3.metric(" ", f_br(finan_90), label_visibility="collapsed")
+     
+-    imp_lucro_mes = float(df_saidas_mes[df_saidas_mes['categoria'].isin(['Impostos sobre Lucro', 'IRPJ', 'CSLL'])]['valor'].sum())
+-    imp_lucro_90 = float(df_saidas_90[df_saidas_90['categoria'].isin(['Impostos sobre Lucro', 'IRPJ', 'CSLL'])]['valor'].sum()) / 3
++    cq1, cq2, cq3 = st.columns([2, 1, 1])
++    cq1.markdown("**10. (-) JCP (Juros s/ Capital Pr├│prio)**")
++    cq2.metric(" ", f_br(jcp_mes), label_visibility="collapsed")
++    cq3.metric(" ", f_br(jcp_90), label_visibility="collapsed")
+     
+-    finan_mes = float(df_saidas_mes[(df_saidas_mes['codigo'] == '3.2.1') | (df_saidas_mes['categoria'].isin(['Financiamento', 'Empr├®stimos', 'Juros', 'Despesas Financeiras']))]['valor'].sum())
+-    finan_90 = float(df_saidas_90[(df_saidas_90['codigo'] == '3.2.1') | (df_saidas_90['categoria'].isin(['Financiamento', 'Empr├®stimos', 'Juros', 'Despesas Financeiras']))]['valor'].sum()) / 3
++    st.markdown("---")
++    st.subheader("­ƒææ VI. Lucratividade (Empresa vs S├│cio)")
+     
+-    jcp_mes = float(df_saidas_mes[df_saidas_mes['categoria'].isin(['JCP', 'Juros sobre Capital Pr├│prio'])]['valor'].sum())
+-    jcp_90 = float(df_saidas_90[df_saidas_90['categoria'].isin(['JCP', 'Juros sobre Capital Pr├│prio'])]['valor'].sum()) / 3
++    cr1, cr2, cr3 = st.columns([2, 1, 1])
++    cr1.markdown(f"#### 11.(=) LUCRO L├ìQUIDO TOTAL GERADO `{lucro_perc:.1f}%`")
++    cr2.markdown(f"#### {f_br(lucro_mes)}")
++    cr3.markdown(f"#### {f_br(lucro_90)}")
+     
+-    # N├¡vel 7: Lucro L├¡quido
+-    lucro_mes = ebitda_mes - depr_mes - imp_lucro_mes - finan_mes - jcp_mes
+-    lucro_90 = ebitda_90 - depr_90 - imp_lucro_90 - finan_90 - jcp_90
+-    lucro_perc = (lucro_mes / rl_mes * 100) if rl_mes > 0 else 0.0
++    cs1, cs2, cs3 = st.columns([2, 1, 1])
++    cs1.markdown("**12. (-) Dividendos (Saque/Distrib. do S├│cio)**")
++    cs2.metric(" ", f_br(div_mes), label_visibility="collapsed")
++    cs3.metric(" ", f_br(div_90), label_visibility="collapsed")
+     
+-    # N├¡vel 8: Divis├úo S├│cio vs Ind├║stria
+-    div_mes = float(df_saidas_mes[df_saidas_mes['categoria'].isin(['Dividendos', 'Distribui├º├úo de Lucros', 'Distribui├º├úo de Lucro'])]['valor'].sum())
+-    div_90 = float(df_saidas_90[df_saidas_90['categoria'].isin(['Dividendos', 'Distribui├º├úo de Lucros', 'Distribui├º├úo de Lucro'])]['valor'].sum()) / 3
++    ct1, ct2, ct3 = st.columns([2, 1, 1])
++    ct1.markdown(f"### ­ƒÆÄ LUCRO RETIDO (PATRIM├öNIO CNPJ)")
++    if retido_mes < 0:
++        str_ret = f"­ƒøæ {f_br(retido_mes)}"
++    else:
++        str_ret = f"­ƒÜÇ {f_br(retido_mes)}"
++    ct2.markdown(f"### {str_ret}")
++    ct3.markdown(f"### {f_br(retido_90)}")
+ 
+-    retido_mes = lucro_mes - div_mes
+-    retido_90 = lucro_90 - div_90
++with tab2:
++    st.subheader("Ponto de Sobreviv├¬ncia (Break-Even)")
+     
+-    # Ponto de Equil├¡brio
+-    break_even = (df_mes_val / (mc_perc / 100)) if mc_perc > 0 else 0.0
++    st.markdown(f"> **O que ├® isso?** ├ë o ponto exato de faturamento onde a sua f├íbrica zera todas as contas operacionais (EBITDA Zero) e passa a ter fluxo positivo para pagar bancos e lucros. Vender abaixo disso significa tirar dinheiro do pr├│prio bolso para a f├íbrica abrir as portas.")
+     
+-    # -------- RENDERIZA├ç├âO VISUAL ---------
+-    
+-    tab1, tab2 = st.tabs(["­ƒù║´©Å DRE T├ítico de F├íbrica", "­ƒôè Ponto de Equil├¡brio (Break-Even)"])
+-    
+-    with tab1:
+-        st.subheader("I. Faturamento Bruto (Tra├º├úo)")
+-        c1, c2, c3 = st.columns([2, 1, 1])
+-        c1.markdown("**1. Receita Operacional Bruta (Entradas Totais)**")
+-        c2.metric("M├¬s Atual", f_br(rb_mes))
+-        c3.metric("M├®dia ├Ült. 90 Dias", f_br(rb_90), delta=f"{(rb_mes - rb_90)/rb_90*100:.1f}%" if rb_90>0 else "0%")
+-        
+-        c4, c5, c6 = st.columns([2, 1, 1])
+-        c4.markdown("**2. (-) Devolu├º├Áes / Abatimentos**")
+-        c5.metric(" ", f_br(dev_mes), label_visibility="collapsed")
+-        c6.metric(" ", f_br(dev_90), label_visibility="collapsed")
+-        
+-        c_imp1, c_imp2, c_imp3 = st.columns([2, 1, 1])
+-        c_imp1.markdown("**3. (-) Impostos sobre Venda (Simples/ICMS/DAS)**")
+-        c_imp2.metric(" ", f_br(imp_venda_mes), label_visibility="collapsed")
+-        c_imp3.metric(" ", f_br(imp_venda_90), label_visibility="collapsed")
+-        
+-        c7, c8, c9 = st.columns([2, 1, 1])
+-        c7.markdown("#### (=) Receita L├¡quida Real")
+-        c8.markdown(f"#### {f_br(rl_mes)}")
+-        c9.markdown(f"#### {f_br(rl_90)}")
+-        
+-        st.markdown("---")
+-        st.subheader("II. Motores de Custo Vari├ível (O Ch├úo de F├íbrica)")
+-        
+-        ca, cb, cc = st.columns([2, 1, 1])
+-        ca.markdown("**4. (-) Custo de Mercadorias Vendidas (CMV FIFO Real)**")
+-        cb.metric("M├¬s Atual", f_br(cv_mes), delta="Sa├¡da", delta_color="inverse")
+-        cc.metric("M├®dia Trimestral", f_br(cv_90), delta="Base", delta_color="off")
+-        
+-        c_c1, c_c2, c_c3 = st.columns([2, 1, 1])
+-        c_c1.markdown("**5. (-) Despesas Comerciais Vari├íveis** *(Comiss├Áes & Log├¡stica/Fretes)*")
+-        c_c2.metric(" ", f_br(frete_mes + comi_mes), label_visibility="collapsed")
+-        c_c3.metric(" ", f_br(frete_90 + comi_90), label_visibility="collapsed")
+-        
+-        c_a1, c_a2, c_a3 = st.columns([2, 1, 1])
+-        c_a1.markdown("**5.1 (-) Contratos Comerciais & Rebates (Acordos de Rede - 2.2.2)**")
+-        c_a2.metric(" ", f_br(acordos_mes), label_visibility="collapsed")
+-        c_a3.metric(" ", f_br(acordos_90), label_visibility="collapsed")
+-        
+-        c_d1, c_d2, c_d3 = st.columns([2, 1, 1])
+-        c_d1.markdown("**5.2 (-) Taxas de Descarga (CD/Redes)**")
+-        c_d2.metric(" ", f_br(descarga_mes), label_visibility="collapsed")
+-        c_d3.metric(" ", f_br(descarga_90), label_visibility="collapsed")
+-        
+-        c_deg1, c_deg2, c_deg3 = st.columns([2, 1, 1])
+-        c_deg1.markdown("**5.3 (-) Degusta├º├Áes e Amostras (A├º├Áes Comerciais - 2.2.1)**")
+-        c_deg2.metric(" ", f_br(degust_mes), label_visibility="collapsed")
+-        c_deg3.metric(" ", f_br(degust_90), label_visibility="collapsed")
+-        
+-        c_prm1, c_prm2, c_prm3 = st.columns([2, 1, 1])
+-        c_prm1.markdown("**5.4 (-) Custos de Promotores de Vendas (Servi├ºos - 2.2.4)**")
+-        c_prm2.metric(" ", f_br(promotores_mes), label_visibility="collapsed")
+-        c_prm3.metric(" ", f_br(promotores_90), label_visibility="collapsed")
+-        
+-        cd, ce, cf = st.columns([2, 1, 1])
+-        cd.markdown(f"#### (=) MARGEM DE CONTRIBUI├ç├âO L├ìQUIDA   ­ƒøí´©Å `{mc_perc:.1f}%`")
+-        ce.markdown(f"#### {f_br(mc_mes)}")
+-        cf.markdown(f"#### {f_br(mc_90)}")
+-        
+-        st.markdown("---")
+-        st.subheader("III. O Peso Existencial (Despesas Engessadas)")
+-        
+-        cg, ch, ci = st.columns([2, 1, 1])
+-        cg.markdown("**6. (-) Desp. Fixas Totais (RH, Energia, Adm)**")
+-        ch.metric("M├¬s Atual", f_br(df_mes_val), delta="Sa├¡da", delta_color="inverse")
+-        ci.metric("M├®dia Trimestral", f_br(df_90), delta="Base", delta_color="off")
+-        
+-        c_pro1, c_pro2, c_pro3 = st.columns([2, 1, 1])
+-        c_pro1.markdown(">*Dessa Fila: (-) Pr├│-Labore (Sal├írio S├│cio)*")
+-        c_pro2.markdown(f">*{f_br(pro_mes)}*")
+-        c_pro3.markdown(f">*{f_br(pro_90)}*")
+-        
+-        st.markdown("---")
+-        st.subheader("IV. Resultado Operacional (EBITDA)")
+-        cj, ck, cl = st.columns([2, 1, 1])
+-        cj.markdown(f"### ­ƒøí´©Å EBITDA `{ebitda_perc:.1f}%`")
+-        if ebitda_mes < 0:
+-            str_ebitda = f"­ƒøæ {f_br(ebitda_mes)}"
+-        else:
+-            str_ebitda = f"Ô£ö´©Å {f_br(ebitda_mes)}"
+-        ck.markdown(f"### {str_ebitda}")
+-        cl.markdown(f"### {f_br(ebitda_90)}")
+-        
+-        st.markdown("---")
+-        st.subheader("V. Fatores N├úo-Operacionais e Financeiros")
+-        
+-        cm1, cm2, cm3 = st.columns([2, 1, 1])
+-        cm1.markdown("**7. (-) Deprecia├º├úo / Amortiza├º├úo**")
+-        cm2.metric(" ", f_br(depr_mes), label_visibility="collapsed")
+-        cm3.metric(" ", f_br(depr_90), label_visibility="collapsed")
+-        
+-        cn1, cn2, cn3 = st.columns([2, 1, 1])
+-        cn1.markdown("**8. (-) Impostos sobre Lucro (IRPJ/CSLL)**")
+-        cn2.metric(" ", f_br(imp_lucro_mes), label_visibility="collapsed")
+-        cn3.metric(" ", f_br(imp_lucro_90), label_visibility="collapsed")
+-        
+-        co1, co2, co3 = st.columns([2, 1, 1])
+-        co1.markdown("**9. (-) Juros e Financiamentos**")
+-        co2.metric(" ", f_br(finan_mes), label_visibility="collapsed")
+-        co3.metric(" ", f_br(finan_90), label_visibility="collapsed")
+-        
+-        cq1, cq2, cq3 = st.columns([2, 1, 1])
+-        cq1.markdown("**10. (-) JCP (Juros s/ Capital Pr├│prio)**")
+-        cq2.metric(" ", f_br(jcp_mes), label_visibility="collapsed")
+-        cq3.metric(" ", f_br(jcp_90), label_visibility="collapsed")
+-        
+-        st.markdown("---")
+-        st.subheader("­ƒææ VI. Lucratividade (Empresa vs S├│cio)")
+-        
+-        cr1, cr2, cr3 = st.columns([2, 1, 1])
+-        cr1.markdown(f"#### 11.(=) LUCRO L├ìQUIDO TOTAL GERADO `{lucro_perc:.1f}%`")
+-        cr2.markdown(f"#### {f_br(lucro_mes)}")
+-        cr3.markdown(f"#### {f_br(lucro_90)}")
+-        
+-        cs1, cs2, cs3 = st.columns([2, 1, 1])
+-        cs1.markdown("**12. (-) Dividendos (Saque/Distrib. do S├│cio)**")
+-        cs2.metric(" ", f_br(div_mes), label_visibility="collapsed")
+-        cs3.metric(" ", f_br(div_90), label_visibility="collapsed")
+-        
+-        ct1, ct2, ct3 = st.columns([2, 1, 1])
+-        ct1.markdown(f"### ­ƒÆÄ LUCRO RETIDO (PATRIM├öNIO CNPJ)")
+-        if retido_mes < 0:
+-            str_ret = f"­ƒøæ {f_br(retido_mes)}"
+-        else:
+-            str_ret = f"­ƒÜÇ {f_br(retido_mes)}"
+-        ct2.markdown(f"### {str_ret}")
+-        ct3.markdown(f"### {f_br(retido_90)}")
+-
+-    with tab2:
+-        st.subheader("Ponto de Sobreviv├¬ncia (Break-Even)")
+-        
+-        st.markdown(f"> **O que ├® isso?** ├ë o ponto exato de faturamento onde a sua f├íbrica zera todas as contas operacionais (EBITDA Zero) e passa a ter fluxo positivo para pagar bancos e lucros. Vender abaixo disso significa tirar dinheiro do pr├│prio bolso para a f├íbrica abrir as portas.")
+-        
+-        colB1, colB2 = st.columns(2)
+-        colB1.metric("Faturamento M├¡nimo para Sobreviv├¬ncia (M├¬s)", f_br(break_even))
+-        faltante = break_even - rl_mes
+-        if faltante > 0:
+-            colB2.metric("Ainda Faltam Vender (Neste M├¬s):", f_br(faltante), delta="Risco de Sangria", delta_color="inverse")
+-            st.warning(f"ÔÜá´©Å Aten├º├úo! Voc├¬ faturou apenas {f_br(rl_mes)} esse m├¬s. A sua margem atual n├úo cobre os R$ {df_mes_val:,.2f} de despesas fixas. Desperte a ├írea comercial ou enxugue o RH e o aluguel.")
+-        else:
+-            lucro_acima = rl_mes - break_even
+-            colB2.metric("Oceano Azul (Faturamento Acima do Ponto):", f_br(lucro_acima), delta="Zona de Lucro", delta_color="normal")
+-            st.success(f"­ƒÑ│ Parab├®ns M├íquina! Voc├¬ j├í estourou o teto e pagou todas das despesas desse m├¬s. As pr├│ximas vendas s├úo lucro quase l├¡quido pro caixa!")
++    colB1, colB2 = st.columns(2)
++    colB1.metric("Faturamento M├¡nimo para Sobreviv├¬ncia (M├¬s)", f_br(break_even))
++    faltante = break_even - rl_mes
++    if faltante > 0:
++        colB2.metric("Ainda Faltam Vender (Neste M├¬s):", f_br(faltante), delta="Risco de Sangria", delta_color="inverse")
++        st.warning(f"ÔÜá´©Å Aten├º├úo! Voc├¬ faturou apenas {f_br(rl_mes)} esse m├¬s. A sua margem atual n├úo cobre os R$ {df_mes_val:,.2f} de despesas fixas. Desperte a ├írea comercial ou enxugue o RH e o aluguel.")
++    else:
++        lucro_acima = rl_mes - break_even
++        colB2.metric("Oceano Azul (Faturamento Acima do Ponto):", f_br(lucro_acima), delta="Zona de Lucro", delta_color="normal")
++        st.success(f"­ƒÑ│ Parab├®ns M├íquina! Voc├¬ j├í estourou o teto e pagou todas das despesas desse m├¬s. As pr├│ximas vendas s├úo lucro quase l├¡quido pro caixa!")m├¬s. As pr├│ximas vendas s├úo lucro quase l├¡quido pro caixa!")
+             
+ else:
+     st.info("A F├íbrica n├úo possui hist├│rico financeiro (Fluxo de Caixa Vazio). O DRE Comercial exige dados para ser calculado.")

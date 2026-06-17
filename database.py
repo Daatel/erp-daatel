@@ -63,6 +63,32 @@ def db_connection():
     finally:
         release_connection(conn)
 
+@contextmanager
+def db_transaction():
+    """Context manager que garante início de transação, COMMIT em caso de sucesso e ROLLBACK em caso de erro."""
+    conn = get_connection()
+    is_pg = "DATABASE_URL" in st.secrets
+    old_autocommit = False
+    if is_pg:
+        old_autocommit = conn.autocommit
+        conn.autocommit = False
+    try:
+        yield conn
+        conn.commit()
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise e
+    finally:
+        if is_pg:
+            try:
+                conn.autocommit = old_autocommit
+            except Exception:
+                pass
+        release_connection(conn)
+
 def format_pg(sql):
     if "DATABASE_URL" in st.secrets:
         import re
@@ -92,6 +118,9 @@ def format_pg(sql):
     else:
         # SQLite: traduz string_agg do PostgreSQL para group_concat do SQLite
         sql = sql.replace("string_agg", "group_concat")
+        # Remove FOR UPDATE de forma case-insensitive
+        import re
+        sql = re.sub(r"(?i)\bFOR\s+UPDATE\b", "", sql)
     return sql
 
 class CursorWrapper:
@@ -855,6 +884,147 @@ def fetch_all(query, params=()):
     except Exception as e:
         st.error(f"Erro no fetch_all: {e}")
         return pd.DataFrame()
+
+def run_query_tx(cursor, query, params=()):
+    params = clean_params(params)
+    cursor.execute(format_pg(query), params)
+
+def fetch_all_tx(cursor, query, params=()):
+    params = clean_params(params)
+    cursor.execute(format_pg(query), params)
+    data = cursor.fetchall()
+    if cursor.description:
+        cols = [desc[0] for desc in cursor.description]
+        return pd.DataFrame(data, columns=cols)
+    return pd.DataFrame()
+
+def consumir_estoque_fifo_tx(cursor, produto_id, quantidade, data_mov, origem, doc_ref):
+    """
+    Consome o estoque utilizando o algoritmo FIFO dentro de uma transação com FOR UPDATE.
+    """
+    query_lotes = """
+        SELECT pd.id, pd.custo_unitario_lote, pd.data, pd.produto_final_kg,
+               (pd.produto_final_kg - COALESCE((
+                    SELECT SUM(em.quantidade) 
+                    FROM estoque_movimentos em 
+                    WHERE em.lote_origem_id = pd.id AND em.tipo_movimento = 'Saída'
+               ), 0.0)) as saldo
+        FROM producao_diaria pd
+        WHERE pd.produto_id = ?
+        ORDER BY pd.data ASC, pd.id ASC
+        FOR UPDATE
+    """
+    df_lotes = fetch_all_tx(cursor, query_lotes, (produto_id,))
+    
+    quantidade_restante = float(quantidade)
+    custo_acumulado = 0.0
+    is_estimado = False
+    
+    lotes_disponiveis = []
+    if not df_lotes.empty:
+        df_lotes['saldo'] = df_lotes['saldo'].astype(float)
+        lotes_disponiveis = df_lotes[df_lotes['saldo'] > 0.0].to_dict('records')
+        
+    for lot in lotes_disponiveis:
+        if quantidade_restante <= 0:
+            break
+            
+        lote_id = int(lot['id'])
+        custo_un_lote = float(lot['custo_unitario_lote'] or 0.0)
+        saldo_lote = float(lot['saldo'])
+        
+        if saldo_lote >= quantidade_restante:
+            run_query_tx(
+                cursor,
+                """INSERT INTO estoque_movimentos 
+                   (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+                   VALUES (?, ?, 'Saída', ?, ?, ?, ?)""",
+                (data_mov, produto_id, quantidade_restante, origem, doc_ref, lote_id)
+            )
+            custo_acumulado += quantidade_restante * custo_un_lote
+            quantidade_restante = 0.0
+            break
+        else:
+            run_query_tx(
+                cursor,
+                """INSERT INTO estoque_movimentos 
+                   (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+                   VALUES (?, ?, 'Saída', ?, ?, ?, ?)""",
+                (data_mov, produto_id, saldo_lote, origem, doc_ref, lote_id)
+            )
+            custo_acumulado += saldo_lote * custo_un_lote
+            quantidade_restante -= saldo_lote
+            
+    if quantidade_restante > 0:
+        is_estimado = True
+        df_prod = fetch_all_tx(cursor, "SELECT custo_unidade FROM produtos WHERE id = ?", (produto_id,))
+        custo_padrao = float(df_prod.iloc[0]['custo_unidade'] or 0.0) if not df_prod.empty else 0.0
+        
+        run_query_tx(
+            cursor,
+            """INSERT INTO estoque_movimentos 
+               (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+               VALUES (?, ?, 'Saída', ?, ?, ?, NULL)""",
+            (data_mov, produto_id, quantidade_restante, origem, doc_ref)
+        )
+        custo_acumulado += quantidade_restante * custo_padrao
+        
+    return custo_acumulado, is_estimado
+
+def gerar_comissao_se_necessario_tx(cursor, venda_id, momento_gatilho, cliente_nome=None):
+    """
+    Versão transacional de gerar_comissao_se_necessario que utiliza um cursor compartilhado.
+    """
+    df_venda = fetch_all_tx(cursor, '''
+        SELECT v.vendedor_id, v.comissao_valor, v.cliente_id, v.produto_id, v.valor_total,
+               c.nome as cliente_nome, COALESCE(c.rede_clientes, '') as rede_clientes
+        FROM vendas v
+        JOIN clientes c ON v.cliente_id = c.id
+        WHERE v.id = ?
+    ''', (venda_id,))
+    
+    if df_venda.empty:
+        return
+        
+    vendedor_id = int(df_venda.iloc[0]['vendedor_id'])
+    comissao_val = float(df_venda.iloc[0]['comissao_valor'] or 0.0)
+    cliente_id = int(df_venda.iloc[0]['cliente_id'])
+    produto_id = int(df_venda.iloc[0]['produto_id']) if pd.notna(df_venda.iloc[0]['produto_id']) else None
+    valor_total = float(df_venda.iloc[0]['valor_total'] or 0.0)
+    cli_nome = cliente_nome if cliente_nome else df_venda.iloc[0]['cliente_nome']
+    rede_c = df_venda.iloc[0]['rede_clientes']
+    if not rede_c:
+        rede_c = "TODOS"
+        
+    df_vend = fetch_all_tx(cursor, "SELECT gatilho_comissao, dia_vencimento_comissao, nome FROM funcionarios WHERE id = ?", (vendedor_id,))
+    if df_vend.empty:
+        return
+        
+    gatilho = str(df_vend.iloc[0]['gatilho_comissao'] or 'FATURAMENTO').upper()
+    
+    if momento_gatilho == 'FATURAMENTO' and "LIQUIDAÇÃO" in gatilho:
+        return
+    if momento_gatilho == 'LIQUIDAÇÃO' and "LIQUIDAÇÃO" not in gatilho:
+        return
+        
+    if comissao_val <= 0.0:
+        df_regra = fetch_all_tx(cursor, '''
+            SELECT percentual 
+            FROM comissoes_regras 
+            WHERE vendedor_id = ? 
+              AND (produto_id = ? OR produto_id IS NULL)
+              AND (rede_clientes = ? OR rede_clientes = 'TODOS')
+            ORDER BY (CASE WHEN produto_id = ? THEN 2 ELSE 1 END) DESC,
+                     (CASE WHEN rede_clientes = ? THEN 2 ELSE 1 END) DESC
+            LIMIT 1
+        ''', (vendedor_id, produto_id, rede_c, produto_id, rede_c))
+        
+        if not df_regra.empty:
+            percentual = float(df_regra.iloc[0]['percentual'])
+            comissao_val = valor_total * (percentual / 100.0)
+            
+    if comissao_val > 0.0:
+        run_query_tx(cursor, "UPDATE vendas SET comissao_valor = ? WHERE id = ?", (comissao_val, venda_id))
 
 def consumir_estoque_fifo(produto_id, quantidade, data_mov, origem, doc_ref):
     """

@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, datetime, timedelta
-from database import run_query, fetch_all
+from database import run_query, fetch_all, db_transaction, run_query_tx, fetch_all_tx
 from estilo import carregar_estilo
 
 st.set_page_config(page_title="Produção e Custeio", page_icon="🏭", layout="wide")
@@ -180,56 +180,63 @@ with tab1:
             str_hr_fim = hr_fim.strftime("%H:%M")
             peso_princiapl = insumos_usados[0][3] if insumos_usados else 0.0
             
-            # --- GRAVAÇÃO NO BANCO ---
-            
-            # A) Grava Lote no Cabeçalho (producao_diaria)
-            obs_sobra = " | ".join([f"Puxado: {q_p}kg, Sobrou: {s}kg de {item}" for item, q_p, s, q_c in insumos_usados if s > 0])
-            obs_final = observacoes
-            if obs_sobra:
-                obs_final = f"{observacoes}\n[Auditoria de Sobras]: {obs_sobra}".strip()
-                
-            run_query(
-                """INSERT INTO producao_diaria
-                   (data, hora_inicio, hora_fim, materia_prima_kg, produto_id, produto_final_kg, perdas_kg, observacoes, custo_total_lote, custo_unitario_lote, data_validade)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (data_prod.strftime("%Y-%m-%d"), str_hr_ini, str_hr_fim, peso_princiapl, pf_id, pf_gerado_qtd, perdas_kg, obs_final, custo_total_lote, custo_unit_pf, data_validade.strftime("%Y-%m-%d"))
-            )
-            
-            lote_id = fetch_all("SELECT id FROM producao_diaria ORDER BY id DESC LIMIT 1").iloc[0]['id']
-            ref_doc = f"Lote OP #{lote_id}"
-            
-            # B) Baixa nas Matérias-Primas (estoque_movimentos e producao_insumos)
-            for item_nome, qt_p, sob, qt_c in insumos_usados:
-                item_id = int(mp_dict[item_nome]['id'])
-                
-                # Na receita, fica gravado o consumo real para a DRE
-                run_query("INSERT INTO producao_insumos (producao_id, produto_id, quantidade) VALUES (?, ?, ?)", 
-                          (lote_id, item_id, qt_c))
-                          
-                # 1. Registra a saída total requisitada do estoque
-                run_query("""INSERT INTO estoque_movimentos 
-                             (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia) 
-                             VALUES (?, ?, 'Saída', ?, ?, ?)""",
-                          (data_prod.strftime("%Y-%m-%d"), item_id, qt_p, "Produção_Requisição", ref_doc))
-                          
-                # 2. Devolve a sobra não utilizada para o estoque
-                if sob > 0:
-                    run_query("""INSERT INTO estoque_movimentos 
-                                 (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia) 
-                                 VALUES (?, ?, 'Entrada', ?, ?, ?)""",
-                              (data_prod.strftime("%Y-%m-%d"), item_id, sob, "Produção_Devolução_Sobra", ref_doc))
-                          
-            # C) Entrada do Produto Acabado no Estoque
-            run_query("""INSERT INTO estoque_movimentos 
-                         (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
-                         VALUES (?, ?, 'Entrada', ?, ?, ?, ?)""",
-                      (data_prod.strftime("%Y-%m-%d"), pf_id, pf_gerado_qtd, "Produção_Entrada", ref_doc, int(lote_id)))
-                      
-            # D) ATUALIZA O CUSTO DO PRODUTO (Estoque Financeiro)
-            run_query("UPDATE produtos SET custo_unidade = ? WHERE id = ?", (custo_unit_pf, pf_id))
-            
-            # --- FEEDBACK VISUAL ---
-            st.success(f"✔️ Lote Físico #{lote_id} gravado e Estoques atualizados!")
+            # --- GRAVAÇÃO NO BANCO (Transacional) ---
+            try:
+                with db_transaction() as conn:
+                    cursor = conn.cursor()
+                    
+                    # A) Grava Lote no Cabeçalho (producao_diaria)
+                    obs_sobra = " | ".join([f"Puxado: {q_p}kg, Sobrou: {s}kg de {item}" for item, q_p, s, q_c in insumos_usados if s > 0])
+                    obs_final = observacoes
+                    if obs_sobra:
+                        obs_final = f"{observacoes}\n[Auditoria de Sobras]: {obs_sobra}".strip()
+                        
+                    run_query_tx(
+                        cursor,
+                        """INSERT INTO producao_diaria
+                           (data, hora_inicio, hora_fim, materia_prima_kg, produto_id, produto_final_kg, perdas_kg, observacoes, custo_total_lote, custo_unitario_lote, data_validade)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (data_prod.strftime("%Y-%m-%d"), str_hr_ini, str_hr_fim, peso_princiapl, pf_id, pf_gerado_qtd, perdas_kg, obs_final, custo_total_lote, custo_unit_pf, data_validade.strftime("%Y-%m-%d"))
+                    )
+                    
+                    lote_id_df = fetch_all_tx(cursor, "SELECT id FROM producao_diaria ORDER BY id DESC LIMIT 1")
+                    lote_id = lote_id_df.iloc[0]['id']
+                    ref_doc = f"Lote OP #{lote_id}"
+                    
+                    # B) Baixa nas Matérias-Primas (estoque_movimentos e producao_insumos)
+                    for item_nome, qt_p, sob, qt_c in insumos_usados:
+                        item_id = int(mp_dict[item_nome]['id'])
+                        
+                        # Na receita, fica gravado o consumo real para a DRE
+                        run_query_tx(cursor, "INSERT INTO producao_insumos (producao_id, produto_id, quantidade) VALUES (?, ?, ?)", 
+                                  (lote_id, item_id, qt_c))
+                                  
+                        # 1. Registra a saída total requisitada do estoque
+                        run_query_tx(cursor, """INSERT INTO estoque_movimentos 
+                                     (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia) 
+                                     VALUES (?, ?, 'Saída', ?, ?, ?)""",
+                                  (data_prod.strftime("%Y-%m-%d"), item_id, qt_p, "Produção_Requisição", ref_doc))
+                                  
+                        # 2. Devolve a sobra não utilizada para o estoque
+                        if sob > 0:
+                            run_query_tx(cursor, """INSERT INTO estoque_movimentos 
+                                         (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia) 
+                                         VALUES (?, ?, 'Entrada', ?, ?, ?)""",
+                                      (data_prod.strftime("%Y-%m-%d"), item_id, sob, "Produção_Devolução_Sobra", ref_doc))
+                                  
+                    # C) Entrada do Produto Acabado no Estoque
+                    run_query_tx(cursor, """INSERT INTO estoque_movimentos 
+                                 (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+                                 VALUES (?, ?, 'Entrada', ?, ?, ?, ?)""",
+                               (data_prod.strftime("%Y-%m-%d"), pf_id, pf_gerado_qtd, "Produção_Entrada", ref_doc, int(lote_id)))
+                              
+                    # D) ATUALIZA O CUSTO DO PRODUTO (Estoque Financeiro)
+                    run_query_tx(cursor, "UPDATE produtos SET custo_unidade = ? WHERE id = ?", (custo_unit_pf, pf_id))
+                    
+                    # --- FEEDBACK VISUAL ---
+                    st.success(f"✔️ Lote Físico #{lote_id} gravado e Estoques atualizados!")
+            except Exception as e:
+                st.error(f"🛑 Erro ao salvar o lote de produção (Operação cancelada): {str(e)}")          
             
             st.markdown("### 📊 Raio-X de Produção deste Lote")
             rx1, rx2 = st.columns(2)

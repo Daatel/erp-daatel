@@ -1,7 +1,11 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
-from database import run_query, fetch_all, gerar_comissao_se_necessario
+from database import (
+    run_query, fetch_all, gerar_comissao_se_necessario,
+    db_transaction, run_query_tx, fetch_all_tx,
+    consumir_estoque_fifo_tx, gerar_comissao_se_necessario_tx
+)
 from estilo import carregar_estilo
 
 st.set_page_config(page_title="Faturamento & Expedição", page_icon="📦", layout="wide")
@@ -105,100 +109,144 @@ with tab1:
             sobrescrever = col_f2.checkbox("Sobrescrever Vencimento do Cliente?")
             venc_boleto_override = col_f2.date_input("Vencimento Forçado", value=date.today() + timedelta(days=30)) if sobrescrever else None
             
+            def simular_emissao_sefaz_with_retry(venda_id, cliente_nome, valor, max_retries=3):
+                import random
+                import time
+                status_placeholder = st.empty()
+                status_placeholder.info(f"📡 Transmitindo NF-e da Venda #{venda_id} ({cliente_nome}) para a SEFAZ... Valor: R$ {valor:,.2f}")
+                time.sleep(0.5)
+                base_backoff = 1.0  # segundos
+                for attempt in range(1, max_retries + 1):
+                    try:
+                        # 20% de chance de instabilidade temporária na SEFAZ para fins de demonstração
+                        if random.random() < 0.20:
+                            raise Exception("Erro HTTP 503: SEFAZ fora do ar temporariamente.")
+                        status_placeholder.success(f"✅ NF da Venda #{venda_id} ({cliente_nome}) autorizada na SEFAZ (Tentativa {attempt})!")
+                        time.sleep(0.5)
+                        status_placeholder.empty()
+                        return True
+                    except Exception as e:
+                        if attempt == max_retries:
+                            status_placeholder.error(f"🛑 Falha final: SEFAZ inalcançável após {max_retries} tentativas. Revertendo alterações.")
+                            raise e
+                        sleep_time = (base_backoff * (2 ** (attempt - 1))) + random.uniform(0.1, 0.5)
+                        status_placeholder.warning(f"⚠️ Tentativa {attempt} falhou ({str(e)}). Retentando em {sleep_time:.2f}s...")
+                        time.sleep(sleep_time)
+
             if col_f3.button("📦 Processar Faturamento Selecionado", type="primary", use_container_width=True):
-                # Pega a conta de receita do plano de contas
                 p_c = fetch_all("SELECT id FROM planos_de_contas WHERE categoria LIKE '%Receita%' LIMIT 1")
                 pc_id = int(p_c.iloc[0]['id']) if not p_c.empty else None
                 
-                for _, row in pedidos_selecionados.iterrows():
-                    pid = int(row['pedido_id'])
-                    
-                    # Pega detalhes originais da venda para o DB
-                    vd = df_fila[df_fila['pedido_id'] == pid].iloc[0]
-                    v_total = float(vd['valor_total'])
-                    cli_nome = vd['cliente']
-                    prod_nome = vd['produto']
-                    prod_id = int(vd['p_id'])
-                    qtd = float(vd['quantidade'])
-                    
-                    # Lote e Validade JIT
-                    lote_impresso = row.get('Lote Impresso (NF/DAV)', '')
-                    validade_impressa = row.get('Validade (NF/DAV)', '')
-                    
-                    # 1. Muda Status da Venda e Numeração (DAV)
-                    if "DAV" in tipo_doc:
-                        df_dav_max = fetch_all("SELECT MAX(CAST(numero_documento AS INTEGER)) as max_dav FROM vendas WHERE tipo_documento LIKE '%DAV%'")
-                        max_dav = df_dav_max.iloc[0]['max_dav'] if not df_dav_max.empty and pd.notna(df_dav_max.iloc[0]['max_dav']) else 0
-                        novo_dav = int(max_dav) + 1
-                        dav_str = f"{novo_dav:010d}"
-                        run_query("UPDATE vendas SET status='FATURADO', tipo_documento=?, numero_documento=?, lote_impresso=?, validade_impressa=? WHERE id=?", (tipo_doc, dav_str, lote_impresso, validade_impressa, pid))
-                    else:
-                        run_query("UPDATE vendas SET status='FATURADO', tipo_documento=?, lote_impresso=?, validade_impressa=? WHERE id=?", (tipo_doc, lote_impresso, validade_impressa, pid))
-                    
-                    # 2. Baixa de Estoque via FIFO
-                    from database import consumir_estoque_fifo
-                    custo_cmv_real, is_estimado = consumir_estoque_fifo(
-                        produto_id=prod_id,
-                        quantidade=qtd,
-                        data_mov=date.today().strftime("%Y-%m-%d"),
-                        origem=f'Expedição {tipo_doc}',
-                        doc_ref=f"Venda Lote #{pid}"
-                    )
-                    
-                    run_query("UPDATE vendas SET custo_cmv_real = ? WHERE id = ?", (custo_cmv_real, pid))
-                    
-                    if is_estimado:
-                        st.warning(f"⚠️ O CMV do Pedido #{pid} ({cli_nome}) foi estimado por falta de lote correspondente no estoque (Estoque Negativo).")
-                    
-                    # 3. Lançamento Financeiro com Inteligência de Prazo do Cliente
-                    cli_id_df = fetch_all("SELECT cliente_id FROM vendas WHERE id=?", (pid,))
-                    cli_id = int(cli_id_df.iloc[0]['cliente_id']) if not cli_id_df.empty else 0
-                    
-                    cli_prazo_df = fetch_all("SELECT prazo_pagamento_dias FROM clientes WHERE id=?", (cli_id,))
-                    prazo_dias = int(cli_prazo_df.iloc[0]['prazo_pagamento_dias']) if not cli_prazo_df.empty and 'prazo_pagamento_dias' in cli_prazo_df.columns and pd.notnull(cli_prazo_df.iloc[0]['prazo_pagamento_dias']) else 30
-                    
-                    venc_final = venc_boleto_override if sobrescrever else date.today() + timedelta(days=prazo_dias)
-
-                    dsc_financeira = f"{tipo_doc} - Venda #{pid} ({cli_nome} - {prod_nome})"
-                    run_query("INSERT INTO contas_a_receber (venda_id, cliente_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                              (pid, cli_id, pc_id, dsc_financeira, v_total, venc_final.strftime("%Y-%m-%d"), 'PENDENTE'))
-                    
-                    # 4. Geração de Passivo (Contas a Pagar) para Acordos Comerciais de Rede
-                    custo_acordos = float(vd['custo_acordos_rede']) if pd.notnull(vd['custo_acordos_rede']) else 0.0
-                    if custo_acordos > 0:
-                        venc_acordo = date.today() + timedelta(days=30)
-                        cli_rede_df = fetch_all("SELECT rede_clientes FROM clientes WHERE id=?", (cli_id,))
-                        rede_str = cli_rede_df.iloc[0]['rede_clientes'] if not cli_rede_df.empty and cli_rede_df.iloc[0]['rede_clientes'] else "Rede Desconhecida"
-                        desc_acordo = f"Repasse Acordo Comercial (Contrato/Logística): REDE {str(rede_str).upper()} - Venda #{pid}"
+                try:
+                    # Envolve tudo em uma transação atômica
+                    with db_transaction() as conn:
+                        cursor = conn.cursor()
                         
-                        p_c_acordo = fetch_all("SELECT id FROM planos_de_contas WHERE codigo = '2.2.2' OR nome LIKE '%Acordo%' OR nome LIKE '%Comiss%' LIMIT 1")
-                        pc_acord_id = int(p_c_acordo.iloc[0]['id']) if not p_c_acordo.empty else None
+                        for _, row in pedidos_selecionados.iterrows():
+                            pid = int(row['pedido_id'])
+                            
+                            # Pega detalhes originais da venda para o DB
+                            vd_df = fetch_all_tx(cursor, '''
+                                SELECT v.id as pedido_id, v.data as data_pedido, c.nome as cliente, c.uf as uf_cliente, 
+                                       p.nome as produto, p.id as p_id, v.quantidade, v.valor_total, v.custo_acordos_rede
+                                FROM vendas v 
+                                JOIN clientes c ON v.cliente_id=c.id
+                                JOIN produtos p ON v.produto_id=p.id
+                                WHERE v.id = ?
+                            ''', (pid,))
+                            
+                            if vd_df.empty:
+                                continue
+                            
+                            vd = vd_df.iloc[0]
+                            v_total = float(vd['valor_total'])
+                            cli_nome = vd['cliente']
+                            prod_nome = vd['produto']
+                            prod_id = int(vd['p_id'])
+                            qtd = float(vd['quantidade'])
+                            
+                            lote_impresso = row.get('Lote Impresso (NF/DAV)', '')
+                            validade_impressa = row.get('Validade (NF/DAV)', '')
+                            
+                            # Se for Nota Fiscal, transmite para o SEFAZ antes de baixar no banco
+                            if "Nota Fiscal" in tipo_doc:
+                                simular_emissao_sefaz_with_retry(pid, cli_nome, v_total)
+                            
+                            # 1. Muda Status da Venda e Numeração (DAV)
+                            if "DAV" in tipo_doc:
+                                df_dav_max = fetch_all_tx(cursor, "SELECT MAX(CAST(numero_documento AS INTEGER)) as max_dav FROM vendas WHERE tipo_documento LIKE '%DAV%'")
+                                max_dav = df_dav_max.iloc[0]['max_dav'] if not df_dav_max.empty and pd.notna(df_dav_max.iloc[0]['max_dav']) else 0
+                                novo_dav = int(max_dav) + 1
+                                dav_str = f"{novo_dav:010d}"
+                                run_query_tx(cursor, "UPDATE vendas SET status='FATURADO', tipo_documento=?, numero_documento=?, lote_impresso=?, validade_impressa=? WHERE id=?", (tipo_doc, dav_str, lote_impresso, validade_impressa, pid))
+                            else:
+                                run_query_tx(cursor, "UPDATE vendas SET status='FATURADO', tipo_documento=?, lote_impresso=?, validade_impressa=? WHERE id=?", (tipo_doc, lote_impresso, validade_impressa, pid))
+                            
+                            # 2. Baixa de Estoque via FIFO na transação
+                            custo_cmv_real, is_estimado = consumir_estoque_fifo_tx(
+                                cursor=cursor,
+                                produto_id=prod_id,
+                                quantidade=qtd,
+                                data_mov=date.today().strftime("%Y-%m-%d"),
+                                origem=f'Expedição {tipo_doc}',
+                                doc_ref=f"Venda Lote #{pid}"
+                            )
+                            
+                            run_query_tx(cursor, "UPDATE vendas SET custo_cmv_real = ? WHERE id = ?", (custo_cmv_real, pid))
+                            
+                            if is_estimado:
+                                st.warning(f"⚠️ O CMV do Pedido #{pid} ({cli_nome}) foi estimado por falta de lote correspondente no estoque (Estoque Negativo).")
+                            
+                            # 3. Lançamento Financeiro
+                            cli_id_df = fetch_all_tx(cursor, "SELECT cliente_id FROM vendas WHERE id=?", (pid,))
+                            cli_id = int(cli_id_df.iloc[0]['cliente_id']) if not cli_id_df.empty else 0
+                            
+                            cli_prazo_df = fetch_all_tx(cursor, "SELECT prazo_pagamento_dias FROM clientes WHERE id=?", (cli_id,))
+                            prazo_dias = int(cli_prazo_df.iloc[0]['prazo_pagamento_dias']) if not cli_prazo_df.empty and 'prazo_pagamento_dias' in cli_prazo_df.columns and pd.notnull(cli_prazo_df.iloc[0]['prazo_pagamento_dias']) else 30
+                            
+                            venc_final = venc_boleto_override if sobrescrever else date.today() + timedelta(days=prazo_dias)
+                            dsc_financeira = f"{tipo_doc} - Venda #{pid} ({cli_nome} - {prod_nome})"
+                            
+                            run_query_tx(cursor, "INSERT INTO contas_a_receber (venda_id, cliente_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                      (pid, cli_id, pc_id, dsc_financeira, v_total, venc_final.strftime("%Y-%m-%d"), 'PENDENTE'))
+                            
+                            # 4. Acordos de Rede
+                            custo_acordos = float(vd['custo_acordos_rede']) if pd.notnull(vd['custo_acordos_rede']) else 0.0
+                            if custo_acordos > 0:
+                                venc_acordo = date.today() + timedelta(days=30)
+                                cli_rede_df = fetch_all_tx(cursor, "SELECT rede_clientes FROM clientes WHERE id=?", (cli_id,))
+                                rede_str = cli_rede_df.iloc[0]['rede_clientes'] if not cli_rede_df.empty and cli_rede_df.iloc[0]['rede_clientes'] else "Rede Desconhecida"
+                                desc_acordo = f"Repasse Acordo Comercial (Contrato/Logística): REDE {str(rede_str).upper()} - Venda #{pid}"
+                                
+                                p_c_acordo = fetch_all_tx(cursor, "SELECT id FROM planos_de_contas WHERE codigo = '2.2.2' OR nome LIKE '%Acordo%' OR nome LIKE '%Comiss%' LIMIT 1")
+                                pc_acord_id = int(p_c_acordo.iloc[0]['id']) if not p_c_acordo.empty else None
+                                
+                                run_query_tx(cursor, "INSERT INTO contas_a_pagar (plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 'PENDENTE')",
+                                          (pc_acord_id, cli_id, desc_acordo, custo_acordos, venc_acordo.strftime("%Y-%m-%d")))
+                            
+                            # 5. Taxa de Descarga
+                            cli_taxa_df = fetch_all_tx(cursor, "SELECT taxa_descarga, regras_descarga, nome FROM clientes WHERE id=?", (cli_id,))
+                            if not cli_taxa_df.empty:
+                                taxa_desc = float(cli_taxa_df.iloc[0]['taxa_descarga'] or 0.0)
+                                if taxa_desc > 0:
+                                    regra_str = cli_taxa_df.iloc[0]['regras_descarga'] or "Sem regras específicas"
+                                    desc_taxa = f"Taxa de Descarga CD - {cli_nome} - Venda #{pid} | Regra: {regra_str}"
+                                    
+                                    p_c_descarga = fetch_all_tx(cursor, "SELECT id FROM planos_de_contas WHERE codigo = '2.1.5' OR nome LIKE '%Frete%' OR nome LIKE '%Descarga%' LIMIT 1")
+                                    pc_desc_id = int(p_c_descarga.iloc[0]['id']) if not p_c_descarga.empty else None
+                                    
+                                    run_query_tx(cursor, "INSERT INTO contas_a_pagar (plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 'PENDENTE')",
+                                              (pc_desc_id, cli_id, desc_taxa, taxa_desc, date.today().strftime("%Y-%m-%d")))
+                                    run_query_tx(cursor, "UPDATE vendas SET custo_descarga=? WHERE id=?", (taxa_desc, pid))
+                                     
+                            # 6. Comissão
+                            gerar_comissao_se_necessario_tx(cursor, pid, 'FATURAMENTO', cli_nome)
                         
-                        run_query("INSERT INTO contas_a_pagar (plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 'PENDENTE')",
-                                  (pc_acord_id, cli_id, desc_acordo, custo_acordos, venc_acordo.strftime("%Y-%m-%d")))
-                    
-                    # 5. Taxa de Descarga do Cliente → Contas a Pagar imediato (D+0) + grava custo na venda
-                    cli_taxa_df = fetch_all("SELECT taxa_descarga, regras_descarga, nome FROM clientes WHERE id=?", (cli_id,))
-                    if not cli_taxa_df.empty:
-                        taxa_desc = float(cli_taxa_df.iloc[0]['taxa_descarga'] or 0.0)
-                        if taxa_desc > 0:
-                            regra_str = cli_taxa_df.iloc[0]['regras_descarga'] or "Sem regras específicas"
-                            desc_taxa = f"Taxa de Descarga CD - {cli_nome} - Venda #{pid} | Regra: {regra_str}"
-                            
-                            p_c_descarga = fetch_all("SELECT id FROM planos_de_contas WHERE codigo = '2.1.5' OR nome LIKE '%Frete%' OR nome LIKE '%Descarga%' LIMIT 1")
-                            pc_desc_id = int(p_c_descarga.iloc[0]['id']) if not p_c_descarga.empty else None
-                            
-                            # Gera passivo financeiro vinculado ao cliente
-                            run_query("INSERT INTO contas_a_pagar (plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 'PENDENTE')",
-                                      (pc_desc_id, cli_id, desc_taxa, taxa_desc, date.today().strftime("%Y-%m-%d")))
-                            # Grava na venda para o DRE classificar como custo comercial variável
-                            run_query("UPDATE vendas SET custo_descarga=? WHERE id=?", (taxa_desc, pid))
-                             
-                    # 6. Geração de Passivo (Contas a Pagar) para a Comissão do Vendedor (se for no FATURAMENTO)
-                    gerar_comissao_se_necessario(pid, 'FATURAMENTO', cli_nome)
-
-                st.success(f"✅ {len(pedidos_selecionados)} Pedido(s) Faturados com Sucesso! Estoque e Financeiro atualizados.")
-                import time; time.sleep(2); st.rerun()
+                        st.success(f"✅ {len(pedidos_selecionados)} Pedido(s) Faturados com Sucesso! Estoque e Financeiro atualizados de forma consistente.")
+                        time.sleep(2)
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"🛑 Erro ao processar faturamento (Operação cancelada/revertida): {str(e)}")
                 
         st.markdown("---")
         with st.expander("🖨️ Reimpressão e Visualização de Documentos (DAV)"):
