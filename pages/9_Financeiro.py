@@ -420,13 +420,13 @@ try:
             forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()))
             pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()))
             
-            col_m3, col_m4 = st.columns([1, 2])
+            col_m3, col_m4 = st.columns(2)
             with col_m3:
-                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
                 is_vinc = st.checkbox("É despesa Vinculada a Cliente?", value=False)
-            cli_sel = col_m4.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()), disabled=not is_vinc)
-            
-            venc_p = st.date_input("Vencimento", date.today() + timedelta(days=30))
+                cli_sel = st.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()), disabled=not is_vinc)
+            with col_m4:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                venc_p = st.date_input("Vencimento", date.today() + timedelta(days=30))
             
             col_m5, col_m6 = st.columns([2, 1])
             desc_p = col_m5.text_input("Descrição / Fatura (Ex: Nota Fiscal nº 123)")
