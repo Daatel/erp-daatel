@@ -12,7 +12,7 @@ st.set_page_config(
 from estilo import carregar_estilo
 carregar_estilo()
 
-st.title("Dashboard Executivo")
+st.title("Visão Global")
 
 st.markdown(f"Bem-vindo, **{st.session_state.get('logged_user', 'Usuário')}**. Abaixo está o resumo da operação.")
 

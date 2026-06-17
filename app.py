@@ -227,7 +227,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-p_dash = st.Page("pages/0_Dashboard.py", title="Painel Executivo", icon="📊", default=True)
+p_dash = st.Page("pages/0_Dashboard.py", title="Visão Global", icon="📊", default=True)
 p_cadastros = st.Page("pages/1_Cadastros.py", title="Cadastros Básicos", icon="📝")
 p_compras = st.Page("pages/2_Compras.py", title="Compras & XML", icon="🛒")
 p_pessoas = st.Page("pages/3_Pessoas.py", title="Pessoas", icon="👥")
