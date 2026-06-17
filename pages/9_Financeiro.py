@@ -114,12 +114,13 @@ try:
     saldo_total_empresa = sum(saldo_por_banco.values())
 
     # ================== GUIAS ==================
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📊 Dashboard 30 Dias", 
         "🔻 Contas a Pagar (Saída)", 
         "🟢 Contas a Receber (Entrada)", 
         "🏦 Conciliação Bancária",
-        "🔄 Transferência entre Contas"
+        "🔄 Transferência entre Contas",
+        "🚚 Auditoria Logística"
     ])
 
     # ------------------ ABA 1: DASHBOARD E PROJEÇÃO 30D ------------------
@@ -502,76 +503,7 @@ try:
                 df_view['Valor (R$)'] = df_view['Valor'].apply(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
                 st.dataframe(df_view[['id', 'Fornecedor', 'Planta de Custo', 'Descrição/Fatura', 'Vencimento', 'Valor (R$)', 'Status', 'Data PGTO']], hide_index=True, width="stretch")
             
-            # --- VISUALIZADOR DE CANHOTOS ---
-            with st.expander("🔍 Auditar Canhotos de Viagens (Transportadoras)"):
-                st.markdown("Verifique os comprovantes anexados pela expedição antes de autorizar o pagamento.")
-                contas_man = df_all_contas[df_all_contas['Descrição/Fatura'].str.contains("Acerto Rota/Manifesto #", na=False)]
-                if not contas_man.empty:
-                    opcoes_audit = {}
-                    for _, r in contas_man.iterrows():
-                        try:
-                            man_id = int(r['Descrição/Fatura'].split("#")[1].split("-")[0].strip())
-                            opcoes_audit[f"Manifesto #{man_id} ({r['Fornecedor']})"] = man_id
-                        except:
-                            pass
-                    
-                    if opcoes_audit:
-                        aud_selecionado = st.selectbox("Selecione a fatura de frete para auditar:", ["-- SELECIONE --"] + list(opcoes_audit.keys()))
-                        if aud_selecionado != "-- SELECIONE --":
-                            mid = opcoes_audit[aud_selecionado]
-                            df_v_audit = fetch_all("SELECT id, comprovante_url FROM vendas WHERE manifesto_id=?", (mid,))
-                            
-                            if not df_v_audit.empty:
-                                cols = st.columns(3)
-                                for idx, row_v in df_v_audit.iterrows():
-                                    v_id = row_v['id']
-                                    url = row_v['comprovante_url']
-                                    with cols[idx % 3]:
-                                        st.markdown(f"**NF/Pedido #{v_id}**")
-                                        if pd.notna(url) and url != "":
-                                            if str(url).lower().endswith(".pdf"):
-                                                st.info(f"📄 Arquivo PDF (Acesse a pasta local): `{url}`")
-                                            else:
-                                                try:
-                                                    st.image(url, caption=f"Canhoto NF #{v_id}", use_container_width=True)
-                                                except:
-                                                    st.error(f"Erro ao ler imagem: `{url}`")
-                                        else:
-                                            st.warning("Pendente")
-                            else:
-                                st.info("Não há pedidos atrelados a este manifesto.")
-                else:
-                    st.info("Nenhuma fatura de frete com manifesto associado para auditar.")
-            # --------------------------------
-            
-            # --- AUDITORIA DE RECIBOS DE DESCARGA ---
-            with st.expander("🧾 Auditar Recibos de Descarga (Taxa de CD) — Comprovantes da Logística"):
-                st.markdown("Revise os comprovantes de descarga enviados pela equipe logística antes de liquidar no Financeiro.")
-                df_desc_ag = df_all_contas[
-                    df_all_contas['Descrição/Fatura'].str.contains("Taxa de Descarga", na=False)
-                ]
-                if df_desc_ag.empty:
-                    st.info("✅ Nenhuma taxa de descarga pendente de auditoria.")
-                else:
-                    for _, rd in df_desc_ag.iterrows():
-                        st.markdown(f"**#{rd['id']} | {rd['Descrição/Fatura']}**")
-                        col_d1, col_d2 = st.columns([2, 1])
-                        col_d2.metric("Valor", f"R$ {rd['Valor']:,.2f}".replace(',','X').replace('.',',').replace('X','.'))
-                        col_d2.markdown(f"**Status:** `{rd['Status']}`")
-                        comprov = rd.get('Comprovante', None)
-                        if pd.notna(comprov) and comprov != "":
-                            with col_d1:
-                                if str(comprov).lower().endswith(".pdf"):
-                                    st.info(f"📄 Recibo PDF salvo em: `{comprov}`")
-                                else:
-                                    try:
-                                        st.image(comprov, caption=f"Recibo de Descarga — #{rd['id']}", use_container_width=True)
-                                    except:
-                                        st.warning(f"Arquivo salvo em: `{comprov}`")
-                        else:
-                            col_d1.warning("⏳ Recibo ainda não enviado pela Logística.")
-                        st.markdown("---")
-            # ----------------------------------------
+            # (Note: Visualizador de Canhotos e Recibos de Descarga foram movidos para a guia 'Auditoria Logística')
             
             # Executar Baixa Multi-Conta (Lote)
             if "PENDENTE" in df_view['Status'].values or "AGUARDANDO BAIXA" in df_view['Status'].values:
@@ -1182,6 +1114,95 @@ try:
                 
                 st.success(f"✔️ Transferência de R$ {valor_transf:,.2f} realizada com sucesso de '{conta_origem_lbl}' para '{conta_destino_lbl}'!")
                 import time; time.sleep(1.5); st.rerun()
+
+    # ------------------ Guia 6: AUDITORIA LOGÍSTICA ------------------
+    with tab6:
+        st.subheader("🚚 Auditoria de Comprovantes Logísticos")
+        st.markdown("""
+        Utilize esta área para auditar os comprovantes de entrega (Canhotos de Viagem) e de descarga (Taxa de CD) 
+        antes de efetuar o pagamento correspondente de fretes e tarifas.
+        """)
+        
+        # Recarregar df_all_contas para garantir que esteja atualizado na aba de auditoria
+        df_all_contas = fetch_all("""
+            SELECT c.id, f.nome_fantasia as 'Fornecedor', p.nome as 'Planta de Custo', 
+                   c.descricao as 'Descrição/Fatura', c.data_vencimento as 'Vencimento', 
+                   c.valor as 'Valor', c.status as 'Status', c.data_pagamento as 'Data PGTO',
+                   c.comprovante_url as 'Comprovante', c.cliente_id
+            FROM contas_a_pagar c
+            LEFT JOIN fornecedores f ON c.fornecedor_id = f.id
+            LEFT JOIN planos_de_contas p ON c.plano_conta_id = p.id
+            ORDER BY c.data_vencimento ASC
+        """)
+        
+        # --- VISUALIZADOR DE CANHOTOS ---
+        with st.expander("🔍 Auditar Canhotos de Viagens (Transportadoras)", expanded=True):
+            st.markdown("Verifique os comprovantes anexados pela expedição antes de autorizar o pagamento.")
+            contas_man = df_all_contas[df_all_contas['Descrição/Fatura'].str.contains("Acerto Rota/Manifesto #", na=False)]
+            if not contas_man.empty:
+                opcoes_audit = {}
+                for _, r in contas_man.iterrows():
+                    try:
+                        man_id = int(r['Descrição/Fatura'].split("#")[1].split("-")[0].strip())
+                        opcoes_audit[f"Manifesto #{man_id} ({r['Fornecedor']})"] = man_id
+                    except:
+                        pass
+                
+                if opcoes_audit:
+                    aud_selecionado = st.selectbox("Selecione a fatura de frete para auditar:", ["-- SELECIONE --"] + list(opcoes_audit.keys()))
+                    if aud_selecionado != "-- SELECIONE --":
+                        mid = opcoes_audit[aud_selecionado]
+                        df_v_audit = fetch_all("SELECT id, comprovante_url FROM vendas WHERE manifesto_id=?", (mid,))
+                        
+                        if not df_v_audit.empty:
+                            cols = st.columns(3)
+                            for idx, row_v in df_v_audit.iterrows():
+                                v_id = row_v['id']
+                                url = row_v['comprovante_url']
+                                with cols[idx % 3]:
+                                    st.markdown(f"**NF/Pedido #{v_id}**")
+                                    if pd.notna(url) and url != "":
+                                        if str(url).lower().endswith(".pdf"):
+                                            st.info(f"📄 Arquivo PDF (Acesse a pasta local): `{url}`")
+                                        else:
+                                            try:
+                                                st.image(url, caption=f"Canhoto NF #{v_id}", use_container_width=True)
+                                            except:
+                                                st.error(f"Erro ao ler imagem: `{url}`")
+                                    else:
+                                        st.warning("Pendente")
+                        else:
+                            st.info("Não há pedidos atrelados a este manifesto.")
+            else:
+                st.info("Nenhuma fatura de frete com manifesto associado para auditar.")
+        
+        # --- AUDITORIA DE RECIBOS DE DESCARGA ---
+        with st.expander("🧾 Auditar Recibos de Descarga (Taxa de CD) — Comprovantes da Logística", expanded=True):
+            st.markdown("Revise os comprovantes de descarga enviados pela equipe logística antes de liquidar no Financeiro.")
+            df_desc_ag = df_all_contas[
+                df_all_contas['Descrição/Fatura'].str.contains("Taxa de Descarga", na=False)
+            ]
+            if df_desc_ag.empty:
+                st.info("✅ Nenhuma taxa de descarga pendente de auditoria.")
+            else:
+                for _, rd in df_desc_ag.iterrows():
+                    st.markdown(f"**#{rd['id']} | {rd['Descrição/Fatura']}**")
+                    col_d1, col_d2 = st.columns([2, 1])
+                    col_d2.metric("Valor", f"R$ {rd['Valor']:,.2f}".replace(',','X').replace('.',',').replace('X','.'))
+                    col_d2.markdown(f"**Status:** `{rd['Status']}`")
+                    comprov = rd.get('Comprovante', None)
+                    if pd.notna(comprov) and comprov != "":
+                        with col_d1:
+                            if str(comprov).lower().endswith(".pdf"):
+                                    st.info(f"📄 Recibo PDF salvo em: `{comprov}`")
+                            else:
+                                try:
+                                    st.image(comprov, caption=f"Recibo de Descarga — #{rd['id']}", use_container_width=True)
+                                except:
+                                    st.warning(f"Arquivo salvo em: `{comprov}`")
+                    else:
+                        col_d1.warning("⏳ Recibo ainda não enviado pela Logística.")
+                    st.markdown("---")
 
 except Exception as e:
     st.error(f"Erro Crítico de Tela Bancária: {e}")
