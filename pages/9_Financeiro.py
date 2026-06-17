@@ -122,273 +122,405 @@ try:
         "🔄 Transferência entre Contas",
         "🚚 Auditoria Logística"
     ])
-
+    
     # ------------------ ABA 1: DASHBOARD E PROJEÇÃO 30D ------------------
     with tab1:
-        st.subheader("Radar Executivo (Saldos e Projeções)")
+        # 1. Verification of Last Reconciliation (Tolerance D-1)
+        df_max_conc = fetch_all("SELECT MAX(data) as max_data FROM fluxo_caixa WHERE conciliado = TRUE OR conciliado = 1")
+        last_conc_date = None
+        out_of_tolerance = False
+        if not df_max_conc.empty and pd.notna(df_max_conc.iloc[0]['max_data']):
+            last_conc_date = pd.to_datetime(df_max_conc.iloc[0]['max_data']).date()
+            if last_conc_date < hoje - timedelta(days=1):
+                out_of_tolerance = True
+        else:
+            out_of_tolerance = True
+            
+        # Display dynamic reconciliation status badge using native Streamlit banners
+        if out_of_tolerance:
+            st.error(f"🚨 **ALERTA DE SEGURANÇA:** Conciliação financeira pendente! Último registro conciliado: {last_conc_date.strftime('%d/%m/%Y') if last_conc_date else 'nunca'}. A tolerância máxima é de D-1 (ontem). Efetue a conciliação na aba correspondente.")
+        else:
+            st.success(f"🟢 **CONCILIAÇÃO EM DIA:** Caixa conciliado até {last_conc_date.strftime('%d/%m/%Y') if last_conc_date else 'nunca'}.")
+            
+        # Header area
+        st.markdown("### 🏆 Cockpit Financeiro Diário - Empório do Alho")
         
-        # 1. CÁLCULO DE VALORIZAÇÃO DE ESTOQUE (Preço de Custo Realista)
-        query_est = """
-            SELECT
-                p.custo_unidade,
-                SUM(CASE WHEN e.tipo_movimento = 'Entrada' THEN e.quantidade ELSE 0 END) - 
-                SUM(CASE WHEN e.tipo_movimento = 'Saída' THEN e.quantidade ELSE 0 END) as saldo_fisico
-            FROM estoque_movimentos e
-            JOIN produtos p ON e.produto_id = p.id
-            GROUP BY p.id, p.custo_unidade
-        """
-        df_est = fetch_all(query_est)
-        valor_estoque = 0.0
-        if not df_est.empty:
-            for _, rp in df_est.iterrows():
-                # Nota: Custos não preenchidos no cadastro virão como 0, forçando o Gestor a alimentar seus custos
-                c = float(rp['custo_unidade']) if pd.notnull(rp['custo_unidade']) else 0.0
-                sf = float(rp['saldo_fisico']) if pd.notnull(rp['saldo_fisico']) else 0.0
-                if sf > 0:
-                    valor_estoque += sf * c
-
-        capital_global = saldo_total_empresa + valor_estoque
-
-        # 1.1 PLACAR MÁXIMO DE PATRIMÔNIO CROSSEOVER
-        st.markdown("### 🏆 Posição de Capital Acumulado da Fábrica")
-        cTot1, cTot2, cTot3 = st.columns(3)
-        cTot1.metric("💰 DISPONIBILIDADE/CAIXA", f"R$ {saldo_total_empresa:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        cTot2.metric("📦 PATRIMÔNIO (Dinheiro Físico)", f"R$ {valor_estoque:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        cTot3.metric("💎 CAPITAL GLOBAL BLINDADO", f"R$ {capital_global:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        # 2. TOP ROW CARDS (KPIs): Entra hoje, Sai hoje, Resultado do dia
+        # Query planned receivables due today (PENDENTE)
+        df_rec_hoje = fetch_all("SELECT SUM(valor) as total FROM contas_a_receber WHERE status='PENDENTE' AND data_vencimento=?", (hoje.strftime("%Y-%m-%d"),))
+        entra_hoje_val = float(df_rec_hoje.iloc[0]['total'] or 0.0) if not df_rec_hoje.empty else 0.0
         
-        with st.expander("📍 Ver Distribuição do Dinheiro Vivo (Liquidez Diária) Pelos Bancos:"):
-            cols_b = st.columns(len(saldo_por_banco) if len(saldo_por_banco) > 0 else 1)
-            for idx, (bid,_s) in enumerate(saldo_por_banco.items()):
-                b_name = df_bancos[df_bancos['id'] == bid].iloc[0]['nome']
-                cols_b[idx].metric(f"🏦 {b_name}", f"R$ {_s:,.2f}".replace('.',','))
+        # Query planned payables due today (PENDENTE)
+        df_pag_hoje = fetch_all("SELECT SUM(valor) as total FROM contas_a_pagar WHERE status='PENDENTE' AND data_vencimento=?", (hoje.strftime("%Y-%m-%d"),))
+        sai_hoje_val = float(df_pag_hoje.iloc[0]['total'] or 0.0) if not df_pag_hoje.empty else 0.0
+        
+        resultado_dia_val = entra_hoje_val - sai_hoje_val
+        
+        c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
+        
+        # Format values to BRL
+        def to_brl(v):
+            return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            
+        c_kpi1.metric("💰 Entra hoje", to_brl(entra_hoje_val))
+        c_kpi2.metric("💸 Sai hoje", to_brl(sai_hoje_val))
+        c_kpi3.metric("💎 Resultado do dia", to_brl(resultado_dia_val), 
+                     delta=to_brl(resultado_dia_val) if resultado_dia_val != 0 else None,
+                     delta_color="normal" if resultado_dia_val >= 0 else "inverse")
+        
+        st.markdown("---")
+        
+        # 3. MIDDLE ROW: A cobrar (vencido) & A pagar (vencido) tables
+        c_mid_left, c_mid_right = st.columns(2)
+        
+        # --- LEFT: A COBRAR (VENCIDO) ---
+        with c_mid_left:
+            # Query pending overdue receivables
+            df_vencidos_rec = fetch_all("""
+                SELECT c.valor, c.data_vencimento, cl.nome as cliente_nome
+                FROM contas_a_receber c
+                JOIN clientes cl ON c.cliente_id = cl.id
+                WHERE c.status = 'PENDENTE' AND c.data_vencimento < ?
+            """, (hoje.strftime("%Y-%m-%d"),))
+            
+            total_vencido_rec = 0.0
+            df_grouped_rec = pd.DataFrame()
+            if not df_vencidos_rec.empty:
+                total_vencido_rec = df_vencidos_rec['valor'].sum()
+                df_vencidos_rec['dias'] = (hoje - pd.to_datetime(df_vencidos_rec['data_vencimento']).dt.date).apply(lambda x: x.days)
+                df_grouped_rec = df_vencidos_rec.groupby('cliente_nome').agg(
+                    dias_atraso=('dias', 'max'),
+                    total_valor=('valor', 'sum')
+                ).reset_index().sort_values('total_valor', ascending=False).head(5)
                 
+            st.markdown(f"#### 📅 A cobrar (vencido): **<span style='color:#ef4444;'>{to_brl(total_vencido_rec)}</span>**", unsafe_allow_html=True)
+            
+            if df_grouped_rec.empty:
+                st.info("Nenhum valor vencido a cobrar. Excelente!")
+            else:
+                df_grouped_rec_view = df_grouped_rec.copy()
+                df_grouped_rec_view['dias_atraso'] = df_grouped_rec_view['dias_atraso'].apply(lambda x: f"{x} dias")
+                df_grouped_rec_view['total_valor'] = df_grouped_rec_view['total_valor'].apply(to_brl)
+                df_grouped_rec_view.columns = ['Cliente', 'Maior Atraso', 'Saldo Total Devido']
+                st.dataframe(df_grouped_rec_view, hide_index=True, use_container_width=True)
+                
+            st.caption("Ver todos os clientes na aba **Contas a Receber (Entrada)**")
+            
+        # --- RIGHT: A PAGAR (VENCIDO) ---
+        with c_mid_right:
+            # Query pending overdue payables
+            df_vencidos_pag = fetch_all("""
+                SELECT c.valor, c.data_vencimento, f.nome_fantasia as fornecedor_nome
+                FROM contas_a_pagar c
+                JOIN fornecedores f ON c.fornecedor_id = f.id
+                WHERE c.status = 'PENDENTE' AND c.data_vencimento < ?
+            """, (hoje.strftime("%Y-%m-%d"),))
+            
+            total_vencido_pag = 0.0
+            df_grouped_pag = pd.DataFrame()
+            if not df_vencidos_pag.empty:
+                total_vencido_pag = df_vencidos_pag['valor'].sum()
+                df_vencidos_pag['dias'] = (hoje - pd.to_datetime(df_vencidos_pag['data_vencimento']).dt.date).apply(lambda x: x.days)
+                df_grouped_pag = df_vencidos_pag.groupby('fornecedor_nome').agg(
+                    dias_atraso=('dias', 'max'),
+                    total_valor=('valor', 'sum')
+                ).reset_index().sort_values('total_valor', ascending=False).head(5)
+                
+            st.markdown(f"#### 📅 A pagar (vencido): **<span style='color:#b45309;'>{to_brl(total_vencido_pag)}</span>**", unsafe_allow_html=True)
+            
+            if df_grouped_pag.empty:
+                st.info("Nenhuma conta vencida a pagar. Excelente!")
+            else:
+                df_grouped_pag_view = df_grouped_pag.copy()
+                df_grouped_pag_view['dias_atraso'] = df_grouped_pag_view['dias_atraso'].apply(lambda x: f"{x} dias")
+                df_grouped_pag_view['total_valor'] = df_grouped_pag_view['total_valor'].apply(to_brl)
+                df_grouped_pag_view.columns = ['Fornecedor', 'Maior Atraso', 'Saldo Total a Pagar']
+                st.dataframe(df_grouped_pag_view, hide_index=True, use_container_width=True)
+                
+            st.caption("Ver todos os fornecedores na aba **Contas a Pagar (Saída)**")
+            
         st.markdown("---")
         
-        # 2. CONSTRUINDO A RÉGUA DE PREVISÃO DE 30 DIAS
-        # Precisamos das Contas a Receber PENDENTES
-        df_rec_pendente = fetch_all("SELECT valor, data_vencimento FROM contas_a_receber WHERE status='PENDENTE'")
-        inadimplentes = 0.0
-        recebe_hoje = 0.0
+        # 4. CHART SECTION (14-Day Flow chart)
+        st.subheader("📊 Painel de Liquidez Projetado (14 Dias)")
         
-        df_pag_pendente = fetch_all("SELECT valor, data_vencimento FROM contas_a_pagar WHERE status='PENDENTE'")
-        atrasadas_pagar = 0.0
-        pagar_hoje = 0.0
+        # Checkbox to include overdue accounts in today's calculation
+        incluir_atraso = st.checkbox("Considerar contas em atraso no gráfico", value=False, key="inc_atrasados_chk")
         
-        fluxo_projetado = {}
-        for i in range(31):
+        # Fetch expected receivables and payables for the next 14 days (D0 to D13)
+        df_rec_futuro = fetch_all("SELECT valor, data_vencimento FROM contas_a_receber WHERE status='PENDENTE'")
+        df_pag_futuro = fetch_all("SELECT valor, data_vencimento FROM contas_a_pagar WHERE status='PENDENTE'")
+        
+        fluxo_14d = {}
+        for i in range(14):
             d_alvo = hoje + timedelta(days=i)
-            fluxo_projetado[str(d_alvo)] = {"Entradas": 0.0, "Saidas": 0.0}
+            fluxo_14d[str(d_alvo)] = {"Entradas": 0.0, "Saidas": 0.0}
             
-        if not df_rec_pendente.empty:
-            df_rec_pendente['data_vencimento_dt'] = pd.to_datetime(df_rec_pendente['data_vencimento']).dt.date
-            inadimplentes = df_rec_pendente[df_rec_pendente['data_vencimento_dt'] < hoje]['valor'].sum()
-            recebe_hoje = df_rec_pendente[df_rec_pendente['data_vencimento_dt'] == hoje]['valor'].sum()
-            
-            # Somar nas janelas de 30 dias
-            for _, rp in df_rec_pendente.iterrows():
-                dt_str = str(rp['data_vencimento_dt'])
-                if dt_str in fluxo_projetado:
-                    fluxo_projetado[dt_str]['Entradas'] += float(rp['valor'])
-
-        if not df_pag_pendente.empty:
-            df_pag_pendente['data_vencimento_dt'] = pd.to_datetime(df_pag_pendente['data_vencimento']).dt.date
-            atrasadas_pagar = df_pag_pendente[df_pag_pendente['data_vencimento_dt'] < hoje]['valor'].sum()
-            pagar_hoje = df_pag_pendente[df_pag_pendente['data_vencimento_dt'] == hoje]['valor'].sum()
-            
-            for _, pp in df_pag_pendente.iterrows():
-                dt_str = str(pp['data_vencimento_dt'])
-                if dt_str in fluxo_projetado:
-                    fluxo_projetado[dt_str]['Saidas'] += float(pp['valor'])
-
-        # Placas de Risco
-        cA, cB, cC, cD = st.columns(4)
-        cA.metric("🔴 Atrasadas a Pagar (Fogo)", f"R$ {atrasadas_pagar:,.2f}".replace('.',','))
-        cB.metric("🟡 Contas a Pagar Hoje", f"R$ {pagar_hoje:,.2f}".replace('.',','))
-        cC.error(f"⚠️ Inadimplência na Praça: R$ {inadimplentes:,.2f}")
-        cD.success(f"🟩 Entradas Previstas Hoje: R$ {recebe_hoje:,.2f}")
+        # Distribute expected receivables (inputs)
+        if not df_rec_futuro.empty:
+            df_rec_futuro['venc_date'] = pd.to_datetime(df_rec_futuro['data_vencimento']).dt.date
+            for _, r in df_rec_futuro.iterrows():
+                v_date = r['venc_date']
+                if v_date < hoje and incluir_atraso:
+                    # Overdue added to D0 (today)
+                    fluxo_14d[str(hoje)]["Entradas"] += float(r['valor'])
+                elif str(v_date) in fluxo_14d:
+                    fluxo_14d[str(v_date)]["Entradas"] += float(r['valor'])
+                    
+        # Distribute expected payables (outputs)
+        if not df_pag_futuro.empty:
+            df_pag_futuro['venc_date'] = pd.to_datetime(df_pag_futuro['data_vencimento']).dt.date
+            for _, r in df_pag_futuro.iterrows():
+                v_date = r['venc_date']
+                if v_date < hoje and incluir_atraso:
+                    # Overdue added to D0 (today)
+                    fluxo_14d[str(hoje)]["Saidas"] += float(r['valor'])
+                elif str(v_date) in fluxo_14d:
+                    fluxo_14d[str(v_date)]["Saidas"] += float(r['valor'])
+                    
+        # Prepare Plotly chart data
+        datas_14 = []
+        entradas_14 = []
+        saidas_14 = []
+        saldos_14 = []
         
-        st.markdown("---")
+        saldo_proj = saldo_total_empresa
         
-        # 3. GRÁFICO PROJETADO
-        st.subheader("Painel de Liquidez Misto (Barras vs Linha Flutuante)")
-        datas_eixo = []
-        entradas_eixo = []
-        saidas_eixo = []
-        saldos_eixo = []
-        
-        saldo_andando = saldo_total_empresa
-        
-        for i in range(31):
+        for i in range(14):
             d_alvo = hoje + timedelta(days=i)
-            d_str = str(d_alvo)[8:10] + "/" + str(d_alvo)[5:7] # Display like 15/04
+            d_str = "Hoje" if i == 0 else f"D+{i}"
             
-            ent = fluxo_projetado[str(d_alvo)]["Entradas"]
-            sai = fluxo_projetado[str(d_alvo)]["Saidas"]
+            ent = fluxo_14d[str(d_alvo)]["Entradas"]
+            sai = fluxo_14d[str(d_alvo)]["Saidas"]
             
-            saldo_andando = saldo_andando + ent - sai
+            saldo_proj = saldo_proj + ent - sai
             
-            datas_eixo.append(d_str)
-            entradas_eixo.append(ent)
-            saidas_eixo.append(sai)
-            saldos_eixo.append(saldo_andando)
+            datas_14.append(d_str)
+            entradas_14.append(ent)
+            saidas_14.append(sai)
+            saldos_14.append(saldo_proj)
             
-        fig = go.Figure()
+        fig_14 = go.Figure()
         
-        # Barras de Contas a Receber
-        fig.add_trace(go.Bar(
-            x=datas_eixo, y=entradas_eixo,
-            name="A Receber (Entradas)",
-            marker_color='#2563eb'  # Azul corporativo RoyalBlue
+        # Receivables (positive columns)
+        fig_14.add_trace(go.Bar(
+            x=datas_14, y=entradas_14,
+            name="Entradas Previstas",
+            marker_color='#2563eb' # Royal Blue
         ))
         
-        # Barras de Contas a Pagar (Para baixo da linha zero)
-        fig.add_trace(go.Bar(
-            x=datas_eixo, y=[-s for s in saidas_eixo],
-            name="A Pagar (Saídas)",
-            marker_color='#ef4444'  # Vermelho Vivo
+        # Payables (negative columns)
+        fig_14.add_trace(go.Bar(
+            x=datas_14, y=[-s for s in saidas_14],
+            name="Saídas Previstas",
+            marker_color='#ef4444' # Red
         ))
         
-        # Linha Curva com de Saldo Flutuante
-        fig.add_trace(go.Scatter(
-            x=datas_eixo, y=saldos_eixo,
+        # Cumulative Cash line
+        fig_14.add_trace(go.Scatter(
+            x=datas_14, y=saldos_14,
             mode='lines+markers',
-            name="💰 SALDO DO DIA",
-            line=dict(color='#10b981', width=4, shape='spline'), # Verde vivo para a linha teto
+            name="💰 Saldo Acumulado",
+            line=dict(color='#10b981', width=3, shape='spline'), # Emerald Green
             marker=dict(size=8, color='white', line=dict(width=2, color='#10b981'))
         ))
         
-        fig.update_layout(
-            title="DRE Financeiro Evolutivo (Acumulado de 30 Dias)",
-            xaxis_title="Linha do Tempo Diária",
-            yaxis_title="R$ Volume Circulante",
-            barmode='relative', # Relativo empilha o vermelho pra baixo da linha zero
+        fig_14.update_layout(
+            xaxis_title="Período de Projeção",
+            yaxis_title="R$ Valor",
+            barmode='relative',
             hovermode="x unified",
-            height=500,
-            plot_bgcolor='rgba(0,0,0,0)'
+            height=450,
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(l=20, r=20, t=20, b=20)
         )
-        fig.update_yaxes(gridcolor='rgba(128,128,128,0.2)', zerolinecolor='rgba(128,128,128,0.5)', zerolinewidth=2)
-        st.plotly_chart(fig, width="stretch")
-
+        fig_14.update_yaxes(gridcolor='rgba(128,128,128,0.2)', zerolinecolor='rgba(128,128,128,0.5)', zerolinewidth=1)
+        st.plotly_chart(fig_14, width="stretch")
+        
         st.markdown("---")
-        st.subheader("🔍 Detalhamento e Auditoria de Lançamentos por Período")
-        st.markdown("Filtre o fluxo de caixa histórico por período e contas para conciliação ou exportação oficial em Excel ou PDF.")
         
-        # Inicializar datas no session state se não existirem
-        if 'det_dt_inicio' not in st.session_state:
-            st.session_state['det_dt_inicio'] = date.today() - timedelta(days=7)
-        if 'det_dt_fim' not in st.session_state:
-            st.session_state['det_dt_fim'] = date.today()
-
-        col_b1, col_b2, col_b3, _ = st.columns([1, 1.3, 1.3, 4.4])
-        if col_b1.button("📅 Hoje", use_container_width=True, key="btn_shortcut_hoje"):
-            st.session_state['det_dt_inicio'] = date.today()
-            st.session_state['det_dt_fim'] = date.today()
-            st.rerun()
-        if col_b2.button("📅 Últimos 7 Dias", use_container_width=True, key="btn_shortcut_7d"):
-            st.session_state['det_dt_inicio'] = date.today() - timedelta(days=7)
-            st.session_state['det_dt_fim'] = date.today()
-            st.rerun()
-        if col_b3.button("📅 Últimos 30 Dias", use_container_width=True, key="btn_shortcut_30d"):
-            st.session_state['det_dt_inicio'] = date.today() - timedelta(days=30)
-            st.session_state['det_dt_fim'] = date.today()
-            st.rerun()
-
-        # Filtros interativos
-        col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+        # 5. BOTTOM SECTION: Gerador de Relatórios
+        st.subheader("📋 Gerador de Relatórios de Clientes e Fornecedores")
+        st.markdown("Filtre e visualize a carteira pendente ou quitada de contas a receber (Clientes) e a pagar (Fornecedores) para exportar em lote.")
         
-        dt_inicio = col_f1.date_input("Data de Início", value=st.session_state['det_dt_inicio'])
-        dt_fim = col_f2.date_input("Data de Fim", value=st.session_state['det_dt_fim'])
+        # Initialize dates
+        if 'rep_dt_inicio' not in st.session_state:
+            st.session_state['rep_dt_inicio'] = date.today() - timedelta(days=30)
+        if 'rep_dt_fim' not in st.session_state:
+            st.session_state['rep_dt_fim'] = date.today() + timedelta(days=30)
+            
+        col_r1, col_r2 = st.columns(2)
+        r_dt_inicio = col_r1.date_input("Data de Início", value=st.session_state['rep_dt_inicio'], key="rep_start_date")
+        r_dt_fim = col_r2.date_input("Data de Fim", value=st.session_state['rep_dt_fim'], key="rep_end_date")
         
-        # Sincronizar alterações manuais de volta ao session_state
-        st.session_state['det_dt_inicio'] = dt_inicio
-        st.session_state['det_dt_fim'] = dt_fim
+        # Update session states
+        st.session_state['rep_dt_inicio'] = r_dt_inicio
+        st.session_state['rep_dt_fim'] = r_dt_fim
         
-        bancos_det_opts = ["TODOS"] + list(opcoes_bancos.keys())
-        banco_filtro = col_f3.selectbox("Filtrar por Conta/Banco", bancos_det_opts, key="det_banco")
+        col_r3, col_r4 = st.columns(2)
+        # Multi-select options
+        status_opts = ["Vencido", "Em Dia", "Atraso", "Risco"]
+        status_selected = col_r3.multiselect("Status do Título", status_opts, default=["Vencido", "Em Dia"], help="Escolha quais tipos de vencimento incluir no relatório.")
         
-        # Categorias de Lançamento (Filtrando vazios e Nulos)
-        df_todas_cats = fetch_all("SELECT DISTINCT categoria FROM fluxo_caixa WHERE categoria IS NOT NULL AND categoria != ''")
-        cats_list = sorted([str(c) for c in df_todas_cats['categoria'].tolist()]) if not df_todas_cats.empty else []
-        cats_opts = ["TODAS"] + cats_list
-        cat_filtro = col_f4.selectbox(
-            "Filtrar por Categoria", 
-            cats_opts, 
-            key="det_cat",
-            help="Selecione uma classificação contábil (Ex: Receita Com Vendas, Comissões, etc.) para isolar esses lançamentos no período."
-        )
+        tipo_selected = col_r4.multiselect("Tipo de Contato", ["Cliente", "Fornecedor"], default=["Cliente", "Fornecedor"])
         
-        # Query de lançamentos no período
-        query_detalhe = """
-            SELECT fc.data as 'Data', fc.tipo as 'Movimentação', 
-                   fc.categoria as 'Categoria', fc.descricao as 'Histórico', fc.valor as 'Valor', 
-                   cb.nome as 'Banco'
-            FROM fluxo_caixa fc
-            LEFT JOIN contas_bancarias cb ON fc.conta_bancaria_id = cb.id
-            WHERE fc.data BETWEEN ? AND ?
-            ORDER BY fc.data DESC, fc.id DESC
-        """
+        st.markdown("<br>", unsafe_allow_html=True)
         
-        df_det = fetch_all(query_detalhe, (dt_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")))
-        
-        if not df_det.empty:
-            # Aplicar filtros adicionais em pandas
-            if banco_filtro != "TODOS":
-                df_det = df_det[df_det['Banco'] == banco_filtro]
-            if cat_filtro != "TODAS":
-                df_det = df_det[df_det['Categoria'] == cat_filtro]
+        # Action button using the same standard green buttons as ERP (from estilo.py)
+        if st.button("📊 Gerar Relatório de Clientes / Fornecedores", type="primary", use_container_width=True):
+            # Fetch all possible receivables and payables in the period
+            df_recs_rep = pd.DataFrame()
+            df_pags_rep = pd.DataFrame()
+            
+            if "Cliente" in tipo_selected:
+                df_recs_rep = fetch_all("""
+                    SELECT c.id, c.data_vencimento, cl.nome as nome_contato, c.descricao, c.valor, c.status, 'Cliente' as tipo
+                    FROM contas_a_receber c
+                    JOIN clientes cl ON c.cliente_id = cl.id
+                    WHERE c.data_vencimento BETWEEN ? AND ?
+                """, (r_dt_inicio.strftime("%Y-%m-%d"), r_dt_fim.strftime("%Y-%m-%d")))
                 
-            if df_det.empty:
-                st.warning("Nenhum lançamento encontrado para os filtros selecionados.")
+            if "Fornecedor" in tipo_selected:
+                df_pags_rep = fetch_all("""
+                    SELECT c.id, c.data_vencimento, f.nome_fantasia as nome_contato, c.descricao, c.valor, c.status, 'Fornecedor' as tipo
+                    FROM contas_a_pagar c
+                    JOIN fornecedores f ON c.fornecedor_id = f.id
+                    WHERE c.data_vencimento BETWEEN ? AND ?
+                """, (r_dt_inicio.strftime("%Y-%m-%d"), r_dt_fim.strftime("%Y-%m-%d")))
+                
+            # Combine
+            df_combined = pd.concat([df_recs_rep, df_pags_rep], ignore_index=True)
+            
+            if df_combined.empty:
+                st.warning("Nenhum registro encontrado para o período e tipo selecionados.")
             else:
-                # Sumarização
-                entradas = df_det[df_det['Movimentação'] == 'Entrada']['Valor'].sum()
-                saidas = df_det[df_det['Movimentação'] == 'Saída']['Valor'].sum()
-                saldo_liq = entradas - saidas
+                # Add extra dynamic statuses
+                df_combined['venc_date'] = pd.to_datetime(df_combined['data_vencimento']).dt.date
+                df_combined['dias_atraso'] = (hoje - df_combined['venc_date']).apply(lambda x: x.days)
                 
-                c_det1, c_det2, c_det3 = st.columns(3)
-                c_det1.metric("🟢 Total de Entradas", f"R$ {entradas:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                c_det2.metric("🔴 Total de Saídas", f"R$ {saidas:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                # Classify according to selected status tags
+                def classificar_status(row):
+                    if row['status'] == 'PENDENTE':
+                        if row['venc_date'] < hoje:
+                            if row['dias_atraso'] > 30:
+                                return 'Risco'
+                            else:
+                                return 'Atraso' # Or Vencido
+                        else:
+                            return 'Em Dia'
+                    elif row['status'] in ('RECEBIDO', 'PAGO'):
+                        return 'Quitado'
+                    return 'Outro'
+                    
+                df_combined['status_financeiro'] = df_combined.apply(classificar_status, axis=1)
                 
-                # Cor do Saldo Líquido
-                if saldo_liq >= 0:
-                    c_det3.success(f"💎 Saldo Líquido: R$ {saldo_liq:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                # Map selected filters
+                mapped_status = []
+                for s in status_selected:
+                    if s == "Vencido":
+                        mapped_status.append("Atraso")
+                        mapped_status.append("Risco")
+                    else:
+                        mapped_status.append(s)
+                        
+                # Filter by status
+                df_filtered = df_combined[df_combined['status_financeiro'].isin(mapped_status)].copy()
+                
+                if df_filtered.empty:
+                    st.warning("Nenhum registro corresponde aos filtros de Status selecionados.")
                 else:
-                    c_det3.error(f"💎 Saldo Líquido: R$ {saldo_liq:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                    st.session_state['relatorio_preview'] = df_filtered
+                    st.session_state['relatorio_filtros'] = f"Período: {r_dt_inicio.strftime('%d/%m/%Y')} a {r_dt_fim.strftime('%d/%m/%Y')} | Tipos: {', '.join(tipo_selected)}"
+                    
+        # Render the Preview & Export Buttons if the report has been generated
+        if 'relatorio_preview' in st.session_state:
+            df_prev = st.session_state['relatorio_preview']
+            st.markdown("---")
+            st.markdown(f"#### 🔎 Visualização do Relatório Gerado")
+            st.caption(st.session_state.get('relatorio_filtros', ''))
+            
+            # Show summary KPIs of the generated report
+            col_res1, col_res2, col_res3 = st.columns(3)
+            tot_cli_val = df_prev[df_prev['tipo'] == 'Cliente']['valor'].sum()
+            tot_for_val = df_prev[df_prev['tipo'] == 'Fornecedor']['valor'].sum()
+            
+            col_res1.metric("Total de Clientes (A Receber)", to_brl(tot_cli_val))
+            col_res2.metric("Total de Fornecedores (A Pagar)", to_brl(tot_for_val))
+            col_res3.metric("Saldo Líquido", to_brl(tot_cli_val - tot_for_val))
+            
+            # Format display dataframe
+            df_display_prev = df_prev.copy()
+            df_display_prev['Vencimento'] = pd.to_datetime(df_display_prev['data_vencimento']).dt.strftime('%d/%m/%Y')
+            df_display_prev['Valor (R$)'] = df_display_prev['valor'].apply(to_brl)
+            df_display_prev['Status Interno'] = df_display_prev['status_financeiro'].map({
+                'Atraso': '🔴 Atraso (<30 dias)',
+                'Risco': '🔥 Risco (>30 dias)',
+                'Em Dia': '🟢 Em Dia'
+            })
+            
+            df_display_view = df_display_prev[['Vencimento', 'tipo', 'nome_contato', 'descricao', 'Valor (R$)', 'Status Interno']]
+            df_display_view.columns = ['Vencimento', 'Tipo', 'Contato', 'Descrição/Fatura', 'Valor', 'Status de Prazo']
+            
+            st.dataframe(df_display_view, hide_index=True, width="stretch")
+            
+            # Export Buttons side-by-side
+            col_dwn1, col_dwn2 = st.columns(2)
+            
+            # 1. Excel/CSV Download
+            csv_rep = df_prev[['data_vencimento', 'tipo', 'nome_contato', 'descricao', 'valor', 'status_financeiro']].to_csv(index=False, sep=";").encode('utf-8-sig')
+            col_dwn1.download_button(
+                label="📥 Baixar Planilha Excel (CSV)",
+                data=csv_rep,
+                file_name=f"relatorio_financeiro_{hoje.strftime('%d_%m_%Y')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="btn_dwn_csv"
+            )
+            
+            # 2. PDF Download
+            try:
+                pdf_rep = FPDF()
+                pdf_rep.add_page()
+                pdf_rep.set_font("Helvetica", "B", 15)
+                pdf_rep.cell(0, 10, "EMPORIO DO ALHO - RELATORIO FINANCEIRO CONSOLIDADO", new_x="LMARGIN", new_y="NEXT", align="C")
+                pdf_rep.set_font("Helvetica", "", 10)
+                pdf_rep.cell(0, 6, st.session_state.get('relatorio_filtros', ''), new_x="LMARGIN", new_y="NEXT", align="C")
+                pdf_rep.ln(5)
                 
-                # Formatação para visualização
-                df_det_view = df_det.copy()
-                df_det_view['Data'] = pd.to_datetime(df_det_view['Data']).dt.strftime('%d/%m/%Y')
-                df_det_view['Valor (R$)'] = df_det_view['Valor'].apply(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                pdf_rep.set_font("Helvetica", "B", 10)
+                pdf_rep.cell(20, 7, "Venc.", border=1)
+                pdf_rep.cell(20, 7, "Tipo", border=1)
+                pdf_rep.cell(50, 7, "Contato/Parceiro", border=1)
+                pdf_rep.cell(65, 7, "Descricao/Fatura", border=1)
+                pdf_rep.cell(35, 7, "Valor", border=1, new_x="LMARGIN", new_y="NEXT")
                 
-                st.dataframe(df_det_view[['Data', 'Movimentação', 'Banco', 'Categoria', 'Histórico', 'Valor (R$)']], hide_index=True, width="stretch")
+                pdf_rep.set_font("Helvetica", "", 8.5)
+                import unicodedata
+                for _, r in df_prev.iterrows():
+                    v_dt = pd.to_datetime(r['data_vencimento']).strftime('%d/%m/%Y')
+                    tp = r['tipo']
+                    cont = "".join(ch for ch in unicodedata.normalize('NFKD', str(r['nome_contato'])) if unicodedata.category(ch) != 'Mn')
+                    desc = "".join(ch for ch in unicodedata.normalize('NFKD', str(r['descricao'])) if unicodedata.category(ch) != 'Mn')[:38]
+                    v_str = f"R$ {float(r['valor']):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    
+                    pdf_rep.cell(20, 6, v_dt, border=1)
+                    pdf_rep.cell(20, 6, tp, border=1)
+                    pdf_rep.cell(50, 6, cont[:28], border=1)
+                    pdf_rep.cell(65, 6, desc, border=1)
+                    pdf_rep.cell(35, 6, v_str, border=1, align="R", new_x="LMARGIN", new_y="NEXT")
+                    
+                pdf_data_rep = bytes(pdf_rep.output())
                 
-                # Ações de Exportação
-                col_exp1, col_exp2 = st.columns(2)
-                
-                # 1. Export Excel (CSV)
-                csv_data = df_det.to_csv(index=False, sep=";").encode('utf-8-sig')
-                col_exp1.download_button(
-                    label="📥 Exportar Planilha (Excel/CSV)",
-                    data=csv_data,
-                    file_name=f"extrato_financeiro_{dt_inicio.strftime('%d-%m-%Y')}_a_{dt_fim.strftime('%d-%m-%Y')}.csv",
-                    mime="text/csv",
+                col_dwn2.download_button(
+                    label="📄 Baixar Relatório Oficial (PDF)",
+                    data=pdf_data_rep,
+                    file_name=f"relatorio_financeiro_{hoje.strftime('%d_%m_%Y')}.pdf",
+                    mime="application/pdf",
                     use_container_width=True,
-                    key="btn_det_csv"
+                    key="btn_dwn_pdf"
                 )
-                
-                # 2. Export PDF
-                try:
-                    pdf_data = gerar_pdf_financeiro(df_det_view, dt_inicio, dt_fim, entradas, saidas, saldo_liq, banco_filtro, cat_filtro)
-                    col_exp2.download_button(
-                        label="📄 Exportar Relatório Oficial (PDF)",
-                        data=pdf_data,
-                        file_name=f"relatorio_financeiro_{dt_inicio.strftime('%d-%m-%Y')}_a_{dt_fim.strftime('%d-%m-%Y')}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True,
-                        key="btn_det_pdf"
-                    )
-                except Exception as pdf_err:
-                    col_exp2.error(f"Erro ao gerar PDF: {pdf_err}")
+            except Exception as pdf_ex:
+                col_dwn2.error(f"Erro ao gerar PDF: {pdf_ex}")
         else:
             st.info("Nenhum lançamento no período selecionado.")
 
