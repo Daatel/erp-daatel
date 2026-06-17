@@ -585,6 +585,67 @@ with tab3:
     if not df_fornecedores.empty:
         export_btn(df_fornecedores, 'fornecedores.csv')
         st.dataframe(df_fornecedores, width="stretch", hide_index=True)
+        
+        with st.expander("✏️ Editar ou Inativar Fornecedor"):
+            opts_forn = {}
+            for _, r in df_fornecedores.iterrows():
+                lbl = f"ID {r['id']} | {r['Nome Fantasia']} ({r['Status']})"
+                opts_forn[lbl] = r['id']
+                
+            f_sel = st.selectbox("Selecione o Fornecedor:", list(opts_forn.keys()))
+            if f_sel:
+                fid = opts_forn[f_sel]
+                f_data = fetch_all("SELECT * FROM fornecedores WHERE id=?", (fid,))
+                if not f_data.empty:
+                    fb = f_data.iloc[0]
+                    with st.form("edit_forn"):
+                        ef1, ef2, ef3 = st.columns(3)
+                        enome = ef1.text_input("Razão Social / Nome", fb['nome'])
+                        efantasia = ef2.text_input("Nome Fantasia", fb['nome_fantasia'])
+                        edoc = ef3.text_input("CNPJ/CPF", fb['cnpj_cpf'] if fb['cnpj_cpf'] else "")
+                        
+                        ef4, ef5, ef6 = st.columns(3)
+                        eie = ef4.text_input("Inscrição Estadual", fb.get('inscricao_estadual', '') if fb.get('inscricao_estadual') else "")
+                        etelefone = ef5.text_input("Telefone", fb.get('telefone', '') if fb.get('telefone') else "")
+                        eemail = ef6.text_input("E-mail", fb.get('email', '') if fb.get('email') else "")
+                        
+                        ef7, ef8, ef9, ef10 = st.columns([2, 1, 1, 1])
+                        eendereco = ef7.text_input("Endereço", fb.get('endereco', '') if fb.get('endereco') else "")
+                        ebairro = ef8.text_input("Bairro", fb.get('bairro', '') if fb.get('bairro') else "")
+                        ecidade = ef9.text_input("Cidade", fb.get('cidade', '') if fb.get('cidade') else "")
+                        euf = ef10.text_input("UF", fb.get('uf', '') if fb.get('uf') else "")
+                        
+                        ef11, ef12, ef13 = st.columns(3)
+                        ecep = ef11.text_input("CEP", fb.get('cep', '') if fb.get('cep') else "")
+                        
+                        f_stts = ["ATIVO", "INATIVO"]
+                        d_stts = fb['status'] if fb['status'] in f_stts else "ATIVO"
+                        estatus = ef12.selectbox("Status", f_stts, index=f_stts.index(d_stts))
+                        
+                        if planos_options:
+                            d_plano = fb.get('plano_de_contas', '')
+                            idx_plano = planos_options.index(d_plano) + 1 if d_plano in planos_options else 0
+                            eplano_de_contas = ef13.selectbox("Plano de Contas", ["(Nenhum/Outro)"] + planos_options, index=idx_plano)
+                        else:
+                            eplano_de_contas = ef13.text_input("Plano de Contas", fb.get('plano_de_contas', '') if fb.get('plano_de_contas') else "")
+                            
+                        eprazo = st.text_input("Condição/Prazo Pagamento Padrão", fb.get('prazo_pagamento', '') if fb.get('prazo_pagamento') else "")
+                        
+                        if st.form_submit_button("Salvar Fornecedor"):
+                            if eplano_de_contas == "(Nenhum/Outro)":
+                                eplano_de_contas = ""
+                                
+                            if enome and efantasia:
+                                run_query("""
+                                    UPDATE fornecedores 
+                                    SET nome=?, nome_fantasia=?, cnpj_cpf=?, inscricao_estadual=?, telefone=?, email=?,
+                                        endereco=?, bairro=?, cidade=?, uf=?, cep=?, status=?, plano_de_contas=?, prazo_pagamento=? 
+                                    WHERE id=?
+                                """, (enome, efantasia, edoc, eie, etelefone, eemail, eendereco, ebairro, ecidade, euf, ecep, estatus, eplano_de_contas, eprazo, fid))
+                                st.success("Fornecedor atualizado com sucesso!")
+                                import time; time.sleep(1); st.rerun()
+                            else:
+                                st.error("Atenção: Razão Social e Nome Fantasia são obrigatórios.")
 
 # ======= REGRAS DE COMISSÃO =======
 with tab4:
