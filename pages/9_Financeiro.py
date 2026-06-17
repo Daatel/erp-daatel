@@ -364,6 +364,24 @@ try:
         
         tipo_selected = col_r4.multiselect("Tipo de Contato", ["Cliente", "Fornecedor"], default=["Cliente", "Fornecedor"])
         
+        # Filtro de Contatos Específicos (Clientes/Fornecedores)
+        contatos_opts = []
+        if "Cliente" in tipo_selected:
+            df_cl_opt = fetch_all("SELECT nome FROM clientes ORDER BY nome")
+            if not df_cl_opt.empty:
+                contatos_opts.extend([f"👤 Cliente: {n}" for n in df_cl_opt['nome'].tolist()])
+        if "Fornecedor" in tipo_selected:
+            df_forn_opt = fetch_all("SELECT nome_fantasia FROM fornecedores ORDER BY nome_fantasia")
+            if not df_forn_opt.empty:
+                contatos_opts.extend([f"🏭 Fornecedor: {n}" for n in df_forn_opt['nome_fantasia'].tolist()])
+                
+        contatos_selecionados = st.multiselect(
+            "Filtrar por Clientes / Fornecedores específicos (Deixe vazio para trazer todos)", 
+            options=contatos_opts, 
+            default=None,
+            key="rep_contatos_filter"
+        )
+        
         st.markdown("<br>", unsafe_allow_html=True)
         
         # Action button using the same standard green buttons as ERP (from estilo.py)
@@ -390,6 +408,17 @@ try:
                 
             # Combine
             df_combined = pd.concat([df_recs_rep, df_pags_rep], ignore_index=True)
+            
+            # Filtrar por Contatos Específicos
+            if not df_combined.empty and contatos_selecionados:
+                pares_filtrar = []
+                for c_sel in contatos_selecionados:
+                    if c_sel.startswith("👤 Cliente: "):
+                        pares_filtrar.append(("Cliente", c_sel.replace("👤 Cliente: ", "")))
+                    elif c_sel.startswith("🏭 Fornecedor: "):
+                        pares_filtrar.append(("Fornecedor", c_sel.replace("🏭 Fornecedor: ", "")))
+                
+                df_combined = df_combined[df_combined.apply(lambda r: (r['tipo'], r['nome_contato']) in pares_filtrar, axis=1)]
             
             if df_combined.empty:
                 st.warning("Nenhum registro encontrado para o período e tipo selecionados.")
@@ -429,8 +458,9 @@ try:
                 if df_filtered.empty:
                     st.warning("Nenhum registro corresponde aos filtros de Status selecionados.")
                 else:
+                    filtro_contatos_str = f" | Contatos: {len(contatos_selecionados)} selecionados" if contatos_selecionados else ""
                     st.session_state['relatorio_preview'] = df_filtered
-                    st.session_state['relatorio_filtros'] = f"Período: {r_dt_inicio.strftime('%d/%m/%Y')} a {r_dt_fim.strftime('%d/%m/%Y')} | Tipos: {', '.join(tipo_selected)}"
+                    st.session_state['relatorio_filtros'] = f"Período: {r_dt_inicio.strftime('%d/%m/%Y')} a {r_dt_fim.strftime('%d/%m/%Y')} | Tipos: {', '.join(tipo_selected)}{filtro_contatos_str}"
                     
         # Render the Preview & Export Buttons if the report has been generated
         if 'relatorio_preview' in st.session_state:
