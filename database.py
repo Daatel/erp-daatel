@@ -69,6 +69,7 @@ def format_pg(sql):
         sql = re.sub(r"(?i)\bas\s+'([^']+)'", r'as "\1"', sql)
         sql = sql.replace("%", "%%")
         sql = sql.replace("?", "%s")
+        sql = re.sub(r"(?i)strftime\(\s*'%%Y-%%m'\s*,\s*([^)]+)\)", r"to_char(\1, 'YYYY-MM')", sql)
         sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
         sql = sql.replace("DATETIME DEFAULT CURRENT_TIMESTAMP", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         sql = sql.replace("BOOLEAN DEFAULT 0", "BOOLEAN DEFAULT FALSE")

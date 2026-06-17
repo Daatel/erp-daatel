@@ -333,7 +333,7 @@ with tab2:
     if st.button("🔄 Consultar Faturamentos e Gerar Arquivo"):
         # Pega as vendas FATURADAS do mês
         q_sefaz = '''
-            SELECT v.id as NUM_PEDIDO, c.nome as CLIENTE, c.cnpj as CNPJ, c.uf as UF_DESTINO,
+            SELECT v.id as NUM_PEDIDO, c.nome as CLIENTE, c.cnpj_cpf as CNPJ, c.uf as UF_DESTINO,
                    p.nome as PRODUTO, v.quantidade as QTD, v.valor_unitario as V_UNIT, v.valor_total as V_TOTAL,
                    v.lote_impresso as LOTE_NF, v.validade_impressa as VAL_NF,
                    v.data as DATA_FATURAMENTO, v.tipo_documento as DOC_ORIGEM

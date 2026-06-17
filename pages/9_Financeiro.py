@@ -409,11 +409,11 @@ try:
                 for _, r in df_pc.iterrows():
                     op_pc[f"{r['codigo']} - {r['nome']}"] = (r['id'], r['codigo'])
                     
-            df_cli = fetch_all("SELECT id, nome, cnpj FROM clientes ORDER BY nome")
+            df_cli = fetch_all("SELECT id, nome, cnpj_cpf FROM clientes ORDER BY nome")
             op_cli = {"-- SELECIONE CLIENTE (Obrigatório p/ 2.2.1, 2.2.2, 2.2.4) --": None}
             if not df_cli.empty:
                 for _, r in df_cli.iterrows():
-                    op_cli[f"{r['nome']} ({r['cnpj']})"] = r['id']
+                    op_cli[f"{r['nome']} ({r['cnpj_cpf']})"] = r['id']
                     
             with st.form("lancar_pagar_manual"):
                 col_m1, col_m2 = st.columns(2)
