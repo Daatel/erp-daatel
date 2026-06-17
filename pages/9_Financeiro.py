@@ -411,46 +411,49 @@ try:
                     op_pc[f"{r['codigo']} - {r['nome']}"] = (r['id'], r['codigo'])
                     
             df_cli = fetch_all("SELECT id, nome, cnpj_cpf FROM clientes ORDER BY nome")
-            op_cli = {"-- SELECIONE CLIENTE (Obrigatório p/ 2.2.1, 2.2.2, 2.2.4) --": None}
+            op_cli = {"-- SELECIONE O CLIENTE --": None}
             if not df_cli.empty:
                 for _, r in df_cli.iterrows():
                     op_cli[f"{r['nome']} ({r['cnpj_cpf']})"] = r['id']
                     
-            with st.form("lancar_pagar_manual", clear_on_submit=True):
-                col_m1, col_m2 = st.columns(2)
-                forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()))
-                pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()))
-                
-                col_m3, col_m4 = st.columns(2)
-                cli_sel = col_m3.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()))
-                venc_p = col_m4.date_input("Vencimento", date.today() + timedelta(days=30))
-                
-                col_m5, col_m6 = st.columns([2, 1])
-                desc_p = col_m5.text_input("Descrição / Fatura (Ex: Nota Fiscal nº 123)")
-                val_p = col_m6.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0)
-                
-                if st.form_submit_button("Salvar Duplicata a Pagar"):
-                    if forn_sel == "-- SELECIONE O FORNECEDOR --":
-                        st.error("Por favor, selecione um Fornecedor.")
-                    elif pc_sel == "-- SELECIONE O PLANO DE CONTAS --":
-                        st.error("Por favor, selecione um Plano de Contas.")
-                    elif not desc_p:
-                        st.error("Preencha a descrição do lançamento.")
+            col_m1, col_m2 = st.columns(2)
+            forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()))
+            pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()))
+            
+            col_m3, col_m4 = st.columns([1, 2])
+            with col_m3:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                is_vinc = st.checkbox("É despesa Vinculada a Cliente?", value=False)
+            cli_sel = col_m4.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()), disabled=not is_vinc)
+            
+            venc_p = st.date_input("Vencimento", date.today() + timedelta(days=30))
+            
+            col_m5, col_m6 = st.columns([2, 1])
+            desc_p = col_m5.text_input("Descrição / Fatura (Ex: Nota Fiscal nº 123)")
+            val_p = col_m6.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0)
+            
+            if st.button("Salvar Duplicata a Pagar", type="primary", use_container_width=True):
+                if forn_sel == "-- SELECIONE O FORNECEDOR --":
+                    st.error("Por favor, selecione um Fornecedor.")
+                elif pc_sel == "-- SELECIONE O PLANO DE CONTAS --":
+                    st.error("Por favor, selecione um Plano de Contas.")
+                elif not desc_p:
+                    st.error("Preencha a descrição do lançamento.")
+                else:
+                    pc_id, pc_codigo = op_pc[pc_sel]
+                    forn_id = op_forn[forn_sel]
+                    cli_id = op_cli[cli_sel] if is_vinc else None
+                    
+                    # Validação de Cliente Obrigatório para 2.2.1, 2.2.2, 2.2.4
+                    if pc_codigo in ('2.2.1', '2.2.2', '2.2.4') and cli_id is None:
+                        st.error(f"⚠️ A conta selecionada ({pc_sel}) exige a vinculação obrigatória de um Cliente (CNPJ) para cálculo de rentabilidade. Por favor, marque a caixa e selecione o cliente correspondente.")
                     else:
-                        pc_id, pc_codigo = op_pc[pc_sel]
-                        forn_id = op_forn.get(forn_sel)
-                        cli_id = op_cli[cli_sel]
-                        
-                        # Validação de Cliente Obrigatório para 2.2.1, 2.2.2, 2.2.4
-                        if pc_codigo in ('2.2.1', '2.2.2', '2.2.4') and cli_id is None:
-                            st.error(f"⚠️ A conta selecionada ({pc_sel}) exige a vinculação obrigatória de um Cliente (CNPJ) para cálculo de rentabilidade. Por favor, selecione um cliente.")
-                        else:
-                            run_query(
-                                "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
-                                (forn_id, pc_id, cli_id, desc_p, val_p, venc_p.strftime("%Y-%m-%d"))
-                            )
-                            st.success("✅ Duplicata a Pagar lançada com sucesso!")
-                            import time; time.sleep(1); st.rerun()
+                        run_query(
+                            "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                            (forn_id, pc_id, cli_id, desc_p, val_p, venc_p.strftime("%Y-%m-%d"))
+                        )
+                        st.success("✅ Duplicata a Pagar lançada com sucesso!")
+                        import time; time.sleep(1); st.rerun()
 
         df_all_contas = fetch_all("""
             SELECT c.id, f.nome_fantasia as 'Fornecedor', p.nome as 'Planta de Custo', 
