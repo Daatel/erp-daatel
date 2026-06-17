@@ -416,23 +416,40 @@ try:
                 for _, r in df_cli.iterrows():
                     op_cli[f"{r['nome']} ({r['cnpj_cpf']})"] = r['id']
                     
+            # CSS para deixar os botões primários verdes nesta página
+            st.markdown("""
+            <style>
+            div.stButton > button[kind="primary"] {
+                background-color: #28a745 !important;
+                color: white !important;
+                border: 1px solid #28a745 !important;
+            }
+            div.stButton > button[kind="primary"]:hover {
+                background-color: #218838 !important;
+                border-color: #1e7e34 !important;
+            }
+            div.stButton > button[kind="primary"]:active {
+                background-color: #1e7e34 !important;
+                border-color: #1c7430 !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
             col_m1, col_m2 = st.columns(2)
             forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()))
             pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()))
             
-            col_m3, col_m4 = st.columns(2)
-            with col_m3:
-                is_vinc = st.checkbox("É despesa Vinculada a Cliente?", value=False)
-                cli_sel = st.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()), disabled=not is_vinc)
-            with col_m4:
-                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-                venc_p = st.date_input("Vencimento", date.today() + timedelta(days=30))
+            col_m3, col_m4 = st.columns([2, 1])
+            desc_p = col_m3.text_input("Descrição / Fatura (Ex: Nota Fiscal nº 123)")
+            val_p = col_m4.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0)
             
-            col_m5, col_m6 = st.columns([2, 1])
-            desc_p = col_m5.text_input("Descrição / Fatura (Ex: Nota Fiscal nº 123)")
-            val_p = col_m6.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0)
+            col_m5, col_m6 = st.columns(2)
+            venc_p = col_m5.date_input("Vencimento", date.today() + timedelta(days=30))
+            with col_m6:
+                is_vinc = st.checkbox("É Cliente Vinculado (CNPJ) ?", value=False)
+                cli_sel = st.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()), disabled=not is_vinc, label_visibility="collapsed")
             
-            if st.button("Salvar Duplicata a Pagar", type="primary", use_container_width=True):
+            if st.button("Salvar Duplicata a Pagar", type="primary", use_container_width=False):
                 if forn_sel == "-- SELECIONE O FORNECEDOR --":
                     st.error("Por favor, selecione um Fornecedor.")
                 elif pc_sel == "-- SELECIONE O PLANO DE CONTAS --":
