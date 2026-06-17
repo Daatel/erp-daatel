@@ -54,7 +54,8 @@ with tab1:
         st.markdown("---")
         st.subheader("🎁 2. O Que Vamos Produzir?")
         col5, col6 = st.columns(2)
-        produto_gerado = col5.selectbox("Produto Final Embalado e Pronto", list(pf_dict.keys()))
+        pf_options = ["-- SELECIONE O PRODUTO --"] + list(pf_dict.keys())
+        produto_gerado = col5.selectbox("Produto Final Embalado e Pronto", pf_options)
         pf_gerado_qtd = col6.number_input("Volume a Produzir (unidades do produto)", min_value=0.0, step=1.0, format="%.3f")
         
         perdas_kg = st.number_input("Perda Física Declarada da Esteira (Ex: Cascas, Sujeira - em Kg)", min_value=0.0, step=0.1)
@@ -66,7 +67,7 @@ with tab1:
     st.markdown("---")
     st.subheader("🧪 3. A Receita (Ingredientes consumidos)")
 
-    pf_id_prod = int(pf_dict[produto_gerado]['id']) if produto_gerado else None
+    pf_id_prod = int(pf_dict[produto_gerado]['id']) if (produto_gerado and produto_gerado != "-- SELECIONE O PRODUTO --") else None
 
     # Carrega ficha técnica do produto selecionado
     df_ficha_prod = fetch_all(
@@ -143,7 +144,9 @@ with tab1:
                     st.stop()
                 insumos_usados.append((item, qt_puxada, sobra, qt_consumida))
                 
-        if not insumos_usados:
+        if produto_gerado == "-- SELECIONE O PRODUTO --":
+            st.error("🛑 Erro: Por favor, selecione o Produto Final Embalado e Pronto.")
+        elif not insumos_usados:
             st.error("🛑 Erro: A máquina precisa consumir pelo menos 1 Insumo/Matéria-Prima.")
         elif pf_gerado_qtd <= 0:
             st.error("🛑 Erro: O Volume Útil Gerado de produto pronto deve ser maior que zero.")

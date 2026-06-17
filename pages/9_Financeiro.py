@@ -398,13 +398,13 @@ try:
         # --- LANÇADOR MANUAL DE DUPLICATA A PAGAR ---
         with st.expander("➕ Lançar uma Duplicata a Pagar (Despesa / Passivo)"):
             df_forn = fetch_all("SELECT id, nome_fantasia FROM fornecedores ORDER BY nome_fantasia")
-            op_forn = {}
+            op_forn = {"-- SELECIONE O FORNECEDOR --": None}
             if not df_forn.empty:
                 for _, r in df_forn.iterrows():
                     op_forn[f"{r['nome_fantasia']}"] = r['id']
             
             df_pc = fetch_all("SELECT id, codigo, nome FROM planos_de_contas WHERE categoria NOT IN ('RECEITA', 'RECEITA_NAO_OP') ORDER BY codigo")
-            op_pc = {}
+            op_pc = {"-- SELECIONE O PLANO DE CONTAS --": (None, None)}
             if not df_pc.empty:
                 for _, r in df_pc.iterrows():
                     op_pc[f"{r['codigo']} - {r['nome']}"] = (r['id'], r['codigo'])
@@ -417,8 +417,8 @@ try:
                     
             with st.form("lancar_pagar_manual", clear_on_submit=True):
                 col_m1, col_m2 = st.columns(2)
-                forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()) if op_forn else ["Nenhum Fornecedor Cadastrado"])
-                pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()) if op_pc else ["Nenhum Plano Cadastrado"])
+                forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()))
+                pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()))
                 
                 col_m3, col_m4 = st.columns(2)
                 cli_sel = col_m3.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()))
@@ -429,13 +429,15 @@ try:
                 val_p = col_m6.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0)
                 
                 if st.form_submit_button("Salvar Duplicata a Pagar"):
-                    if not op_pc:
-                        st.error("Nenhum plano de contas disponível.")
+                    if forn_sel == "-- SELECIONE O FORNECEDOR --":
+                        st.error("Por favor, selecione um Fornecedor.")
+                    elif pc_sel == "-- SELECIONE O PLANO DE CONTAS --":
+                        st.error("Por favor, selecione um Plano de Contas.")
                     elif not desc_p:
                         st.error("Preencha a descrição do lançamento.")
                     else:
                         pc_id, pc_codigo = op_pc[pc_sel]
-                        forn_id = op_forn.get(forn_sel) if op_forn else None
+                        forn_id = op_forn.get(forn_sel)
                         cli_id = op_cli[cli_sel]
                         
                         # Validação de Cliente Obrigatório para 2.2.1, 2.2.2, 2.2.4
@@ -721,8 +723,8 @@ try:
         # Opcional manual input (Já que as vendas futuras deveriam alimentar isso, mas pode surgir algo rápido)
         with st.expander("➕ Lançar uma Duplicata a Receber"):
             # Buscar clientes
-            df_cli = fetch_all("SELECT id, nome FROM clientes")
-            op_cli = {"Genérico / Não Cadastrado": None}
+            df_cli = fetch_all("SELECT id, nome FROM clientes ORDER BY nome")
+            op_cli = {"-- SELECIONE O CLIENTE --": "placeholder", "Genérico / Não Cadastrado": None}
             if not df_cli.empty:
                 for _,r in df_cli.iterrows(): op_cli[r['nome']] = r['id']
                 
@@ -742,13 +744,15 @@ try:
                 val_r = c4.number_input("Valor da Fatura (R$)", min_value=0.01)
                 
                 if st.form_submit_button("Lançar Promessa de Faturamento"):
-                    if desc:
+                    if cli_nome == "-- SELECIONE O CLIENTE --":
+                        st.error("Por favor, selecione um Cliente (ou 'Genérico / Não Cadastrado').")
+                    elif not desc:
+                        st.error("Preencha a descrição.")
+                    else:
                         run_query("INSERT INTO contas_a_receber (cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, 'PENDENTE')",
                                   (op_cli[cli_nome], desc, val_r, venc.strftime("%Y-%m-%d")))
                         st.success("Boleto emitido (pendente)")
                         import time; time.sleep(1); st.rerun()
-                    else:
-                        st.error("Preencha a descrição.")
 
         # ======= FECHAMENTO DE CARTEIRA =======
         st.markdown("---")

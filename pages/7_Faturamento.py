@@ -433,54 +433,65 @@ with tab3:
             st.warning("Cadastros incompletos.")
         else:
             c_opts_dev = {f"{r['nome']}": r['id'] for _, r in df_clientes.iterrows()}
-            cli_dev = d2.selectbox("Rede/Cliente Reclamante", list(c_opts_dev.keys()))
+            cli_options = ["-- SELECIONE O CLIENTE --"] + list(c_opts_dev.keys())
+            cli_dev = d2.selectbox("Rede/Cliente Reclamante", cli_options)
             
             d3, d4, d5 = st.columns([2, 1, 1])
             p_opts_dev = {f"{r['nome']}": r for _, r in df_produtos.iterrows()}
-            prod_dev = d3.selectbox("Pacote/Produto Avariado", list(p_opts_dev.keys()))
+            prod_options = ["-- SELECIONE O PRODUTO --"] + list(p_opts_dev.keys())
+            prod_dev = d3.selectbox("Pacote/Produto Avariado", prod_options)
             qtd_dev = d4.number_input("Carga Negada (Un/Kg)", min_value=0.1, step=1.0)
             
-            p_base = float(p_opts_dev[prod_dev]['preco_venda_base'])
-            valor_abatido = d5.number_input("Sangria Financeira R$ (Amargar no DRE)", value=float(qtd_dev * p_base), min_value=0.0)
+            if prod_dev != "-- SELECIONE O PRODUTO --":
+                p_base = float(p_opts_dev[prod_dev]['preco_venda_base'])
+                val_sug = float(qtd_dev * p_base)
+            else:
+                val_sug = 0.0
+            valor_abatido = d5.number_input("Sangria Financeira R$ (Amargar no DRE)", value=val_sug, min_value=0.0)
             
             d6, d7 = st.columns([1, 2])
             motivo = d6.selectbox("Fator", ["Alho Esponjoso / Mofo", "Vencimento na Gôndola (S/ Giro)", "Amassado pelo Carga", "Quebra Direta"])
             obs_dev = d7.text_input("Nota Restritiva")
             
             if st.form_submit_button("Protocolar Sangria (Estornar Dinheiro da Fábrica)"):
-                c_id = c_opts_dev[cli_dev]
-                p_id = p_opts_dev[prod_dev]['id']
-                
-                # --- LÓGICA FINANCEIRA (DRE) ---
-                run_query("INSERT INTO devolucoes (data, cliente_id, produto_id, quantidade, motivo, valor_financeiro_abatido, observacoes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                          (dt_dev, c_id, p_id, qtd_dev, motivo, valor_abatido, obs_dev))
-                          
-                run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, valor, descricao) VALUES (?, ?, ?, ?, ?)",
-                          (dt_dev, "Saída", "Logística Reversa (Devoluções)", valor_abatido, f"Estorno: {cli_dev} ({qtd_dev}x {prod_dev}) - {motivo}"))
-                          
-                # --- LÓGICA DE ESTOQUE FÍSICO (Retorno com Custo Zero) ---
-                # 1. Busca Saldo Atual
-                df_saldo = fetch_all("SELECT SUM(CASE WHEN tipo_movimento = 'Entrada' THEN quantidade ELSE -quantidade END) as saldo FROM estoque_movimentos WHERE produto_id = ?", (p_id,))
-                saldo_atual = float(df_saldo.iloc[0]['saldo']) if not df_saldo.empty and pd.notna(df_saldo.iloc[0]['saldo']) else 0.0
-                if saldo_atual < 0: saldo_atual = 0.0 # Previne anomalias matemáticas
-                
-                # 2. Busca Custo Atual
-                df_custo = fetch_all("SELECT custo_unidade FROM produtos WHERE id = ?", (p_id,))
-                custo_atual = float(df_custo.iloc[0]['custo_unidade']) if not df_custo.empty and pd.notna(df_custo.iloc[0]['custo_unidade']) else 0.0
-                
-                # 3. Calcula o Custo Médio Ponderado (O lote devolvido entra valendo R$ 0,00)
-                novo_saldo = saldo_atual + qtd_dev
-                novo_custo_medio = (saldo_atual * custo_atual + qtd_dev * 0.0) / novo_saldo if novo_saldo > 0 else custo_atual
-                
-                # 4. Atualiza o cadastro do produto com o custo barateado
-                run_query("UPDATE produtos SET custo_unidade = ? WHERE id = ?", (novo_custo_medio, p_id))
-                
-                # 5. Dá a Entrada Física no Galpão
-                run_query("INSERT INTO estoque_movimentos (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia) VALUES (?, ?, ?, ?, ?, ?)",
-                          (dt_dev, p_id, 'Entrada', qtd_dev, 'Devolução de Cliente', f"Motivo: {motivo} (Cliente: {cli_dev})"))
-
-                st.error(f"Devolução Homologada! Mercadoria retornou ao estoque com custo R$0,00. Custo médio do produto caiu para R$ {novo_custo_medio:.2f}. Impacto DRE: R$ -{valor_abatido:,.2f}")
-                import time; time.sleep(4); st.rerun()
+                if cli_dev == "-- SELECIONE O CLIENTE --":
+                    st.error("Por favor, selecione a Rede/Cliente Reclamante.")
+                elif prod_dev == "-- SELECIONE O PRODUTO --":
+                    st.error("Por favor, selecione o Pacote/Produto Avariado.")
+                else:
+                    c_id = c_opts_dev[cli_dev]
+                    p_id = p_opts_dev[prod_dev]['id']
+                    
+                    # --- LÓGICA FINANCEIRA (DRE) ---
+                    run_query("INSERT INTO devolucoes (data, cliente_id, produto_id, quantidade, motivo, valor_financeiro_abatido, observacoes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                              (dt_dev, c_id, p_id, qtd_dev, motivo, valor_abatido, obs_dev))
+                              
+                    run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, valor, descricao) VALUES (?, ?, ?, ?, ?)",
+                              (dt_dev, "Saída", "Logística Reversa (Devoluções)", valor_abatido, f"Estorno: {cli_dev} ({qtd_dev}x {prod_dev}) - {motivo}"))
+                              
+                    # --- LÓGICA DE ESTOQUE FÍSICO (Retorno com Custo Zero) ---
+                    # 1. Busca Saldo Atual
+                    df_saldo = fetch_all("SELECT SUM(CASE WHEN tipo_movimento = 'Entrada' THEN quantidade ELSE -quantidade END) as saldo FROM estoque_movimentos WHERE produto_id = ?", (p_id,))
+                    saldo_atual = float(df_saldo.iloc[0]['saldo']) if not df_saldo.empty and pd.notna(df_saldo.iloc[0]['saldo']) else 0.0
+                    if saldo_atual < 0: saldo_atual = 0.0 # Previne anomalias matemáticas
+                    
+                    # 2. Busca Custo Atual
+                    df_custo = fetch_all("SELECT custo_unidade FROM produtos WHERE id = ?", (p_id,))
+                    custo_atual = float(df_custo.iloc[0]['custo_unidade']) if not df_custo.empty and pd.notna(df_custo.iloc[0]['custo_unidade']) else 0.0
+                    
+                    # 3. Calcula o Custo Médio Ponderado (O lote devolvido entra valendo R$ 0,00)
+                    novo_saldo = saldo_atual + qtd_dev
+                    novo_custo_medio = (saldo_atual * custo_atual + qtd_dev * 0.0) / novo_saldo if novo_saldo > 0 else custo_atual
+                    
+                    # 4. Atualiza o cadastro do produto com o custo barateado
+                    run_query("UPDATE produtos SET custo_unidade = ? WHERE id = ?", (novo_custo_medio, p_id))
+                    
+                    # 5. Dá a Entrada Física no Galpão
+                    run_query("INSERT INTO estoque_movimentos (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia) VALUES (?, ?, ?, ?, ?, ?)",
+                              (dt_dev, p_id, 'Entrada', qtd_dev, 'Devolução de Cliente', f"Motivo: {motivo} (Cliente: {cli_dev})"))
+    
+                    st.error(f"Devolução Homologada! Mercadoria retornou ao estoque com custo R$0,00. Custo médio do produto caiu para R$ {novo_custo_medio:.2f}. Impacto DRE: R$ -{valor_abatido:,.2f}")
+                    import time; time.sleep(4); st.rerun()
             
     st.markdown("---")
     df_dev = fetch_all('''

@@ -140,45 +140,53 @@ with tab1:
             cli_dict = {f"{r['nome']} - CNPJ: {r['cnpj']}": r['id'] for _, r in df_clientes.iterrows()}
             maq_dict = {f"[{r['patrimônio']}] {r['nome']}": r['id'] for _, r in df_maq_disp.iterrows()}
             
-            sel_cli = c_cli.selectbox("Cliente Destino", list(cli_dict.keys()))
-            sel_maq = c_maq.selectbox("Equipamento (Freezer)", list(maq_dict.keys()))
+            cli_options = ["-- SELECIONE O CLIENTE --"] + list(cli_dict.keys())
+            maq_options = ["-- SELECIONE O EQUIPAMENTO --"] + list(maq_dict.keys())
+            
+            sel_cli = c_cli.selectbox("Cliente Destino", cli_options)
+            sel_maq = c_maq.selectbox("Equipamento (Freezer)", maq_options)
             
             d1, d2 = st.columns(2)
             data_ini = d1.date_input("Data de Envio do Freezer", value=date.today())
             meses = d2.number_input("Duração do Contrato (Meses)", min_value=1, value=12, max_value=60)
             
             if st.form_submit_button("Ativar Comodato & Gerar Contrato", use_container_width=True):
-                cli_id = cli_dict[sel_cli]
-                maq_id = maq_dict[sel_maq]
-                data_venc = data_ini + timedelta(days=30*meses)
-                
-                # 1. Cria comodato
-                run_query("INSERT INTO comodatos (maquina_id, cliente_id, data_inicio, data_vencimento) VALUES (?, ?, ?, ?)",
-                          (maq_id, cli_id, data_ini, data_venc))
-                # 2. Atualiza localizacao da maquina
-                run_query("UPDATE maquinario SET localizacao = 'Cliente' WHERE id = ?", (maq_id,))
-                
-                st.success(f"✅ Equipamento transferido em sistema. Contrato ativo até {data_venc.strftime('%d/%m/%Y')}!")
-                
-                # Simulação do texto do contrato para o usuário
-                # Coleta dados para o PDF
-                df_emp = fetch_all("SELECT * FROM empresa_config LIMIT 1")
-                empresa_info = df_emp.iloc[0] if not df_emp.empty else pd.Series({"razao_social": "Sua Empresa LTDA", "cnpj": "00.000.000/0000-00", "endereco_completo": "Endereço não cadastrado", "nome_fantasia": "Sua Empresa"})
-                
-                cli_info = df_clientes[df_clientes['id'] == cli_id].iloc[0]
-                maq_info = df_maq_disp[df_maq_disp['id'] == maq_id].iloc[0]
-                
-                pdf_bytes = gerar_pdf_comodato(empresa_info, cli_info, maq_info, data_ini, meses, data_venc)
-                
-                st.download_button(
-                    label="📄 Baixar Contrato em PDF (Pronto para Impressão)",
-                    data=pdf_bytes,
-                    file_name=f"Comodato_{cli_info['cnpj']}_{maq_info['patrimônio']}.pdf",
-                    mime="application/pdf",
-                    type="primary"
-                )
-                
-                st.info("Imprima este contrato em 2 vias para entregar ao motorista.")
+                if sel_cli == "-- SELECIONE O CLIENTE --":
+                    st.error("Por favor, selecione o Cliente Destino.")
+                elif sel_maq == "-- SELECIONE O EQUIPAMENTO --":
+                    st.error("Por favor, selecione o Equipamento (Freezer).")
+                else:
+                    cli_id = cli_dict[sel_cli]
+                    maq_id = maq_dict[sel_maq]
+                    data_venc = data_ini + timedelta(days=30*meses)
+                    
+                    # 1. Cria comodato
+                    run_query("INSERT INTO comodatos (maquina_id, cliente_id, data_inicio, data_vencimento) VALUES (?, ?, ?, ?)",
+                              (maq_id, cli_id, data_ini, data_venc))
+                    # 2. Atualiza localizacao da maquina
+                    run_query("UPDATE maquinario SET localizacao = 'Cliente' WHERE id = ?", (maq_id,))
+                    
+                    st.success(f"✅ Equipamento transferido em sistema. Contrato ativo até {data_venc.strftime('%d/%m/%Y')}!")
+                    
+                    # Simulação do texto do contrato para o usuário
+                    # Coleta dados para o PDF
+                    df_emp = fetch_all("SELECT * FROM empresa_config LIMIT 1")
+                    empresa_info = df_emp.iloc[0] if not df_emp.empty else pd.Series({"razao_social": "Sua Empresa LTDA", "cnpj": "00.000.000/0000-00", "endereco_completo": "Endereço não cadastrado", "nome_fantasia": "Sua Empresa"})
+                    
+                    cli_info = df_clientes[df_clientes['id'] == cli_id].iloc[0]
+                    maq_info = df_maq_disp[df_maq_disp['id'] == maq_id].iloc[0]
+                    
+                    pdf_bytes = gerar_pdf_comodato(empresa_info, cli_info, maq_info, data_ini, meses, data_venc)
+                    
+                    st.download_button(
+                        label="📄 Baixar Contrato em PDF (Pronto para Impressão)",
+                        data=pdf_bytes,
+                        file_name=f"Comodato_{cli_info['cnpj']}_{maq_info['patrimônio']}.pdf",
+                        mime="application/pdf",
+                        type="primary"
+                    )
+                    
+                    st.info("Imprima este contrato em 2 vias para entregar ao motorista.")
 
 # ==========================================
 # TAB 2: PAINEL DE EQUIPAMENTOS (ROI / VOLUME)
