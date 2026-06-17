@@ -416,9 +416,10 @@ try:
                 for _, r in df_cli.iterrows():
                     op_cli[f"{r['nome']} ({r['cnpj_cpf']})"] = r['id']
                     
-            # CSS para deixar os botões primários verdes nesta página
+            # CSS para estilização fina de botões e alinhamento/estado do selectbox
             st.markdown("""
             <style>
+            /* Botão primário verde */
             div.stButton > button[kind="primary"] {
                 background-color: #28a745 !important;
                 color: white !important;
@@ -431,6 +432,22 @@ try:
             div.stButton > button[kind="primary"]:active {
                 background-color: #1e7e34 !important;
                 border-color: #1c7430 !important;
+            }
+            
+            /* Ajuste de margem do checkbox para alinhar o selectbox com o date_input */
+            div[data-testid="stCheckbox"] {
+                margin-bottom: -12px !important;
+            }
+            
+            /* Estilo para Selectbox desabilitado (cinza claro) */
+            div[data-baseweb="select"]:has(input:disabled) > div {
+                background-color: #f1f5f9 !important;
+                border-color: #cbd5e1 !important;
+                color: #94a3b8 !important;
+                cursor: not-allowed !important;
+            }
+            div[data-baseweb="select"]:has(input:disabled) * {
+                color: #94a3b8 !important;
             }
             </style>
             """, unsafe_allow_html=True)
