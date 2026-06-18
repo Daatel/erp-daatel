@@ -263,63 +263,7 @@ with tab1:
             if v_sel != "-- SELECIONE --":
                 vid = opcoes_fat[v_sel]
                 
-                # --- ÁREA DE SEGURANÇA E ESTORNO DE FATURAMENTO ---
-                with st.container():
-                    st.markdown("#### 🔄 Central de Segurança: Estornar/Desfazer Faturamento")
-                    df_venda_manifesto = fetch_all("SELECT manifesto_id FROM vendas WHERE id = ?", (vid,))
-                    manifesto_id = df_venda_manifesto.iloc[0]['manifesto_id'] if not df_venda_manifesto.empty else None
-                    
-                    if manifesto_id is not None:
-                        st.error(f"🛑 **Estorno Bloqueado:** Este pedido já está vinculado ao **Manifesto de Logística #{manifesto_id}**! Remova o pedido do caminhão no módulo de Logística antes de tentar estornar o faturamento.")
-                    else:
-                        st.warning("⚠️ **Atenção:** Desfazer o faturamento irá excluir a conta a receber, estornar o saldo JIT dos lotes originais no estoque e retornar o pedido para a fila comercial de Pendentes.")
-                        
-                        if st.button("🔄 Executar Estorno de Faturamento", type="primary", key=f"btn_estorno_venda_{vid}"):
-                            # 1. Buscar movimentações originais de saída para reverter
-                            df_movs = fetch_all('''
-                                SELECT produto_id, quantidade, lote_origem_id 
-                                FROM estoque_movimentos 
-                                WHERE documento_referencia = ? AND tipo_movimento = 'Saída'
-                            ''', (f"Venda Lote #{vid}",))
-                            
-                            # 2. Inserir entradas reversoras
-                            for _, mov in df_movs.iterrows():
-                                p_id = int(mov['produto_id'])
-                                qtd = float(mov['quantidade'])
-                                lote_origem = int(mov['lote_origem_id']) if pd.notnull(mov['lote_origem_id']) else None
-                                
-                                run_query(
-                                    """INSERT INTO estoque_movimentos 
-                                       (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
-                                       VALUES (?, ?, 'Entrada', ?, ?, ?, ?)""",
-                                    (date.today().strftime("%Y-%m-%d"), p_id, qtd, 'Estorno de Faturamento', f"Estorno Venda Lote #{vid}", lote_origem)
-                                )
-                                
-                            # 3. Deletar Contas a Receber associada
-                            run_query("DELETE FROM contas_a_receber WHERE venda_id = ?", (vid,))
-                            
-                            # 4. Deletar Contas a Pagar associadas (descarga e acordos de rede)
-                            desc_descarga = f"%Venda #{vid}%"
-                            run_query("DELETE FROM contas_a_pagar WHERE descricao LIKE ? AND status = 'PENDENTE'", (desc_descarga,))
-                            
-                            # 5. Resetar registro da venda de volta para APROVADO (Pendente)
-                            run_query('''
-                                UPDATE vendas 
-                                SET status = 'APROVADO', 
-                                    tipo_documento = NULL, 
-                                    numero_documento = NULL, 
-                                    custo_cmv_real = 0.0, 
-                                    custo_descarga = 0.0, 
-                                    lote_impresso = NULL, 
-                                    validade_impressa = NULL
-                                WHERE id = ?
-                            ''', (vid,))
-                            
-                            st.success(f"✅ Faturamento do Pedido #{vid} estornado com sucesso! Estoque e financeiro reestabelecidos.")
-                            import time; time.sleep(1.5); st.rerun()
-                            
-                st.markdown("---")
-                
+                # 1. Visualização do Documento (DAV ou NF) primeiro
                 import streamlit.components.v1 as components
                 from utils_dav import buscar_dados_venda, gerar_html_dav
                 
@@ -371,6 +315,62 @@ with tab1:
                             )
                         else:
                             st.success(f"✅ NF autorizada. Para reimprimir o DANFE, utilize seu Emissor SEFAZ com o número **{num_nf}**.")
+                
+                # 2. Central de Segurança (Estornar/Desfazer) no rodapé e dentro de um expander
+                st.markdown("---")
+                with st.expander("🚨 Central de Segurança: Estornar/Desfazer Faturamento"):
+                    st.markdown("#### 🔄 Estornar/Desfazer Faturamento")
+                    df_venda_manifesto = fetch_all("SELECT manifesto_id FROM vendas WHERE id = ?", (vid,))
+                    manifesto_id = df_venda_manifesto.iloc[0]['manifesto_id'] if not df_venda_manifesto.empty else None
+                    
+                    if manifesto_id is not None:
+                        st.error(f"🛑 **Estorno Bloqueado:** Este pedido já está vinculado ao **Manifesto de Logística #{manifesto_id}**! Remova o pedido do caminhão no módulo de Logística antes de tentar estornar o faturamento.")
+                    else:
+                        st.warning("⚠️ **Atenção:** Desfazer o faturamento irá excluir a conta a receber, estornar o saldo JIT dos lotes originais no estoque e retornar o pedido para a fila comercial de Pendentes.")
+                        
+                        if st.button("🔄 Executar Estorno de Faturamento", type="primary", key=f"btn_estorno_venda_{vid}"):
+                            # 1. Buscar movimentações originais de saída para reverter
+                            df_movs = fetch_all('''
+                                SELECT produto_id, quantidade, lote_origem_id 
+                                FROM estoque_movimentos 
+                                WHERE documento_referencia = ? AND tipo_movimento = 'Saída'
+                            ''', (f"Venda Lote #{vid}",))
+                            
+                            # 2. Inserir entradas reversoras
+                            for _, mov in df_movs.iterrows():
+                                p_id = int(mov['produto_id'])
+                                qtd = float(mov['quantidade'])
+                                lote_origem = int(mov['lote_origem_id']) if pd.notnull(mov['lote_origem_id']) else None
+                                
+                                run_query(
+                                    """INSERT INTO estoque_movimentos 
+                                       (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+                                       VALUES (?, ?, 'Entrada', ?, ?, ?, ?)""",
+                                    (date.today().strftime("%Y-%m-%d"), p_id, qtd, 'Estorno de Faturamento', f"Estorno Venda Lote #{vid}", lote_origem)
+                                )
+                                
+                            # 3. Deletar Contas a Receber associada
+                            run_query("DELETE FROM contas_a_receber WHERE venda_id = ?", (vid,))
+                            
+                            # 4. Deletar Contas a Pagar associadas (descarga e acordos de rede)
+                            desc_descarga = f"%Venda #{vid}%"
+                            run_query("DELETE FROM contas_a_pagar WHERE descricao LIKE ? AND status = 'PENDENTE'", (desc_descarga,))
+                            
+                            # 5. Resetar registro da venda de volta para APROVADO (Pendente)
+                            run_query('''
+                                UPDATE vendas 
+                                SET status = 'APROVADO', 
+                                    tipo_documento = NULL, 
+                                    numero_documento = NULL, 
+                                    custo_cmv_real = 0.0, 
+                                    custo_descarga = 0.0, 
+                                    lote_impresso = NULL, 
+                                    validade_impressa = NULL
+                                WHERE id = ?
+                            ''', (vid,))
+                            
+                            st.success(f"✅ Faturamento do Pedido #{vid} estornado com sucesso! Estoque e financeiro reestabelecidos.")
+                            import time; time.sleep(1.5); st.rerun()
         else:
             st.info("Nenhuma venda faturada encontrada.")
 
