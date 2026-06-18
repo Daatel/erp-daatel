@@ -11,7 +11,7 @@ def buscar_dados_venda(venda_id):
     df_venda = fetch_all("""
         SELECT v.id, v.data, v.quantidade, v.valor_unitario, v.valor_total, 
                v.custo_frete_rateado, v.numero_documento, v.tipo_documento,
-               c.nome as cliente_nome, c.cnpj as cliente_cnpj, c.uf as uf, c.status,
+               c.nome as cliente_nome, c.cnpj_cpf as cliente_cnpj, c.uf as uf, c.status,
                p.nome as produto_nome, p.id as p_id,
                f.nome as vendedor_nome
         FROM vendas v
