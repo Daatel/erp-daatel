@@ -253,7 +253,12 @@ with tab1:
     with st.expander("🖨️ Reimpressão e Visualização de Documentos (DAV)"):
         df_fat = fetch_all("SELECT v.id, c.nome, v.tipo_documento, v.numero_documento, v.data FROM vendas v JOIN clientes c ON v.cliente_id=c.id WHERE v.status='FATURADO' ORDER BY v.id DESC LIMIT 30")
         if not df_fat.empty:
-            opcoes_fat = {f"Venda #{r['id']} - {r['nome']} ({r['tipo_documento']})": r['id'] for _, r in df_fat.iterrows()}
+            opcoes_fat = {}
+            for _, r in df_fat.iterrows():
+                num_doc = r['numero_documento']
+                doc_desc = f" - Nº {num_doc}" if num_doc and str(num_doc).strip() else ""
+                label = f"Venda #{r['id']} - {r['nome']} ({r['tipo_documento']}{doc_desc})"
+                opcoes_fat[label] = r['id']
             v_sel = st.selectbox("Selecione o pedido faturado para visualizar/imprimir:", ["-- SELECIONE --"] + list(opcoes_fat.keys()))
             if v_sel != "-- SELECIONE --":
                 vid = opcoes_fat[v_sel]
