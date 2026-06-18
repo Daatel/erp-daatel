@@ -249,125 +249,125 @@ with tab1:
                 except Exception as e:
                     st.error(f"🛑 Erro ao processar faturamento (Operação cancelada/revertida): {str(e)}")
                 
-        st.markdown("---")
-        with st.expander("🖨️ Reimpressão e Visualização de Documentos (DAV)"):
-            df_fat = fetch_all("SELECT v.id, c.nome, v.tipo_documento, v.numero_documento, v.data FROM vendas v JOIN clientes c ON v.cliente_id=c.id WHERE v.status='FATURADO' ORDER BY v.id DESC LIMIT 30")
-            if not df_fat.empty:
-                opcoes_fat = {f"Venda #{r['id']} - {r['nome']} ({r['tipo_documento']})": r['id'] for _, r in df_fat.iterrows()}
-                v_sel = st.selectbox("Selecione o pedido faturado para visualizar/imprimir:", ["-- SELECIONE --"] + list(opcoes_fat.keys()))
-                if v_sel != "-- SELECIONE --":
-                    vid = opcoes_fat[v_sel]
+    st.markdown("---")
+    with st.expander("🖨️ Reimpressão e Visualização de Documentos (DAV)"):
+        df_fat = fetch_all("SELECT v.id, c.nome, v.tipo_documento, v.numero_documento, v.data FROM vendas v JOIN clientes c ON v.cliente_id=c.id WHERE v.status='FATURADO' ORDER BY v.id DESC LIMIT 30")
+        if not df_fat.empty:
+            opcoes_fat = {f"Venda #{r['id']} - {r['nome']} ({r['tipo_documento']})": r['id'] for _, r in df_fat.iterrows()}
+            v_sel = st.selectbox("Selecione o pedido faturado para visualizar/imprimir:", ["-- SELECIONE --"] + list(opcoes_fat.keys()))
+            if v_sel != "-- SELECIONE --":
+                vid = opcoes_fat[v_sel]
+                
+                # --- ÁREA DE SEGURANÇA E ESTORNO DE FATURAMENTO ---
+                with st.container():
+                    st.markdown("#### 🔄 Central de Segurança: Estornar/Desfazer Faturamento")
+                    df_venda_manifesto = fetch_all("SELECT manifesto_id FROM vendas WHERE id = ?", (vid,))
+                    manifesto_id = df_venda_manifesto.iloc[0]['manifesto_id'] if not df_venda_manifesto.empty else None
                     
-                    # --- ÁREA DE SEGURANÇA E ESTORNO DE FATURAMENTO ---
-                    with st.container():
-                        st.markdown("#### 🔄 Central de Segurança: Estornar/Desfazer Faturamento")
-                        df_venda_manifesto = fetch_all("SELECT manifesto_id FROM vendas WHERE id = ?", (vid,))
-                        manifesto_id = df_venda_manifesto.iloc[0]['manifesto_id'] if not df_venda_manifesto.empty else None
+                    if manifesto_id is not None:
+                        st.error(f"🛑 **Estorno Bloqueado:** Este pedido já está vinculado ao **Manifesto de Logística #{manifesto_id}**! Remova o pedido do caminhão no módulo de Logística antes de tentar estornar o faturamento.")
+                    else:
+                        st.warning("⚠️ **Atenção:** Desfazer o faturamento irá excluir a conta a receber, estornar o saldo JIT dos lotes originais no estoque e retornar o pedido para a fila comercial de Pendentes.")
                         
-                        if manifesto_id is not None:
-                            st.error(f"🛑 **Estorno Bloqueado:** Este pedido já está vinculado ao **Manifesto de Logística #{manifesto_id}**! Remova o pedido do caminhão no módulo de Logística antes de tentar estornar o faturamento.")
-                        else:
-                            st.warning("⚠️ **Atenção:** Desfazer o faturamento irá excluir a conta a receber, estornar o saldo JIT dos lotes originais no estoque e retornar o pedido para a fila comercial de Pendentes.")
+                        if st.button("🔄 Executar Estorno de Faturamento", type="primary", key=f"btn_estorno_venda_{vid}"):
+                            # 1. Buscar movimentações originais de saída para reverter
+                            df_movs = fetch_all('''
+                                SELECT produto_id, quantidade, lote_origem_id 
+                                FROM estoque_movimentos 
+                                WHERE documento_referencia = ? AND tipo_movimento = 'Saída'
+                            ''', (f"Venda Lote #{vid}",))
                             
-                            if st.button("🔄 Executar Estorno de Faturamento", type="primary", key=f"btn_estorno_venda_{vid}"):
-                                # 1. Buscar movimentações originais de saída para reverter
-                                df_movs = fetch_all('''
-                                    SELECT produto_id, quantidade, lote_origem_id 
-                                    FROM estoque_movimentos 
-                                    WHERE documento_referencia = ? AND tipo_movimento = 'Saída'
-                                ''', (f"Venda Lote #{vid}",))
+                            # 2. Inserir entradas reversoras
+                            for _, mov in df_movs.iterrows():
+                                p_id = int(mov['produto_id'])
+                                qtd = float(mov['quantidade'])
+                                lote_origem = int(mov['lote_origem_id']) if pd.notnull(mov['lote_origem_id']) else None
                                 
-                                # 2. Inserir entradas reversoras
-                                for _, mov in df_movs.iterrows():
-                                    p_id = int(mov['produto_id'])
-                                    qtd = float(mov['quantidade'])
-                                    lote_origem = int(mov['lote_origem_id']) if pd.notnull(mov['lote_origem_id']) else None
-                                    
-                                    run_query(
-                                        """INSERT INTO estoque_movimentos 
-                                           (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
-                                           VALUES (?, ?, 'Entrada', ?, ?, ?, ?)""",
-                                        (date.today().strftime("%Y-%m-%d"), p_id, qtd, 'Estorno de Faturamento', f"Estorno Venda Lote #{vid}", lote_origem)
-                                    )
-                                    
-                                # 3. Deletar Contas a Receber associada
-                                run_query("DELETE FROM contas_a_receber WHERE venda_id = ?", (vid,))
-                                
-                                # 4. Deletar Contas a Pagar associadas (descarga e acordos de rede)
-                                desc_descarga = f"%Venda #{vid}%"
-                                run_query("DELETE FROM contas_a_pagar WHERE descricao LIKE ? AND status = 'PENDENTE'", (desc_descarga,))
-                                
-                                # 5. Resetar registro da venda de volta para APROVADO (Pendente)
-                                run_query('''
-                                    UPDATE vendas 
-                                    SET status = 'APROVADO', 
-                                        tipo_documento = NULL, 
-                                        numero_documento = NULL, 
-                                        custo_cmv_real = 0.0, 
-                                        custo_descarga = 0.0, 
-                                        lote_impresso = NULL, 
-                                        validade_impressa = NULL
-                                    WHERE id = ?
-                                ''', (vid,))
-                                
-                                st.success(f"✅ Faturamento do Pedido #{vid} estornado com sucesso! Estoque e financeiro reestabelecidos.")
-                                import time; time.sleep(1.5); st.rerun()
-                                
-                    st.markdown("---")
-                    
-                    import streamlit.components.v1 as components
-                    from utils_dav import buscar_dados_venda, gerar_html_dav
-                    
-                    venda_info = buscar_dados_venda(vid)
-                    if venda_info and "DAV" in venda_info['tipo_documento']:
-                        html_dav = gerar_html_dav(venda_info)
-                        components.html(html_dav, height=800, scrolling=True)
-                    elif venda_info:
-                        # Painel de dados para NF (sem XML, mas com todas as informações do registro)
-                        st.markdown("#### 🧾 Dados da Nota Fiscal Registrada")
-                        df_nf_detail = fetch_all("""
-                            SELECT v.id, v.data, v.numero_documento, v.tipo_documento,
-                                   v.valor_total, v.quantidade, v.lote_impresso, v.validade_impressa,
-                                   c.nome as cliente, c.cnpj_cpf, c.cidade, c.uf,
-                                   p.nome as produto, f.nome as vendedor
-                            FROM vendas v
-                            JOIN clientes c ON v.cliente_id = c.id
-                            JOIN produtos p ON v.produto_id = p.id
-                            LEFT JOIN funcionarios f ON v.vendedor_id = f.id
-                            WHERE v.id = ?
-                        """, (vid,))
-                        if not df_nf_detail.empty:
-                            nf = df_nf_detail.iloc[0]
-                            num_nf = nf['numero_documento'] or "(Aguardando número SEFAZ)"
-                            data_fat = pd.to_datetime(nf['data']).strftime('%d/%m/%Y') if pd.notna(nf['data']) else "-"
-                            
-                            info_col1, info_col2, info_col3 = st.columns(3)
-                            info_col1.metric("Nº do Documento", num_nf)
-                            info_col1.metric("Data de Faturamento", data_fat)
-                            info_col1.metric("Tipo", nf['tipo_documento'])
-                            
-                            info_col2.metric("Cliente", nf['cliente'])
-                            info_col2.metric("CNPJ/CPF", nf['cnpj_cpf'] or "(não informado)")
-                            info_col2.metric("Cidade/UF", f"{nf['cidade'] or '-'} / {nf['uf'] or '-'}")
-                            
-                            info_col3.metric("Produto", nf['produto'])
-                            info_col3.metric("Quantidade", f"{nf['quantidade']:,.2f}")
-                            info_col3.metric("Valor Total", format_brl(nf['valor_total']))
-                            
-                            st.markdown("---")
-                            det_col1, det_col2 = st.columns(2)
-                            det_col1.info(f"📦 **Lote Impresso:** {nf['lote_impresso'] or '(não informado)'}")
-                            det_col2.info(f"📅 **Validade Impressa:** {nf['validade_impressa'] or '(não informada)'}")
-                            
-                            if not num_nf or num_nf == "(Aguardando número SEFAZ)":
-                                st.warning(
-                                    "⏳ Esta NF ainda não possui número SEFAZ registrado. "
-                                    "Registre o número na aba **Gerador Fiscal (SEFAZ/Emissor)** para liberar o embarque."
+                                run_query(
+                                    """INSERT INTO estoque_movimentos 
+                                       (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+                                       VALUES (?, ?, 'Entrada', ?, ?, ?, ?)""",
+                                    (date.today().strftime("%Y-%m-%d"), p_id, qtd, 'Estorno de Faturamento', f"Estorno Venda Lote #{vid}", lote_origem)
                                 )
-                            else:
-                                st.success(f"✅ NF autorizada. Para reimprimir o DANFE, utilize seu Emissor SEFAZ com o número **{num_nf}**.")
-            else:
-                st.info("Nenhuma venda faturada encontrada.")
+                                
+                            # 3. Deletar Contas a Receber associada
+                            run_query("DELETE FROM contas_a_receber WHERE venda_id = ?", (vid,))
+                            
+                            # 4. Deletar Contas a Pagar associadas (descarga e acordos de rede)
+                            desc_descarga = f"%Venda #{vid}%"
+                            run_query("DELETE FROM contas_a_pagar WHERE descricao LIKE ? AND status = 'PENDENTE'", (desc_descarga,))
+                            
+                            # 5. Resetar registro da venda de volta para APROVADO (Pendente)
+                            run_query('''
+                                UPDATE vendas 
+                                SET status = 'APROVADO', 
+                                    tipo_documento = NULL, 
+                                    numero_documento = NULL, 
+                                    custo_cmv_real = 0.0, 
+                                    custo_descarga = 0.0, 
+                                    lote_impresso = NULL, 
+                                    validade_impressa = NULL
+                                WHERE id = ?
+                            ''', (vid,))
+                            
+                            st.success(f"✅ Faturamento do Pedido #{vid} estornado com sucesso! Estoque e financeiro reestabelecidos.")
+                            import time; time.sleep(1.5); st.rerun()
+                            
+                st.markdown("---")
+                
+                import streamlit.components.v1 as components
+                from utils_dav import buscar_dados_venda, gerar_html_dav
+                
+                venda_info = buscar_dados_venda(vid)
+                if venda_info and "DAV" in venda_info['tipo_documento']:
+                    html_dav = gerar_html_dav(venda_info)
+                    components.html(html_dav, height=800, scrolling=True)
+                elif venda_info:
+                    # Painel de dados para NF (sem XML, mas com todas as informações do registro)
+                    st.markdown("#### 🧾 Dados da Nota Fiscal Registrada")
+                    df_nf_detail = fetch_all("""
+                        SELECT v.id, v.data, v.numero_documento, v.tipo_documento,
+                               v.valor_total, v.quantidade, v.lote_impresso, v.validade_impressa,
+                               c.nome as cliente, c.cnpj_cpf, c.cidade, c.uf,
+                               p.nome as produto, f.nome as vendedor
+                        FROM vendas v
+                        JOIN clientes c ON v.cliente_id = c.id
+                        JOIN produtos p ON v.produto_id = p.id
+                        LEFT JOIN funcionarios f ON v.vendedor_id = f.id
+                        WHERE v.id = ?
+                    """, (vid,))
+                    if not df_nf_detail.empty:
+                        nf = df_nf_detail.iloc[0]
+                        num_nf = nf['numero_documento'] or "(Aguardando número SEFAZ)"
+                        data_fat = pd.to_datetime(nf['data']).strftime('%d/%m/%Y') if pd.notna(nf['data']) else "-"
+                        
+                        info_col1, info_col2, info_col3 = st.columns(3)
+                        info_col1.metric("Nº do Documento", num_nf)
+                        info_col1.metric("Data de Faturamento", data_fat)
+                        info_col1.metric("Tipo", nf['tipo_documento'])
+                        
+                        info_col2.metric("Cliente", nf['cliente'])
+                        info_col2.metric("CNPJ/CPF", nf['cnpj_cpf'] or "(não informado)")
+                        info_col2.metric("Cidade/UF", f"{nf['cidade'] or '-'} / {nf['uf'] or '-'}")
+                        
+                        info_col3.metric("Produto", nf['produto'])
+                        info_col3.metric("Quantidade", f"{nf['quantidade']:,.2f}")
+                        info_col3.metric("Valor Total", format_brl(nf['valor_total']))
+                        
+                        st.markdown("---")
+                        det_col1, det_col2 = st.columns(2)
+                        det_col1.info(f"📦 **Lote Impresso:** {nf['lote_impresso'] or '(não informado)'}")
+                        det_col2.info(f"📅 **Validade Impressa:** {nf['validade_impressa'] or '(não informada)'}")
+                        
+                        if not num_nf or num_nf == "(Aguardando número SEFAZ)":
+                            st.warning(
+                                "⏳ Esta NF ainda não possui número SEFAZ registrado. "
+                                "Registre o número na aba **Gerador Fiscal (SEFAZ/Emissor)** para liberar o embarque."
+                            )
+                        else:
+                            st.success(f"✅ NF autorizada. Para reimprimir o DANFE, utilize seu Emissor SEFAZ com o número **{num_nf}**.")
+        else:
+            st.info("Nenhuma venda faturada encontrada.")
 
 # ======= 2. EXPORTADOR SEFAZ =======
 with tab2:
