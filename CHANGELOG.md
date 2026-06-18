@@ -2,6 +2,24 @@
 
 ---
 
+## v1.7 — 2026-06-18 (Sessão: Desacoplamento de Estorno e Correção de Emissão de DAV)
+
+### ✅ Tela de Faturamento Independente (`7_Faturamento.py`)
+- **Visualização sempre ativa:** O painel expansível de reimpressão de documentos (DAVs/NFs) agora fica sempre visível no faturamento, mesmo quando a fila de pedidos aprovados pendentes estiver vazia.
+- **Evitado cache de imports:** Adicionado recarregamento dinâmico via `importlib.reload(utils_dav)` para contornar caches de importação no Streamlit, garantindo que alterações no arquivo de utilitário entrem em vigor imediatamente.
+
+### ✅ Nova aba "Estornar NF / DAV" (`7_Faturamento.py`)
+- **Segregação de UX:** Movido todo o fluxo de cancelamento/estorno de faturamentos (Central de Segurança) para uma nova aba dedicada na tela de faturamento, evitando que o usuário confunda a ação de impressão com a de cancelamento.
+- **Relatório de Sucesso Detalhado:** Ao concluir o estorno de uma venda/DAV, o sistema agora exibe um passo a passo detalhando as 3 ações atômicas realizadas:
+  1. Que as mercadorias foram devolvidas ao estoque físico.
+  2. Que o título do Contas a Receber foi excluído e as contas a pagar de comissão/taxa de descarga pendentes foram canceladas.
+  3. Que o pedido retornou ao status comercial "APROVADO" para ser alterado, refaturado ou cancelado de vez nas vendas.
+
+### ✅ Correção na Consulta de Emissão de DAV (`utils_dav.py`)
+- **Fix de coluna de banco de dados:** Corrigida a consulta SQL de geração de dados da DAV para buscar `c.cnpj_cpf` (coluna real da tabela `clientes`) em vez de `c.cnpj` (coluna inexistente), sanando o erro que impedia a visualização da folha A4 e a impressão do documento no Streamlit Cloud.
+
+---
+
 ## v1.6 — 2026-06-12 (Sessão: Integridade Financeira e Paridade NF × DAV)
 
 ### ✅ Inteligência de Baixa no Financeiro (`9_Financeiro.py`)
