@@ -197,6 +197,25 @@ def carregar_estilo():
         [data-testid="stMainBlockContainer"], .block-container {
             padding-top: 3rem !important;
         }
+        /* --- CORREÇÃO DE CONTRASTE DO CALENDÁRIO (st.date_input) --- */
+        /* Month/Year dropdown text and icon in header */
+        div[data-baseweb="calendar"] [data-baseweb="select"] * {
+            color: #ffffff !important;
+        }
+        div[data-baseweb="calendar"] [data-baseweb="select"] svg {
+            fill: #ffffff !important;
+        }
+        /* Navigation arrows (prev/next month) */
+        div[data-baseweb="calendar"] > div:first-child button svg {
+            fill: #ffffff !important;
+        }
+        div[data-baseweb="calendar"] > div:first-child button {
+            color: #ffffff !important;
+        }
+        /* Weekday headers (Su, Mo, Tu, We, Th, Fr, Sa) */
+        div[data-baseweb="calendar"] [role="columnheader"] {
+            color: #ffffff !important;
+        }
     </style>
     </div>
     """, unsafe_allow_html=True)
