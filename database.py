@@ -877,7 +877,9 @@ def _create_tables_internal(conn):
         "ALTER TABLE fornecedores ADD COLUMN chave_pix TEXT",
         "ALTER TABLE fornecedores ADD COLUMN plano_conta_id INTEGER",
         "ALTER TABLE clientes ADD COLUMN forma_pagamento_id INTEGER",
-        "ALTER TABLE vendas ADD COLUMN forma_pagamento_id INTEGER"
+        "ALTER TABLE vendas ADD COLUMN forma_pagamento_id INTEGER",
+        "ALTER TABLE fornecedores ADD COLUMN forma_pagamento_id INTEGER",
+        "ALTER TABLE compras ADD COLUMN forma_pagamento_id INTEGER"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)

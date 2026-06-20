@@ -695,8 +695,15 @@ with tab3:
             plano_de_contas = c13.text_input("Plano de Contas")
             plano_id_val = None
             
+        df_fp_list = fetch_all("SELECT id, nome FROM formas_pagamento ORDER BY id ASC")
+        fp_opts = {}
+        if not df_fp_list.empty:
+            for _, r in df_fp_list.iterrows():
+                fp_opts[r['nome']] = r['id']
+                
         col_prazo, col_pix = st.columns(2)
-        prazo_pagamento = col_prazo.text_input("Condição/Prazo Pagamento Padrão (Ex: A Vista, 30/60, etc)")
+        fp_selecionada = col_prazo.selectbox("Condição/Prazo Pagamento Padrão", list(fp_opts.keys()), key="forn_fp_sel")
+        fp_id_val = fp_opts.get(fp_selecionada, None)
         chave_pix = col_pix.text_input("Código Pix")
             
         if st.form_submit_button("Cadastrar Fornecedor"):
@@ -704,17 +711,30 @@ with tab3:
                 plano_de_contas = ""
                 
             if nome and nome_fantasia:
-                query = """INSERT INTO fornecedores 
-                           (nome, telefone, cnpj_cpf, nome_fantasia, inscricao_estadual,
-                            endereco, bairro, cep, cidade, uf, email, plano_de_contas, status, prazo_pagamento, chave_pix, plano_conta_id) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                nome_limpo = nome.strip().upper()
+                chk_nome = fetch_all("SELECT id FROM fornecedores WHERE UPPER(TRIM(nome)) = ?", (nome_limpo,))
                 
-                run_query(query, (
-                    nome, telefone, cnpj_cpf, nome_fantasia, inscricao_estadual,
-                    endereco, bairro, cep, cidade, uf, email, plano_de_contas, status, prazo_pagamento, chave_pix, plano_id_val
-                ))
-                st.success("Fornecedor cadastrado com sucesso!")
-                import time; time.sleep(1); st.rerun()
+                chk_cnpj = pd.DataFrame()
+                cnpj_val = cnpj_cpf.strip() if cnpj_cpf else ""
+                if cnpj_val:
+                    chk_cnpj = fetch_all("SELECT id FROM fornecedores WHERE TRIM(cnpj_cpf) = ?", (cnpj_val,))
+                
+                if not chk_nome.empty:
+                    st.error(f"⚠️ Já existe um fornecedor cadastrado com a Razão Social/Nome '{nome.strip()}'. Se forem fornecedores diferentes, diferencie-os no nome (ex: '{nome.strip()} RJ', '{nome.strip()} - Filial').")
+                elif not chk_cnpj.empty:
+                    st.error(f"⚠️ Já existe um fornecedor cadastrado com o CNPJ/CPF '{cnpj_val}'.")
+                else:
+                    query = """INSERT INTO fornecedores 
+                               (nome, telefone, cnpj_cpf, nome_fantasia, inscricao_estadual,
+                                endereco, bairro, cep, cidade, uf, email, plano_de_contas, status, prazo_pagamento, chave_pix, plano_conta_id, forma_pagamento_id) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                    
+                    run_query(query, (
+                        nome, telefone, cnpj_cpf, nome_fantasia, inscricao_estadual,
+                        endereco, bairro, cep, cidade, uf, email, plano_de_contas, status, fp_selecionada, chave_pix, plano_id_val, fp_id_val
+                    ))
+                    st.success("Fornecedor cadastrado com sucesso!")
+                    import time; time.sleep(1); st.rerun()
             else:
                 st.error("Atenção: Razão Social e Nome Fantasia são obrigatórios.")
                 
@@ -771,8 +791,27 @@ with tab3:
                             eplano_de_contas = ef13.text_input("Plano de Contas", fb.get('plano_de_contas', '') if fb.get('plano_de_contas') else "")
                             eplano_id_val = None
                             
+                        df_fp_list_edit = fetch_all("SELECT id, nome FROM formas_pagamento ORDER BY id ASC")
+                        fp_opts_edit = {}
+                        if not df_fp_list_edit.empty:
+                            for _, r in df_fp_list_edit.iterrows():
+                                fp_opts_edit[r['nome']] = r['id']
+                        
                         col_eprazo, col_epix = st.columns(2)
-                        eprazo = col_eprazo.text_input("Condição/Prazo Pagamento Padrão", fb.get('prazo_pagamento', '') if fb.get('prazo_pagamento') else "")
+                        
+                        d_fp_id = fb.get('forma_pagamento_id') if 'forma_pagamento_id' in fb else None
+                        d_fp_nome = ""
+                        if d_fp_id is not None and pd.notna(d_fp_id):
+                            df_cur_fp = fetch_all("SELECT nome FROM formas_pagamento WHERE id=?", (int(d_fp_id),))
+                            if not df_cur_fp.empty:
+                                d_fp_nome = df_cur_fp.iloc[0]['nome']
+                        
+                        if not d_fp_nome:
+                            d_fp_nome = fb.get('prazo_pagamento', '')
+                            
+                        idx_fp = list(fp_opts_edit.keys()).index(d_fp_nome) if d_fp_nome in fp_opts_edit else 0
+                        efp_selecionada = col_eprazo.selectbox("Condição/Prazo Pagamento Padrão", list(fp_opts_edit.keys()), index=idx_fp, key="forn_efp_sel")
+                        efp_id_val = fp_opts_edit.get(efp_selecionada, None)
                         echave_pix = col_epix.text_input("Código Pix", fb.get('chave_pix', '') if fb.get('chave_pix') else "")
                         
                         if st.form_submit_button("Salvar Fornecedor"):
@@ -780,14 +819,27 @@ with tab3:
                                 eplano_de_contas = ""
                                 
                             if enome and efantasia:
-                                run_query("""
-                                    UPDATE fornecedores 
-                                    SET nome=?, nome_fantasia=?, cnpj_cpf=?, inscricao_estadual=?, telefone=?, email=?,
-                                        endereco=?, bairro=?, cidade=?, uf=?, cep=?, status=?, plano_de_contas=?, prazo_pagamento=?, chave_pix=?, plano_conta_id=? 
-                                    WHERE id=?
-                                """, (enome, efantasia, edoc, eie, etelefone, eemail, eendereco, ebairro, ecidade, euf, ecep, estatus, eplano_de_contas, eprazo, echave_pix, eplano_id_val, fid))
-                                st.success("Fornecedor atualizado com sucesso!")
-                                import time; time.sleep(1); st.rerun()
+                                enome_limpo = enome.strip().upper()
+                                chk_nome = fetch_all("SELECT id FROM fornecedores WHERE UPPER(TRIM(nome)) = ? AND id != ?", (enome_limpo, fid))
+                                
+                                chk_cnpj = pd.DataFrame()
+                                ecnpj_val = edoc.strip() if edoc else ""
+                                if ecnpj_val:
+                                    chk_cnpj = fetch_all("SELECT id FROM fornecedores WHERE TRIM(cnpj_cpf) = ? AND id != ?", (ecnpj_val, fid))
+                                
+                                if not chk_nome.empty:
+                                    st.error(f"⚠️ Já existe outro fornecedor cadastrado com a Razão Social/Nome '{enome.strip()}'. Se forem fornecedores diferentes, diferencie-os no nome.")
+                                elif not chk_cnpj.empty:
+                                    st.error(f"⚠️ Já existe outro fornecedor cadastrado com o CNPJ/CPF '{ecnpj_val}'.")
+                                else:
+                                    run_query("""
+                                        UPDATE fornecedores 
+                                        SET nome=?, nome_fantasia=?, cnpj_cpf=?, inscricao_estadual=?, telefone=?, email=?,
+                                            endereco=?, bairro=?, cidade=?, uf=?, cep=?, status=?, plano_de_contas=?, prazo_pagamento=?, chave_pix=?, plano_conta_id=?, forma_pagamento_id=? 
+                                        WHERE id=?
+                                    """, (enome, efantasia, edoc, eie, etelefone, eemail, eendereco, ebairro, ecidade, euf, ecep, estatus, eplano_de_contas, efp_selecionada, echave_pix, eplano_id_val, efp_id_val, fid))
+                                    st.success("Fornecedor cadastrado com sucesso!")
+                                    import time; time.sleep(1); st.rerun()
                             else:
                                 st.error("Atenção: Razão Social e Nome Fantasia são obrigatórios.")
 

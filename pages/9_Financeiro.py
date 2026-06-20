@@ -863,6 +863,149 @@ try:
                             st.success(f"✔️ {len(selecionados)} contas liquidadas e debitadas do banco {conta_saida} com sucesso!")
                             import time; time.sleep(2); st.rerun()
 
+            # ======= RENEGOCIAÇÃO DE DÍVIDAS COM FORNECEDORES (CONSOLIDAR E REPARCELAR) =======
+            with st.expander("🤝 Renegociar Contas a Pagar com Fornecedor (Consolidar e Reparcelar)"):
+                st.markdown("Consolide múltiplos boletos pendentes/atrasados de um fornecedor em um novo acordo de parcelamento.")
+                
+                # Buscar fornecedores com contas pendentes
+                df_forn_devedores = fetch_all("""
+                    SELECT DISTINCT f.id, f.nome_fantasia, f.nome 
+                    FROM contas_a_pagar c
+                    JOIN fornecedores f ON c.fornecedor_id = f.id
+                    WHERE c.status = 'PENDENTE'
+                    ORDER BY f.nome_fantasia
+                """)
+                
+                if df_forn_devedores.empty:
+                    st.info("Não há fornecedores com contas pendentes para renegociação.")
+                else:
+                    opcoes_forn_devedores = {}
+                    for _, r in df_forn_devedores.iterrows():
+                        lbl = r['nome_fantasia'] if pd.notna(r['nome_fantasia']) and r['nome_fantasia'].strip() else r['nome']
+                        opcoes_forn_devedores[lbl] = r['id']
+                        
+                    forn_renome = st.selectbox("Selecione o Fornecedor para Renegociar:", ["-- SELECIONE --"] + list(opcoes_forn_devedores.keys()), key="reneg_forn_sel")
+                    
+                    if forn_renome != "-- SELECIONE --":
+                        f_id_reneg = opcoes_forn_devedores[forn_renome]
+                        # Buscar faturas pendentes do fornecedor
+                        df_pend_reneg_f = fetch_all("""
+                            SELECT id, descricao, valor, data_vencimento, plano_conta_id, compra_id 
+                            FROM contas_a_pagar 
+                            WHERE fornecedor_id=? AND status='PENDENTE' 
+                            ORDER BY data_vencimento ASC
+                        """, (f_id_reneg,))
+                        
+                        if df_pend_reneg_f.empty:
+                            st.info("Este fornecedor não possui contas pendentes.")
+                        else:
+                            # Criar rótulos legíveis para o multiselect
+                            df_pend_reneg_f['venc_f'] = pd.to_datetime(df_pend_reneg_f['data_vencimento']).dt.strftime('%d/%m/%Y')
+                            opts_titulos_f = {}
+                            for _, r in df_pend_reneg_f.iterrows():
+                                lbl = f"ID #{r['id']} | {r['descricao']} | Venc: {r['venc_f']} | R$ {r['valor']:,.2f}"
+                                opts_titulos_f[lbl] = r
+                            
+                            selec_titulos_lbls_f = st.multiselect(
+                                "Selecione os boletos a consolidar no acordo:",
+                                options=list(opts_titulos_f.keys()),
+                                default=list(opts_titulos_f.keys()),
+                                key="reneg_titulos_forn_sel"
+                            )
+                            
+                            if not selec_titulos_lbls_f:
+                                st.warning("Selecione pelo menos um boleto para realizar a renegociação.")
+                            else:
+                                # Calcular soma original
+                                titulos_para_acordo_f = [opts_titulos_f[lbl] for lbl in selec_titulos_lbls_f]
+                                soma_original_f = sum(float(t['valor']) for t in titulos_para_acordo_f)
+                                
+                                st.metric("Total da Dívida Consolidada (Original)", f"R$ {soma_original_f:,.2f}")
+                                
+                                col_ref1, col_ref2 = st.columns(2)
+                                novo_valor_acordo_f = col_ref1.number_input(
+                                    "Novo Valor Acordado (R$)",
+                                    min_value=0.01,
+                                    value=soma_original_f,
+                                    step=0.01,
+                                    key="reneg_novo_valor_forn"
+                                )
+                                
+                                # Carregar formas de pagamento cadastradas
+                                df_fps = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
+                                fps_dict = {r['nome']: r for _, r in df_fps.iterrows()}
+                                
+                                forma_pag_acordo_f = col_ref2.selectbox(
+                                    "Nova Condição de Pagamento:",
+                                    list(fps_dict.keys()),
+                                    key="reneg_forma_pag_forn"
+                                )
+                                
+                                rule_str_f = fps_dict[forma_pag_acordo_f]['parcelas']
+                                import re
+                                dias_list_f = [int(n) for n in re.findall(r'\d+', rule_str_f)]
+                                if not dias_list_f:
+                                    dias_list_f = [0]
+                                
+                                N_f = len(dias_list_f)
+                                val_pf = round(novo_valor_acordo_f / N_f, 2)
+                                diff_pf = round(novo_valor_acordo_f - val_pf * N_f, 2)
+                                
+                                data_base_acordo_f = st.date_input("Data Base para Vencimento das Parcelas:", value=date.today(), key="reneg_data_base_forn")
+                                
+                                # Gerar prévia das novas parcelas
+                                preview_reneg_f = []
+                                for i, dias in enumerate(dias_list_f):
+                                    v_p = val_pf + (diff_pf if i == N_f - 1 else 0.0)
+                                    dt_v = data_base_acordo_f + timedelta(days=dias)
+                                    preview_reneg_f.append({
+                                        "Parcela": f"{i+1}/{N_f}",
+                                        "Vencimento": dt_v.strftime("%d/%m/%Y"),
+                                        "Valor": f"R$ {v_p:,.2f}",
+                                        "valor_num": v_p,
+                                        "venc_date": dt_v
+                                    })
+                                
+                                st.markdown("**Prévia do Novo Parcelamento:**")
+                                st.dataframe(pd.DataFrame(preview_reneg_f)[["Parcela", "Vencimento", "Valor"]], hide_index=True, use_container_width=True)
+                                
+                                # Input da descrição/observações do acordo
+                                desc_acordo_f = st.text_input("Descrição / Motivo do Acordo (opcional):", value="Acordo de Renegociação de Contas a Pagar", key="reneg_desc_obs_forn")
+                                
+                                if st.button("Confirmar Acordo de Renegociação com Fornecedor", type="primary", use_container_width=True, key="reneg_confirm_btn_forn"):
+                                    with st.spinner("Processando renegociação de contas a pagar..."):
+                                        import uuid
+                                        acordo_id_f = str(uuid.uuid4())[:8].upper()
+                                        
+                                        ids_cancelar_f = [int(t['id']) for t in titulos_para_acordo_f]
+                                        nota_cancelamento_f = f" [RENEGOCIADO - Acordo #{acordo_id_f}]"
+                                        
+                                        for t_id in ids_cancelar_f:
+                                            run_query(
+                                                "UPDATE contas_a_pagar SET status='CANCELADO', descricao = descricao || ? WHERE id=?",
+                                                (nota_cancelamento_f, t_id)
+                                            )
+                                        
+                                        # Inserir novos títulos
+                                        for i, p_info in enumerate(preview_reneg_f):
+                                            nova_desc = f"{desc_acordo_f} (Acordo #{acordo_id_f} - Parcela {p_info['Parcela']})"
+                                            venc_str = p_info['venc_date'].strftime("%Y-%m-%d")
+                                            val_num = p_info['valor_num']
+                                            
+                                            p_c_id_default = titulos_para_acordo_f[0].get('plano_conta_id')
+                                            compra_id_default = titulos_para_acordo_f[0].get('compra_id')
+                                            
+                                            run_query(
+                                                "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, compra_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                                                (f_id_reneg,
+                                                 int(p_c_id_default) if pd.notna(p_c_id_default) else None,
+                                                 int(compra_id_default) if pd.notna(compra_id_default) else None,
+                                                 nova_desc, val_num, venc_str)
+                                            )
+                                            
+                                    st.success(f"🤝 Renegociação com fornecedor concluída com sucesso! Acordo #{acordo_id_f} registrado com {N_f} novas parcelas.")
+                                    import time; time.sleep(1.5); st.rerun()
+
             # --- RENEGOCIAÇÃO / EDIÇÃO DE DUPLICATA ---
             with st.expander("✏️ Renegociar / Editar Duplicata"):
                 df_pend_edit = fetch_all("""

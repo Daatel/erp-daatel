@@ -22,12 +22,19 @@ if 'itens_nf' not in st.session_state:
     st.session_state.itens_nf = []
 if 'parcelas_temp' not in st.session_state:
     st.session_state.parcelas_temp = []
+if 'compras_clique_bloqueado' not in st.session_state:
+    st.session_state.compras_clique_bloqueado = False
 
 # ─── PRÉ-REQUISITOS ───────────────────────────────────────────────────────────
 df_fornecedores = fetch_all(
-    "SELECT id, nome_fantasia, nome, plano_de_contas, prazo_pagamento, plano_conta_id FROM fornecedores WHERE status='ATIVO' ORDER BY nome_fantasia")
+    "SELECT id, nome_fantasia, nome, plano_de_contas, prazo_pagamento, plano_conta_id, forma_pagamento_id FROM fornecedores WHERE status='ATIVO' ORDER BY nome_fantasia")
 df_produtos = fetch_all(
     "SELECT id, nome, unidade_medida, is_materia_prima, custo_unidade, unidades_por_fardo FROM produtos ORDER BY nome")
+df_fp = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
+fp_options_compras = df_fp['nome'].tolist() if not df_fp.empty else []
+fp_dict_compras = dict(zip(df_fp['nome'], df_fp['id'])) if not df_fp.empty else {}
+fp_reverse_dict_compras = dict(zip(df_fp['id'], df_fp['nome'])) if not df_fp.empty else {}
+fp_rules_compras = dict(zip(df_fp['nome'], df_fp['parcelas'])) if not df_fp.empty else {}
 
 if df_fornecedores.empty:
     st.error("⚠️ Nenhum fornecedor ativo. Cadastre em **Cadastros → Fornecedores**.")
@@ -56,16 +63,12 @@ DESTINOS = {
     "🧹 Consumo Interno (escritório, limpeza, etc.)": "CONSUMO_INTERNO",
 }
 
-def parse_prazo(p_str):
-    if not p_str:
+def parse_prazo(rule_str):
+    import re
+    dias_list = [int(n) for n in re.findall(r'\d+', str(rule_str))]
+    if not dias_list:
         return [0]
-    p = str(p_str).upper().replace("À", "A").strip()
-    if p in ["A VISTA", "AVISTA", "0", "IMEDIATO", "-"]:
-        return [0]
-    try:
-        return [int(x.strip()) for x in p.split('/')]
-    except:
-        return [0]
+    return dias_list
 
 import xml.etree.ElementTree as ET
 
@@ -131,13 +134,31 @@ numero_doc = hc4.text_input("Número do Documento", value=xml_nNF)
 obs = hc5.text_input("Observações")
 
 frn_data = forn_dict[fornecedor_sel]
-prazo_str = str(frn_data['prazo_pagamento'] or "A VISTA")
+
+# Determinar a condição padrão do fornecedor
+d_fp_id = frn_data.get('forma_pagamento_id') if 'forma_pagamento_id' in frn_data else None
+d_fp_nome = ""
+if d_fp_id is not None and pd.notna(d_fp_id):
+    d_fp_nome = fp_reverse_dict_compras.get(int(d_fp_id), "")
+
+if not d_fp_nome:
+    d_fp_nome = frn_data.get('prazo_pagamento', '')
+
+idx_fp = fp_options_compras.index(d_fp_nome) if d_fp_nome in fp_options_compras else 0
+
+# Exibir o selectbox para selecionar a condição de pagamento desta compra
+hc_fp = st.selectbox("Condição de Pagamento para esta Compra", fp_options_compras, index=idx_fp)
+fp_id_compra = fp_dict_compras.get(hc_fp, None)
+
+prazo_str = hc_fp
+rule_str = fp_rules_compras.get(hc_fp, "0")
+
 numero_doc_final = numero_doc.strip() if numero_doc.strip() else f"AUT-{datetime.now().strftime('%m%d%H%M')}"
 
 if not numero_doc.strip():
     st.caption(f"⚠️ Nº não informado. Será gerado automaticamente: `{numero_doc_final}`")
 
-st.info(f"📋 Fornecedor **{fornecedor_sel}** · Prazo padrão cadastrado: **{prazo_str}**")
+st.info(f"📋 Fornecedor **{fornecedor_sel}** · Condição de Pagamento: **{hc_fp}**")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SEÇÃO 2 — ITENS DA NF
@@ -294,7 +315,7 @@ if st.session_state.itens_nf:
 
     with col_auto:
         if st.button(f"🪄 Gerar pelo Prazo ({prazo_str})", type="primary", use_container_width=True):
-            dias_list = parse_prazo(prazo_str)
+            dias_list = parse_prazo(rule_str)
             qtd_p = len(dias_list)
             valor_p = round(total_bruto_nf / qtd_p, 2)
             diff_p = round(total_bruto_nf - valor_p * qtd_p, 2)
@@ -328,7 +349,7 @@ if st.session_state.itens_nf:
 
     if not st.session_state.parcelas_temp:
         # Auto-gerar pelo prazo do fornecedor
-        dias_list = parse_prazo(prazo_str)
+        dias_list = parse_prazo(rule_str)
         qtd_p = len(dias_list)
         valor_p = round(total_bruto_nf / qtd_p, 2)
         diff_p = round(total_bruto_nf - valor_p * qtd_p, 2)
@@ -375,12 +396,16 @@ if st.session_state.itens_nf:
             )
 
             if st.button("✔️ Registrar NF no Sistema", type="primary", use_container_width=True):
-                if not confirm:
+                if st.session_state.get("compras_clique_bloqueado", False):
+                    st.warning("⚠️ Gravação já em andamento. Aguarde...")
+                elif not confirm:
                     st.error("Marque a caixa de confirmação antes de registrar.")
                 else:
+                    st.session_state["compras_clique_bloqueado"] = True
                     try:
-                        with db_connection() as conn:
-                            cursor = conn.cursor()
+                        with st.spinner("Registrando Notas Fiscais, Estoque e Contas a Pagar..."):
+                            with db_connection() as conn:
+                                cursor = conn.cursor()
 
                             fid = int(frn_data['id'])
                             plano_id = int(frn_data['plano_conta_id']) if 'plano_conta_id' in frn_data and pd.notnull(frn_data['plano_conta_id']) else None
@@ -394,10 +419,10 @@ if st.session_state.itens_nf:
                             destinos_resumo = ", ".join(set(it['destino'] for it in st.session_state.itens_nf))
                             cursor.execute("""
                                 INSERT INTO compras
-                                    (fornecedor_id, data_compra, tipo_insumo, valor_total, tipo_doc, numero_doc, observacoes)
-                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                                    (fornecedor_id, data_compra, tipo_insumo, valor_total, tipo_doc, numero_doc, observacoes, forma_pagamento_id)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                             """, (fid, data_compra.strftime("%Y-%m-%d"), destinos_resumo,
-                                  total_bruto_nf, tipo_doc, numero_doc_final, obs))
+                                  total_bruto_nf, tipo_doc, numero_doc_final, obs, fp_id_compra))
                             compra_id = cursor.lastrowid
 
                             # 2. Itens da NF
@@ -449,6 +474,7 @@ if st.session_state.itens_nf:
                         # Limpa sessão
                         st.session_state.itens_nf = []
                         st.session_state.parcelas_temp = []
+                        st.session_state["compras_clique_bloqueado"] = False
 
                         st.success(
                             f"✅ NF {numero_doc_final} registrada com sucesso! "
@@ -458,6 +484,7 @@ if st.session_state.itens_nf:
                         import time; time.sleep(2); st.rerun()
 
                     except Exception as e:
+                        st.session_state["compras_clique_bloqueado"] = False
                         st.error(f"Erro ao registrar a NF: {e}")
                         import traceback
                         st.code(traceback.format_exc())
