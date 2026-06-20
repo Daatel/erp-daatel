@@ -641,18 +641,18 @@ try:
             """, unsafe_allow_html=True)
 
             col_m1, col_m2 = st.columns(2)
-            forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()))
-            pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()))
+            forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()), key="cap_forn_sel")
+            pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()), key="cap_pc_sel")
             
             col_m3, col_m4 = st.columns([2, 1])
-            desc_p = col_m3.text_input("Descrição / Fatura (Ex: Nota Fiscal nº 123)")
-            val_p = col_m4.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0)
+            desc_p = col_m3.text_input("Descrição / Fatura (Ex: Nota Fiscal nº 123)", key="cap_desc_p")
+            val_p = col_m4.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0, key="cap_val_p")
             
             col_m5, col_m6 = st.columns(2)
-            venc_p = col_m5.date_input("Vencimento (ou da 1ª Parcela)", date.today() + timedelta(days=30))
+            venc_p = col_m5.date_input("Vencimento (ou da 1ª Parcela)", date.today() + timedelta(days=30), key="cap_venc_p")
             with col_m6:
-                is_vinc = st.checkbox("É Cliente Vinculado (CNPJ) ?", value=False)
-                cli_sel = st.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()), disabled=not is_vinc, label_visibility="collapsed")
+                is_vinc = st.checkbox("É Cliente Vinculado (CNPJ) ?", value=False, key="cap_is_vinc")
+                cli_sel = st.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()), disabled=not is_vinc, label_visibility="collapsed", key="cap_cli_sel")
             
             st.markdown("##### 📅 Opções de Parcelamento / Recorrência")
             col_p1, col_p2, col_p3 = st.columns([1, 1.5, 1.5])
@@ -691,7 +691,9 @@ try:
                 st.dataframe(pd.DataFrame(preview_data), hide_index=True, use_container_width=True)
             
             if st.button("Salvar Duplicata a Pagar", type="primary", use_container_width=False):
-                if forn_sel == "-- SELECIONE O FORNECEDOR --":
+                if st.session_state.get("cap_clique_bloqueado", False):
+                    st.warning("⚠️ Gravação já em andamento. Aguarde...")
+                elif forn_sel == "-- SELECIONE O FORNECEDOR --":
                     st.error("Por favor, selecione um Fornecedor.")
                 elif pc_sel == "-- SELECIONE O PLANO DE CONTAS --":
                     st.error("Por favor, selecione um Plano de Contas.")
@@ -706,6 +708,8 @@ try:
                     if pc_codigo in ('2.2.1', '2.2.2', '2.2.4') and cli_id is None:
                         st.error(f"⚠️ A conta selecionada ({pc_sel}) exige a vinculação obrigatória de um Cliente (CNPJ) para cálculo de rentabilidade. Por favor, marque a caixa e selecione o cliente correspondente.")
                     else:
+                        st.session_state["cap_clique_bloqueado"] = True
+                        
                         import calendar
                         def add_months(sourcedate, months):
                             month = sourcedate.month - 1 + months
@@ -714,18 +718,43 @@ try:
                             day = min(sourcedate.day, calendar.monthrange(year, month)[1])
                             return date(year, month, day)
                             
-                        for i in range(n_parcelas):
-                            if periodicidade == "Mensal (Mesmo dia do mês)":
-                                dt_venc = add_months(venc_p, i)
-                            else:
-                                dt_venc = venc_p + timedelta(days=dias_intervalo * i)
+                        with st.spinner("Registrando duplicatas a pagar..."):
+                            for i in range(n_parcelas):
+                                if periodicidade == "Mensal (Mesmo dia do mês)":
+                                    dt_venc = add_months(venc_p, i)
+                                else:
+                                    dt_venc = venc_p + timedelta(days=dias_intervalo * i)
+                                    
+                                desc_final = f"{desc_p} ({i+1}/{n_parcelas})" if n_parcelas > 1 else desc_p
                                 
-                            desc_final = f"{desc_p} ({i+1}/{n_parcelas})" if n_parcelas > 1 else desc_p
-                            
-                            run_query(
-                                "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
-                                (forn_id, pc_id, cli_id, desc_final, val_p, dt_venc.strftime("%Y-%m-%d"))
-                            )
+                                run_query(
+                                    "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                                    (forn_id, pc_id, cli_id, desc_final, val_p, dt_venc.strftime("%Y-%m-%d"))
+                                )
+                        
+                        st.session_state["cap_clique_bloqueado"] = False
+                        
+                        # Limpa chaves do session state
+                        if "cap_forn_sel" in st.session_state:
+                            st.session_state["cap_forn_sel"] = list(op_forn.keys())[0]
+                        if "cap_pc_sel" in st.session_state:
+                            st.session_state["cap_pc_sel"] = list(op_pc.keys())[0]
+                        if "cap_desc_p" in st.session_state:
+                            st.session_state["cap_desc_p"] = ""
+                        if "cap_val_p" in st.session_state:
+                            st.session_state["cap_val_p"] = 0.01
+                        if "cap_venc_p" in st.session_state:
+                            st.session_state["cap_venc_p"] = date.today() + timedelta(days=30)
+                        if "cap_is_vinc" in st.session_state:
+                            st.session_state["cap_is_vinc"] = False
+                        if "cap_cli_sel" in st.session_state:
+                            st.session_state["cap_cli_sel"] = list(op_cli.keys())[0]
+                        if "cap_num_parcelas" in st.session_state:
+                            st.session_state["cap_num_parcelas"] = 1
+                        if "cap_periodicidade" in st.session_state:
+                            st.session_state["cap_periodicidade"] = "Mensal (Mesmo dia do mês)"
+                        if "cap_dias_intervalo" in st.session_state:
+                            st.session_state["cap_dias_intervalo"] = 30
                         
                         if n_parcelas > 1:
                             st.success(f"✅ {n_parcelas} duplicatas a pagar lançadas com sucesso!")
@@ -982,8 +1011,9 @@ try:
                     elif not desc:
                         st.error("Preencha a descrição.")
                     else:
-                        run_query("INSERT INTO contas_a_receber (cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, 'PENDENTE')",
-                                  (op_cli[cli_nome], desc, val_r, venc.strftime("%Y-%m-%d")))
+                        with st.spinner("Registrando recebível..."):
+                            run_query("INSERT INTO contas_a_receber (cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, 'PENDENTE')",
+                                      (op_cli[cli_nome], desc, val_r, venc.strftime("%Y-%m-%d")))
                         st.success("Boleto emitido (pendente)")
                         import time; time.sleep(1); st.rerun()
 
