@@ -16,10 +16,13 @@ def format_brl(val):
     return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 # Carregar dados básicos
-df_clientes = fetch_all("SELECT id, nome, rede_clientes, prazo_pagamento, representante_id FROM clientes WHERE status='ATIVO'")
+df_clientes = fetch_all("SELECT id, nome, rede_clientes, prazo_pagamento, representante_id, forma_pagamento_id FROM clientes WHERE status='ATIVO'")
 df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%'")
 df_produtos = fetch_all("SELECT id, nome, preco_venda_base FROM produtos WHERE is_materia_prima = FALSE")
 df_bancos_pdv = fetch_all("SELECT id, nome FROM contas_bancarias WHERE status='ATIVO'")
+df_fp_all = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento")
+fp_rules_dict = dict(zip(df_fp_all['id'], df_fp_all['parcelas'])) if not df_fp_all.empty else {}
+fp_names_dict = dict(zip(df_fp_all['id'], df_fp_all['nome'])) if not df_fp_all.empty else {}
 
 if df_clientes.empty or df_produtos.empty or df_vendedores.empty:
     st.warning("Cadastre Clientes, Vendedores e Produtos primeiro!")
@@ -39,12 +42,44 @@ else:
         col_p1, col_p2, col_p3 = st.columns(3)
         
         c_opts_pdv = {f"{r['nome']}": r for _, r in df_clientes.iterrows()}
-        pdv_cli_sel = col_p1.selectbox("Cliente Comprador", list(c_opts_pdv.keys()), key="pdv_cli")
+        
+        default_cli_idx = 0
+        for idx, name in enumerate(c_opts_pdv.keys()):
+            if name.upper().strip() == "CONSUMIDOR":
+                default_cli_idx = idx
+                break
+                
+        pdv_cli_sel = col_p1.selectbox("Cliente Comprador", list(c_opts_pdv.keys()), index=default_cli_idx, key="pdv_cli")
         
         v_opts_pdv = {f"{r['nome']}": r for _, r in df_vendedores.iterrows()}
         
         # Auto-selecionar representante vinculado
         cli_obj = c_opts_pdv[pdv_cli_sel]
+        
+        # Checar se a forma de pagamento do cliente selecionado é à vista
+        cli_fp_id = cli_obj.get('forma_pagamento_id')
+        cli_prazo_str = cli_obj.get('prazo_pagamento', '')
+        
+        is_a_vista_pdv = True
+        fp_nome_cli = ""
+        
+        if pd.notna(cli_fp_id):
+            cli_fp_id = int(cli_fp_id)
+            fp_nome_cli = fp_names_dict.get(cli_fp_id, "")
+            rule_str = fp_rules_dict.get(cli_fp_id, "")
+            import re
+            dias_list = [int(n) for n in re.findall(r'\d+', str(rule_str))]
+            if dias_list and any(d > 0 for d in dias_list):
+                is_a_vista_pdv = False
+        else:
+            fp_nome_cli = str(cli_prazo_str) if cli_prazo_str else "A vista"
+            p_limpo = fp_nome_cli.upper().strip()
+            if p_limpo not in ["A VISTA", "AVISTA", "0", "IMEDIATO", "-", ""]:
+                import re
+                dias_list = [int(n) for n in re.findall(r'\d+', p_limpo)]
+                if dias_list and any(d > 0 for d in dias_list):
+                    is_a_vista_pdv = False
+                    
         rep_id = cli_obj['representante_id']
         default_idx = 0
         if pd.notna(rep_id):
@@ -102,6 +137,10 @@ else:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
+        if not is_a_vista_pdv:
+            st.error(f"⚠️ **Atenção:** O cliente selecionado ({pdv_cli_sel}) possui prazo de pagamento a prazo cadastrado: **{fp_nome_cli}**.")
+            st.info("O PDV Express realiza apenas vendas à vista. Para vendas a prazo, por favor, cadastre a venda através da tela de **Pedidos de Venda** e fature-a na tela de **Faturamento**.")
+        
         if st.form_submit_button("⚡ Efetivar Venda & Baixar Estoque/Financeiro JIT", use_container_width=True):
             cli_pdv = c_opts_pdv[pdv_cli_sel]
             ven_pdv = v_opts_pdv[pdv_ven_sel]
@@ -118,11 +157,23 @@ else:
                 # Gera número provisório ou pendente
                 numero_doc_pdv = "BALCAO-" + date.today().strftime('%H%M%S')
             
+            if not is_a_vista_pdv:
+                st.error("❌ Não é permitido realizar venda a prazo pelo PDV Express. Utilize o fluxo normal de Vendas/Faturamento ou selecione um cliente com pagamento à vista.")
+                st.stop()
+
+            # Lançar com forma_pagamento_id
+            fp_id_to_save = cli_pdv.get('forma_pagamento_id')
+            if pd.isna(fp_id_to_save) or fp_id_to_save is None:
+                df_fp_avista = fetch_all("SELECT id FROM formas_pagamento WHERE UPPER(TRIM(nome)) = 'A VISTA'")
+                fp_id_to_save = int(df_fp_avista.iloc[0]['id']) if not df_fp_avista.empty else None
+            else:
+                fp_id_to_save = int(fp_id_to_save)
+
             # 2. Grava a Venda diretamente como FATURADO
             run_query('''
-                INSERT INTO vendas (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, comissao_valor, status, tipo_documento, numero_documento, lote_impresso, validade_impressa)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 0.0, 'FATURADO', ?, ?, ?, ?)
-            ''', (date.today().strftime("%Y-%m-%d"), cli_pdv['id'], ven_pdv['id'], prod_id_pdv, pdv_qtd, pdv_preco, v_total_pdv, pdv_doc, numero_doc_pdv, pdv_lote, pdv_val))
+                INSERT INTO vendas (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, comissao_valor, status, tipo_documento, numero_documento, lote_impresso, validade_impressa, forma_pagamento_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0.0, 'FATURADO', ?, ?, ?, ?, ?)
+            ''', (date.today().strftime("%Y-%m-%d"), cli_pdv['id'], ven_pdv['id'], prod_id_pdv, pdv_qtd, pdv_preco, v_total_pdv, pdv_doc, numero_doc_pdv, pdv_lote, pdv_val, fp_id_to_save))
             
             df_nova_v = fetch_all("SELECT MAX(id) as lg FROM vendas")
             nova_venda_id = int(df_nova_v.iloc[0]['lg'])
