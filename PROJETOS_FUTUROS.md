@@ -100,22 +100,6 @@ Este documento registra as ideias, necessidades e módulos planejados para futura
 * **Complexidade:** Baixa-Média
 * **Público-alvo:** Perfil `FINANCEIRO` e `ADMIN`.
 
----
-
-### 6. Provisionamento Recorrente (Provisório vs. Efetivo)
-
-* **Objetivo:** Lançar previsões de despesas ou receitas recorrentes de valor estimado (Ex: Luz, Água, Telefone) para até 12 meses, permitindo uma projeção de fluxo de caixa muito mais realista.
-* **Escopo:**
-  * Criação de botão/opção "Lançamento Recorrente (Provisório)" nas telas de Contas a Pagar e Receber.
-  * Geração automática em lote de até 12 parcelas com data de vencimento incremental e valor fixo/estimado.
-  * Atribuição de uma tag/flag de status: `PROVISÓRIO` (para estimativas) e `EFETIVO` (para quando o valor real da fatura chega).
-  * Possibilidade de editar o valor e mudar o status para `EFETIVO` de forma rápida ao receber a conta real.
-  * Integração dos provisionamentos provisórios na visualização e nos gráficos de Projeção de Fluxo de Caixa (com opção de ativá-los/desativá-los no gráfico).
-* **Impacto:** Muito Alto - Fornece previsibilidade real para o fluxo de caixa, evitando surpresas com contas recorrentes que ainda não foram faturadas.
-* **Complexidade:** Baixa-Média
-* **Público-alvo:** Perfil `FINANCEIRO` e `ADMIN`.
-
----
 
 ---
 
@@ -148,7 +132,7 @@ Este documento registra as ideias, necessidades e módulos planejados para futura
 
 ---
 
-### [CONCLUIDO] 8. Reforma do Painel Executivo (CEO Cockpit)
+### 8. Reforma do Painel Executivo (CEO Cockpit)
 
 * **Objetivo:** Transformar o atual Dashboard em uma central de inteligência estratégica para o gestor geral / CEO.
 * **Escopo:**
@@ -299,5 +283,28 @@ Este documento registra as ideias, necessidades e módulos planejados para futura
 
 ---
 
+###  ???  Para transformar seu sistema em um SaaS de mercado, você não precisa abandonar o Python. Você precisa apenas separar o Frontend (a tela) do Backend (a lógica e o processamento).
+
+*A evolução natural da sua stack mantendo o Python seria:
+
+[ FRONTEND ] ????????????????? [ BACKEND ] ????????????????? [ BANCO DE DADOS ]
+React.js ou Vue.js            Python (FastAPI)              Supabase (PostgreSQL)
+(Interface Web Moderna)      (Processamento e APIs)         (Isolamento de Dados via RLS)
+
+*Transforme o Python no seu Backend (usando FastAPI): Toda a inteligência do seu sistema (a leitura do PDF com pdfplumber, as validações de preço, o cálculo de comissões e as queries do Supabase) fica concentrada em uma API em Python usando FastAPI. O FastAPI é assíncrono, extremamente veloz e aguenta milhares de acessos por segundo gastando pouquíssimo servidor.
+
+*Construa um Frontend independente: Para as telas que os clientes vão usar no dia a dia, substitua o Streamlit por tecnologias de mercado focadas em interfaces web, como React.js ou Vue.js (ambos usam JavaScript/TypeScript). Eles rodam direto no navegador do usuário, tirando todo o peso de renderização de tela do seu servidor.
+
+*Mantenha o GitHub (ou Bitbucket) e o Supabase: O fluxo de versionamento e o banco de dados permanecem exatamente os mesmos.
+
+*Resumo Técnico
+Mudar de linguagem (ir para C#, Java, PHP ou Node.js)? Não é necessário. Python com FastAPI atende perfeitamente a nível global.
+
+*Mantear o Supabase? Com certeza, use o RLS dele para blindar o multi-tenant do seu SaaS.
+
+*Manter o Streamlit? Apenas para você, como painel administrativo do SaaS (onde você gerencia quem pagou, ativa novos clientes, etc.). Para as telas que os supermercados e as indústrias vão acessar, o Streamlit deve ser substituído por um frontend em React ou Vue focado em consumo de APIs.
+
+
+---
 *Documento mantido como referência viva. Revisão recomendada a cada trimestre ou após conclusão de fase.*
 

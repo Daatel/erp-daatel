@@ -649,10 +649,46 @@ try:
             val_p = col_m4.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0)
             
             col_m5, col_m6 = st.columns(2)
-            venc_p = col_m5.date_input("Vencimento", date.today() + timedelta(days=30))
+            venc_p = col_m5.date_input("Vencimento (ou da 1ª Parcela)", date.today() + timedelta(days=30))
             with col_m6:
                 is_vinc = st.checkbox("É Cliente Vinculado (CNPJ) ?", value=False)
                 cli_sel = st.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()), disabled=not is_vinc, label_visibility="collapsed")
+            
+            st.markdown("##### 📅 Opções de Parcelamento / Recorrência")
+            col_p1, col_p2, col_p3 = st.columns([1, 1.5, 1.5])
+            n_parcelas = col_p1.number_input("Nº de Parcelas", min_value=1, max_value=36, value=1, step=1, key="cap_num_parcelas")
+            
+            periodicidade = "Mensal (Mesmo dia do mês)"
+            dias_intervalo = 30
+            if n_parcelas > 1:
+                periodicidade = col_p2.selectbox("Periodicidade", ["Mensal (Mesmo dia do mês)", "A cada X dias"], key="cap_periodicidade")
+                if periodicidade == "A cada X dias":
+                    dias_intervalo = col_p3.number_input("Dias entre parcelas", min_value=1, max_value=365, value=30, step=1, key="cap_dias_intervalo")
+                
+                # Exibe a prévia das parcelas
+                import calendar
+                def add_months(sourcedate, months):
+                    month = sourcedate.month - 1 + months
+                    year = sourcedate.year + month // 12
+                    month = month % 12 + 1
+                    day = min(sourcedate.day, calendar.monthrange(year, month)[1])
+                    return date(year, month, day)
+                
+                preview_data = []
+                for i in range(n_parcelas):
+                    if periodicidade == "Mensal (Mesmo dia do mês)":
+                        dt_venc = add_months(venc_p, i)
+                    else:
+                        dt_venc = venc_p + timedelta(days=dias_intervalo * i)
+                    preview_data.append({
+                        "Parcela": f"{i+1}/{n_parcelas}",
+                        "Vencimento": dt_venc.strftime("%d/%m/%Y"),
+                        "Valor": f"R$ {val_p:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    })
+                
+                st.info(f"💰 **Total a ser lançado:** {n_parcelas} parcelas de R$ {val_p:,.2f} = **R$ {val_p * n_parcelas:,.2f}**")
+                st.markdown("**Prévia das Parcelas:**")
+                st.dataframe(pd.DataFrame(preview_data), hide_index=True, use_container_width=True)
             
             if st.button("Salvar Duplicata a Pagar", type="primary", use_container_width=False):
                 if forn_sel == "-- SELECIONE O FORNECEDOR --":
@@ -670,11 +706,31 @@ try:
                     if pc_codigo in ('2.2.1', '2.2.2', '2.2.4') and cli_id is None:
                         st.error(f"⚠️ A conta selecionada ({pc_sel}) exige a vinculação obrigatória de um Cliente (CNPJ) para cálculo de rentabilidade. Por favor, marque a caixa e selecione o cliente correspondente.")
                     else:
-                        run_query(
-                            "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
-                            (forn_id, pc_id, cli_id, desc_p, val_p, venc_p.strftime("%Y-%m-%d"))
-                        )
-                        st.success("✅ Duplicata a Pagar lançada com sucesso!")
+                        import calendar
+                        def add_months(sourcedate, months):
+                            month = sourcedate.month - 1 + months
+                            year = sourcedate.year + month // 12
+                            month = month % 12 + 1
+                            day = min(sourcedate.day, calendar.monthrange(year, month)[1])
+                            return date(year, month, day)
+                            
+                        for i in range(n_parcelas):
+                            if periodicidade == "Mensal (Mesmo dia do mês)":
+                                dt_venc = add_months(venc_p, i)
+                            else:
+                                dt_venc = venc_p + timedelta(days=dias_intervalo * i)
+                                
+                            desc_final = f"{desc_p} ({i+1}/{n_parcelas})" if n_parcelas > 1 else desc_p
+                            
+                            run_query(
+                                "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                                (forn_id, pc_id, cli_id, desc_final, val_p, dt_venc.strftime("%Y-%m-%d"))
+                            )
+                        
+                        if n_parcelas > 1:
+                            st.success(f"✅ {n_parcelas} duplicatas a pagar lançadas com sucesso!")
+                        else:
+                            st.success("✅ Duplicata a Pagar lançada com sucesso!")
                         import time; time.sleep(1); st.rerun()
 
         df_all_contas = fetch_all("""

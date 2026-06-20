@@ -131,7 +131,7 @@ def login_form_page():
         <div class="card-footer">
             <span>🛡️ Ambiente Corporativo</span>
             <span>|</span>
-            <span>Versão 1.0.0</span>
+            <span>Versão 1.7</span>
         </div>
         """, unsafe_allow_html=True)
         
