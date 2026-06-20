@@ -56,29 +56,7 @@ else:
         # Auto-selecionar representante vinculado
         cli_obj = c_opts_pdv[pdv_cli_sel]
         
-        # Checar se a forma de pagamento do cliente selecionado é à vista
-        cli_fp_id = cli_obj.get('forma_pagamento_id')
-        cli_prazo_str = cli_obj.get('prazo_pagamento', '')
-        
-        is_a_vista_pdv = True
-        fp_nome_cli = ""
-        
-        if pd.notna(cli_fp_id):
-            cli_fp_id = int(cli_fp_id)
-            fp_nome_cli = fp_names_dict.get(cli_fp_id, "")
-            rule_str = fp_rules_dict.get(cli_fp_id, "")
-            import re
-            dias_list = [int(n) for n in re.findall(r'\d+', str(rule_str))]
-            if dias_list and any(d > 0 for d in dias_list):
-                is_a_vista_pdv = False
-        else:
-            fp_nome_cli = str(cli_prazo_str) if cli_prazo_str else "A vista"
-            p_limpo = fp_nome_cli.upper().strip()
-            if p_limpo not in ["A VISTA", "AVISTA", "0", "IMEDIATO", "-", ""]:
-                import re
-                dias_list = [int(n) for n in re.findall(r'\d+', p_limpo)]
-                if dias_list and any(d > 0 for d in dias_list):
-                    is_a_vista_pdv = False
+
                     
         rep_id = cli_obj['representante_id']
         default_idx = 0
@@ -95,6 +73,35 @@ else:
         col_p4, col_p5, col_p6 = st.columns([1, 1.2, 1.2])
         pdv_qtd = col_p4.number_input("Quantidade (Volumes/Kg)", min_value=1.0, step=1.0, key="pdv_qtd")
         
+        # Determinar índice inicial da forma de pagamento do cliente selecionado
+        cli_fp_id = cli_obj.get('forma_pagamento_id')
+        cli_fp_nome = ""
+        if pd.notna(cli_fp_id):
+            cli_fp_nome = fp_names_dict.get(int(cli_fp_id), "")
+        if not cli_fp_nome:
+            cli_fp_nome = cli_obj.get('prazo_pagamento', '')
+            
+        default_fp_idx = fp_options_pdv.index(cli_fp_nome) if cli_fp_nome in fp_options_pdv else 0
+        
+        # Se o cliente for CONSUMIDOR, a forma de pagamento é forçada para 'A vista'
+        is_consumidor = (pdv_cli_sel.upper().strip() == "CONSUMIDOR")
+        
+        if is_consumidor:
+            avista_name = "A vista"
+            for name in fp_options_pdv:
+                if name.upper().strip() == "A VISTA":
+                    avista_name = name
+                    break
+            pdv_fp_sel = col_p6.selectbox("Condição de Pagamento", [avista_name], disabled=True, key="pdv_fp")
+        else:
+            pdv_fp_sel = col_p6.selectbox("Condição de Pagamento", fp_options_pdv, index=default_fp_idx, key="pdv_fp")
+            
+        rule_str = fp_rules_pdv.get(pdv_fp_sel, "0")
+        import re
+        dias_list = [int(n) for n in re.findall(r'\d+', str(rule_str))]
+        is_a_vista_pdv = (not dias_list or all(d == 0 for d in dias_list))
+        fp_nome_cli = pdv_fp_sel
+
         # Preço dinâmico de balcão
         prod_id_pdv = int(p_opts_pdv[pdv_prod_sel]['id'])
         saldo_est_pdv = dict_saldos_pdv.get(prod_id_pdv, 0.0)
@@ -121,7 +128,11 @@ else:
         pdv_doc = col_p7.selectbox("Documento de Venda", ["DAV (Documento Auxiliar de Venda)", "Nota Fiscal (NF)"], key="pdv_doc")
         
         b_opts_pdv = {f"{r['nome']}": r['id'] for _, r in df_bancos_pdv.iterrows()}
-        pdv_banco_sel = col_p8.selectbox("Recebido em Qual Conta/Caixa?", list(b_opts_pdv.keys()), key="pdv_banco")
+        if is_a_vista_pdv:
+            pdv_banco_sel = col_p8.selectbox("Recebido em Qual Conta/Caixa?", list(b_opts_pdv.keys()), key="pdv_banco")
+        else:
+            col_p8.text_input("Conta/Caixa", value="Contas a Receber (Prazo)", disabled=True, key="pdv_banco_disabled")
+            pdv_banco_sel = None
         
         pdv_lote = col_p9.text_input("📝 Lote Impresso", value=date.today().strftime('FAB %d/%m'), key="pdv_lote")
         pdv_val = col_p9.text_input("📅 Validade", value=(date.today() + timedelta(days=90)).strftime('%d/%m/%Y'), key="pdv_val")
@@ -138,13 +149,18 @@ else:
         st.markdown("<br>", unsafe_allow_html=True)
         
         if not is_a_vista_pdv:
-            st.error(f"⚠️ **Atenção:** O cliente selecionado ({pdv_cli_sel}) possui prazo de pagamento a prazo cadastrado: **{fp_nome_cli}**.")
-            st.info("O PDV Express realiza apenas vendas à vista. Para vendas a prazo, por favor, cadastre a venda através da tela de **Pedidos de Venda** e fature-a na tela de **Faturamento**.")
+            st.info("ℹ️ **Faturamento a Prazo:** A venda gerará duplicatas pendentes no Contas a Receber. A baixa financeira será feita posteriormente.")
         
         if st.form_submit_button("⚡ Efetivar Venda & Baixar Estoque/Financeiro JIT", use_container_width=True):
             cli_pdv = c_opts_pdv[pdv_cli_sel]
             ven_pdv = v_opts_pdv[pdv_ven_sel]
-            bCid = b_opts_pdv[pdv_banco_sel]
+            
+            # Bloquear CONSUMIDOR a prazo
+            if not is_a_vista_pdv and cli_pdv['nome'].upper().strip() == "CONSUMIDOR":
+                st.error("❌ Não é permitido realizar venda a prazo para o cliente CONSUMIDOR genérico. Por favor, selecione um cliente cadastrado.")
+                st.stop()
+                
+            bCid = b_opts_pdv[pdv_banco_sel] if is_a_vista_pdv else None
             
             # 1. Gerar número de documento
             numero_doc_pdv = ""
@@ -157,17 +173,8 @@ else:
                 # Gera número provisório ou pendente
                 numero_doc_pdv = "BALCAO-" + date.today().strftime('%H%M%S')
             
-            if not is_a_vista_pdv:
-                st.error("❌ Não é permitido realizar venda a prazo pelo PDV Express. Utilize o fluxo normal de Vendas/Faturamento ou selecione um cliente com pagamento à vista.")
-                st.stop()
-
             # Lançar com forma_pagamento_id
-            fp_id_to_save = cli_pdv.get('forma_pagamento_id')
-            if pd.isna(fp_id_to_save) or fp_id_to_save is None:
-                df_fp_avista = fetch_all("SELECT id FROM formas_pagamento WHERE UPPER(TRIM(nome)) = 'A VISTA'")
-                fp_id_to_save = int(df_fp_avista.iloc[0]['id']) if not df_fp_avista.empty else None
-            else:
-                fp_id_to_save = int(fp_id_to_save)
+            fp_id_to_save = fp_ids_pdv.get(pdv_fp_sel, None)
 
             # 2. Grava a Venda diretamente como FATURADO
             run_query('''
@@ -189,23 +196,48 @@ else:
             )
             run_query("UPDATE vendas SET custo_cmv_real = ? WHERE id = ?", (custo_cmv_real, nova_venda_id))
             
-            # 4. Grava Financeiro como RECEBIDO de imediato
-            run_query('''
-                INSERT INTO contas_a_receber (cliente_id, descricao, valor, data_vencimento, status, data_recebimento, conta_bancaria_id, venda_id)
-                VALUES (?, ?, ?, ?, 'RECEBIDO', ?, ?, ?)
-            ''', (cli_pdv['id'], f"{pdv_doc} #{numero_doc_pdv}", v_total_pdv, date.today().strftime("%Y-%m-%d"), date.today().strftime("%Y-%m-%d"), bCid, nova_venda_id))
-            
-            # 5. Lança no fluxo de caixa bancário imediatamente
-            desc_receita = f"REC. Balcão Cliente {cli_pdv['nome']}: {pdv_doc} #{numero_doc_pdv}"
-            run_query('''
-                INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado, cliente_id) 
-                VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, TRUE, ?)
-            ''', (date.today().strftime("%Y-%m-%d"), desc_receita, v_total_pdv, nova_venda_id, bCid, cli_pdv['id']))
-            
-            # 6. Dispara o cálculo e gravação de comissão
-            gerar_comissao_se_necessario(nova_venda_id, 'FATURAMENTO', cli_pdv['nome'])
-            # Também aciona o momento de liquidação já que a venda foi recebida e quitada no mesmo ato!
-            gerar_comissao_se_necessario(nova_venda_id, 'LIQUIDAÇÃO', cli_pdv['nome'])
-            
-            st.success(f"Venda Balcão #{nova_venda_id} concluída com sucesso. Documento emitido: {pdv_doc} #{numero_doc_pdv}. Estoque JIT baixado e {format_brl(v_total_pdv)} creditado na conta '{pdv_banco_sel}'.")
+            # 4. Grava Financeiro
+            if is_a_vista_pdv:
+                run_query('''
+                    INSERT INTO contas_a_receber (cliente_id, descricao, valor, data_vencimento, status, data_recebimento, conta_bancaria_id, venda_id)
+                    VALUES (?, ?, ?, ?, 'RECEBIDO', ?, ?, ?)
+                ''', (cli_pdv['id'], f"{pdv_doc} #{numero_doc_pdv}", v_total_pdv, date.today().strftime("%Y-%m-%d"), date.today().strftime("%Y-%m-%d"), bCid, nova_venda_id))
+                
+                # 5. Lança no fluxo de caixa bancário imediatamente
+                desc_receita = f"REC. Balcão Cliente {cli_pdv['nome']}: {pdv_doc} #{numero_doc_pdv}"
+                run_query('''
+                    INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado, cliente_id) 
+                    VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, TRUE, ?)
+                ''', (date.today().strftime("%Y-%m-%d"), desc_receita, v_total_pdv, nova_venda_id, bCid, cli_pdv['id']))
+                
+                # 6. Dispara o cálculo e gravação de comissão
+                gerar_comissao_se_necessario(nova_venda_id, 'FATURAMENTO', cli_pdv['nome'])
+                gerar_comissao_se_necessario(nova_venda_id, 'LIQUIDAÇÃO', cli_pdv['nome'])
+                
+                st.success(f"Venda Balcão #{nova_venda_id} concluída com sucesso. Documento emitido: {pdv_doc} #{numero_doc_pdv}. Estoque JIT baixado e {format_brl(v_total_pdv)} creditado na conta '{pdv_banco_sel}'.")
+            else:
+                # Gerar parcelas do Contas a Receber
+                dias_list = [int(n) for n in re.findall(r'\d+', str(rule_str))]
+                if not dias_list:
+                    dias_list = [0]
+                
+                N = len(dias_list)
+                val_p = round(v_total_pdv / N, 2)
+                diff_p = round(v_total_pdv - val_p * N, 2)
+                
+                for i, dias in enumerate(dias_list):
+                    v_p = val_p + (diff_p if i == N - 1 else 0.0)
+                    dt_v = date.today() + timedelta(days=dias)
+                    desc_p = f"{pdv_doc} #{numero_doc_pdv} (Parc. {i+1}/{N})"
+                    
+                    run_query('''
+                        INSERT INTO contas_a_receber (cliente_id, descricao, valor, data_vencimento, status, venda_id)
+                        VALUES (?, ?, ?, ?, 'PENDENTE', ?)
+                    ''', (cli_pdv['id'], desc_p, v_p, dt_v.strftime("%Y-%m-%d"), nova_venda_id))
+                
+                # Dispara cálculo de comissão apenas para faturamento
+                gerar_comissao_se_necessario(nova_venda_id, 'FATURAMENTO', cli_pdv['nome'])
+                
+                st.success(f"Venda Balcão #{nova_venda_id} faturada a prazo. Documento emitido: {pdv_doc} #{numero_doc_pdv}. Estoque JIT baixado e duplicatas ({N} parcela(s)) lançadas em carteira para o cliente.")
+                
             import time; time.sleep(2.0); st.rerun()
