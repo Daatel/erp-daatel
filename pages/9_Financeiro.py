@@ -901,15 +901,32 @@ try:
                             st.markdown(f"**Valor original a reparcelar:** R$ {valor_original:,.2f}")
                             rp1, rp2 = st.columns(2)
                             n_parc = rp1.number_input("Nº de Parcelas", min_value=2, value=2, step=1, key="n_repar")
-                            dias_entre = rp2.number_input("Dias entre Parcelas", min_value=1, value=30, step=1, key="dias_repar")
                             data_inicio = st.date_input("Data da 1ª Parcela", value=date.today(), key="dt_repar")
+                            
+                            rp3, rp4 = st.columns(2)
+                            periodicidade_rp = rp3.selectbox("Periodicidade", ["Mensal (Mesmo dia do mês)", "A cada X dias"], key="periodicidade_repar")
+                            dias_entre = 30
+                            if periodicidade_rp == "A cada X dias":
+                                dias_entre = rp4.number_input("Dias entre Parcelas", min_value=1, value=30, step=1, key="dias_repar")
 
                             valor_parc = round(valor_original / n_parc, 2)
                             diff_parc = round(valor_original - valor_parc * n_parc, 2)
+                            
+                            import calendar
+                            def add_months(sourcedate, months):
+                                month = sourcedate.month - 1 + months
+                                year = sourcedate.year + month // 12
+                                month = month % 12 + 1
+                                day = min(sourcedate.day, calendar.monthrange(year, month)[1])
+                                return date(year, month, day)
+
                             preview = []
                             for i in range(n_parc):
                                 v = valor_parc + (diff_parc if i == n_parc - 1 else 0)
-                                d = data_inicio + timedelta(days=dias_entre * i)
+                                if periodicidade_rp == "Mensal (Mesmo dia do mês)":
+                                    d = add_months(data_inicio, i)
+                                else:
+                                    d = data_inicio + timedelta(days=dias_entre * i)
                                 preview.append({"Parcela": f"{i+1}/{n_parc}", "Vencimento": d.strftime("%d/%m/%Y"), "Valor": f"R$ {v:,.2f}"})
                             st.dataframe(pd.DataFrame(preview), hide_index=True, use_container_width=True)
 
@@ -917,7 +934,10 @@ try:
                                 run_query("UPDATE contas_a_pagar SET status='CANCELADO', descricao = descricao || ' [REPARCELADO]' WHERE id=?", (dup_id,))
                                 for i in range(n_parc):
                                     v = valor_parc + (diff_parc if i == n_parc - 1 else 0)
-                                    d = data_inicio + timedelta(days=dias_entre * i)
+                                    if periodicidade_rp == "Mensal (Mesmo dia do mês)":
+                                        d = add_months(data_inicio, i)
+                                    else:
+                                        d = data_inicio + timedelta(days=dias_entre * i)
                                     nova_desc_rp = f"{dup_data['descricao']} (Repar. {i+1}/{n_parc})"
                                     run_query(
                                         "INSERT INTO contas_a_pagar (fornecedor_id, compra_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
