@@ -44,10 +44,16 @@ with tab1:
     if not df_saldos.empty:
         dict_saldos = dict(zip(df_saldos['produto_id'], df_saldos['saldo_atual']))
 
+    # Busca formas de pagamento
+    df_fp = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
+    fp_dict = dict(zip(df_fp['id'], df_fp['nome'])) if not df_fp.empty else {}
+    fp_names = df_fp['nome'].tolist() if not df_fp.empty else []
+
     # Busca fila de pedidos abertos
     df_fila = fetch_all('''
         SELECT v.id as pedido_id, v.data as data_pedido, c.nome as cliente, c.uf as uf_cliente, 
-               p.nome as produto, p.id as p_id, v.quantidade, v.valor_total, v.custo_acordos_rede
+               p.nome as produto, p.id as p_id, v.quantidade, v.valor_total, v.custo_acordos_rede,
+               v.forma_pagamento_id
         FROM vendas v 
         JOIN clientes c ON v.cliente_id=c.id
         JOIN produtos p ON v.produto_id=p.id
@@ -75,11 +81,13 @@ with tab1:
         df_grid['Lote Impresso (NF/DAV)'] = date.today().strftime('FAB %d/%m')
         df_grid['Validade (NF/DAV)'] = (date.today() + timedelta(days=90)).strftime('%d/%m/%Y')
         
+        df_grid['Forma de Pagamento'] = df_grid['forma_pagamento_id'].map(fp_dict).fillna("A vista")
+        
         # Formatações visuais
         df_grid['data_pedido'] = pd.to_datetime(df_grid['data_pedido']).dt.strftime('%d/%m/%Y')
         df_grid['Valor Pedido'] = df_grid['valor_total'].apply(format_brl)
         
-        df_view = df_grid[['Selecionar', 'pedido_id', 'data_pedido', 'cliente', 'produto', 'quantidade', 'Saldo em Estoque', 'Farol (Status Físico)', 'Valor Pedido', 'Lote Impresso (NF/DAV)', 'Validade (NF/DAV)']]
+        df_view = df_grid[['Selecionar', 'pedido_id', 'data_pedido', 'cliente', 'produto', 'quantidade', 'Saldo em Estoque', 'Farol (Status Físico)', 'Valor Pedido', 'Forma de Pagamento', 'Lote Impresso (NF/DAV)', 'Validade (NF/DAV)']]
         
         st.markdown("### Selecione os Pedidos para Expedição")
         st.markdown("*Dica Comercial:* Digite ou aceite o Lote e Validade que a fábrica vai imprimir hoje à noite. Essa informação não trava o sistema contábil, apenas sai no papel para o cliente.")
@@ -87,6 +95,7 @@ with tab1:
         edited_df = st.data_editor(df_view, hide_index=True, width="stretch",
                                    column_config={
                                        "Selecionar": st.column_config.CheckboxColumn("Faturar?", default=False),
+                                       "Forma de Pagamento": st.column_config.SelectboxColumn("Forma de Pagamento", options=fp_names, required=True),
                                        "Lote Impresso (NF/DAV)": st.column_config.TextColumn("📝 Lote (Editar)"),
                                        "Validade (NF/DAV)": st.column_config.TextColumn("📅 Validade (Editar)")
                                    },
@@ -115,6 +124,87 @@ with tab1:
             sobrescrever = col_f2.checkbox("Sobrescrever Vencimento do Cliente?")
             venc_boleto_override = col_f2.date_input("Vencimento Forçado", value=date.today() + timedelta(days=30)) if sobrescrever else None
             
+            # Lógica de geração de parcelas para a prévia
+            import re
+            insts = []
+            
+            fp_rule_dict = dict(zip(df_fp['nome'], df_fp['parcelas'])) if not df_fp.empty else {}
+            
+            for _, row in pedidos_selecionados.iterrows():
+                pid = int(row['pedido_id'])
+                fp_nome = row['Forma de Pagamento']
+                v_total = float(df_fila[df_fila['pedido_id'] == pid].iloc[0]['valor_total'])
+                
+                if sobrescrever:
+                    insts.append({
+                        "Pedido ID": pid,
+                        "Cliente": row['cliente'],
+                        "Parcela": "1/1",
+                        "Vencimento": venc_boleto_override,
+                        "Valor (R$)": float(v_total),
+                        "Valor Original": float(v_total)
+                    })
+                else:
+                    rule_str = fp_rule_dict.get(fp_nome, "30")
+                    dias_list = [int(n) for n in re.findall(r'\d+', rule_str)]
+                    if not dias_list:
+                        dias_list = [0]
+                    
+                    N = len(dias_list)
+                    val_p = round(v_total / N, 2)
+                    diff_p = round(v_total - val_p * N, 2)
+                    
+                    for i, dias in enumerate(dias_list):
+                        v_p = val_p + (diff_p if i == N - 1 else 0.0)
+                        dt_v = date.today() + timedelta(days=dias)
+                        insts.append({
+                            "Pedido ID": pid,
+                            "Cliente": row['cliente'],
+                            "Parcela": f"{i+1}/{N}",
+                            "Vencimento": dt_v,
+                            "Valor (R$)": float(v_p),
+                            "Valor Original": float(v_total)
+                        })
+            
+            sel_ids = sorted(pedidos_selecionados['pedido_id'].tolist())
+            sobrescreveu_flag = f"{sobrescrever}_{venc_boleto_override}"
+            session_key_ids = f"last_sel_{sel_ids}_{sobrescreveu_flag}"
+            if st.session_state.get('last_selected_combo') != session_key_ids:
+                st.session_state['parcelas_faturamento'] = insts
+                st.session_state['last_selected_combo'] = session_key_ids
+            
+            st.markdown("#### 💳 Revisar/Customizar Parcelas do Contas a Receber")
+            st.caption("Altere os valores ou datas de vencimento de cada parcela se necessário. A soma das parcelas de cada pedido deve ser igual ao seu total original.")
+            
+            df_insts = pd.DataFrame(st.session_state['parcelas_faturamento'])
+            if not df_insts.empty:
+                df_insts['Vencimento'] = pd.to_datetime(df_insts['Vencimento']).dt.date
+                
+            edited_insts_df = st.data_editor(
+                df_insts,
+                hide_index=True,
+                column_config={
+                    "Pedido ID": st.column_config.NumberColumn("Pedido ID", disabled=True),
+                    "Cliente": st.column_config.TextColumn("Cliente", disabled=True),
+                    "Parcela": st.column_config.TextColumn("Parcela", disabled=True),
+                    "Vencimento": st.column_config.DateColumn("Vencimento", required=True),
+                    "Valor (R$)": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f", min_value=0.01, required=True),
+                    "Valor Original": st.column_config.NumberColumn("Valor Original", disabled=True, format="R$ %.2f")
+                },
+                use_container_width=True,
+                key="editor_insts_fat"
+            )
+            st.session_state['parcelas_faturamento'] = edited_insts_df.to_dict('records')
+            
+            validacao_somas = True
+            for pid in df_insts['Pedido ID'].unique():
+                df_p = edited_insts_df[edited_insts_df['Pedido ID'] == pid]
+                orig_val = float(df_p.iloc[0]['Valor Original'])
+                soma_val = round(df_p['Valor (R$)'].sum(), 2)
+                if abs(orig_val - soma_val) > 0.01:
+                    validacao_somas = False
+                    st.error(f"⚠️ **Erro no Pedido #{pid}:** A soma das parcelas (R$ {soma_val:,.2f}) não é igual ao total original (R$ {orig_val:,.2f}). Diferença: R$ {round(orig_val - soma_val, 2):,.2f}")
+
             def simular_emissao_sefaz_with_retry(venda_id, cliente_nome, valor, max_retries=3):
                 import random
                 import time
@@ -124,7 +214,6 @@ with tab1:
                 base_backoff = 1.0  # segundos
                 for attempt in range(1, max_retries + 1):
                     try:
-                        # 20% de chance de instabilidade temporária na SEFAZ para fins de demonstração
                         if random.random() < 0.20:
                             raise Exception("Erro HTTP 503: SEFAZ fora do ar temporariamente.")
                         status_placeholder.success(f"✅ NF da Venda #{venda_id} ({cliente_nome}) autorizada na SEFAZ (Tentativa {attempt})!")
@@ -139,7 +228,7 @@ with tab1:
                         status_placeholder.warning(f"⚠️ Tentativa {attempt} falhou ({str(e)}). Retentando em {sleep_time:.2f}s...")
                         time.sleep(sleep_time)
 
-            if col_f3.button("📦 Processar Faturamento Selecionado", type="primary", use_container_width=True):
+            if col_f3.button("📦 Processar Faturamento Selecionado", type="primary", use_container_width=True, disabled=not validacao_somas):
                 p_c = fetch_all("SELECT id FROM planos_de_contas WHERE categoria LIKE '%Receita%' LIMIT 1")
                 pc_id = int(p_c.iloc[0]['id']) if not p_c.empty else None
                 
@@ -204,17 +293,28 @@ with tab1:
                                 st.warning(f"⚠️ O CMV do Pedido #{pid} ({cli_nome}) foi estimado por falta de lote correspondente no estoque (Estoque Negativo).")
                             
                             # 3. Lançamento Financeiro
-                            cli_id_df = fetch_all_tx(cursor, "SELECT cliente_id FROM vendas WHERE id=?", (pid,))
                             cli_id = int(cli_id_df.iloc[0]['cliente_id']) if not cli_id_df.empty else 0
                             
-                            cli_prazo_df = fetch_all_tx(cursor, "SELECT prazo_pagamento_dias FROM clientes WHERE id=?", (cli_id,))
-                            prazo_dias = int(cli_prazo_df.iloc[0]['prazo_pagamento_dias']) if not cli_prazo_df.empty and 'prazo_pagamento_dias' in cli_prazo_df.columns and pd.notnull(cli_prazo_df.iloc[0]['prazo_pagamento_dias']) else 30
+                            # Obter parcelas customizadas salvas
+                            insts_pedido = [p for p in st.session_state['parcelas_faturamento'] if p['Pedido ID'] == pid]
                             
-                            venc_final = venc_boleto_override if sobrescrever else date.today() + timedelta(days=prazo_dias)
-                            dsc_financeira = f"{tipo_doc} - Venda #{pid} ({cli_nome} - {prod_nome})"
+                            # Pegar ID da Forma de Pagamento selecionada no grid
+                            row_grid = pedidos_selecionados[pedidos_selecionados['pedido_id'] == pid].iloc[0]
+                            fp_sel_nome = row_grid['Forma de Pagamento']
+                            df_fp_sel = fetch_all_tx(cursor, "SELECT id FROM formas_pagamento WHERE nome=?", (fp_sel_nome,))
+                            fp_id_val = int(df_fp_sel.iloc[0]['id']) if not df_fp_sel.empty else None
                             
-                            run_query_tx(cursor, "INSERT INTO contas_a_receber (venda_id, cliente_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                      (pid, cli_id, pc_id, dsc_financeira, v_total, venc_final.strftime("%Y-%m-%d"), 'PENDENTE'))
+                            # Atualizar forma de pagamento id no pedido
+                            run_query_tx(cursor, "UPDATE vendas SET forma_pagamento_id=? WHERE id=?", (fp_id_val, pid))
+                            
+                            for p in insts_pedido:
+                                val_i = float(p['Valor (R$)'])
+                                venc_i = p['Vencimento']
+                                venc_str = venc_i.strftime("%Y-%m-%d") if hasattr(venc_i, 'strftime') else str(venc_i)
+                                desc_i = f"{tipo_doc} ({p['Parcela']}) - Venda #{pid} ({cli_nome} - {prod_nome})"
+                                
+                                run_query_tx(cursor, "INSERT INTO contas_a_receber (venda_id, cliente_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                          (pid, cli_id, pc_id, desc_i, val_i, venc_str, 'PENDENTE'))
                             
                             # 4. Acordos de Rede
                             custo_acordos = float(vd['custo_acordos_rede']) if pd.notnull(vd['custo_acordos_rede']) else 0.0

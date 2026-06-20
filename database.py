@@ -176,6 +176,15 @@ def initialize_database():
 def _create_tables_internal(conn):
     cursor = CursorWrapper(conn.cursor())
 
+    # 0.0. Formas de Pagamento
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS formas_pagamento (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL UNIQUE,
+        parcelas TEXT NOT NULL
+    )
+    ''')
+
     # 0. Redes de Clientes e Grupos
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS redes_clientes (
@@ -742,6 +751,28 @@ def _create_tables_internal(conn):
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO empresa_config (razao_social, nome_fantasia, cnpj, endereco_completo) VALUES ('Empório do Alho LTDA', 'Empório do Alho', '00.000.000/0001-00', 'Rua Principal, 123 - Centro')")
 
+    # Inserir formas de pagamento padrão se a tabela estiver vazia
+    cursor.execute("SELECT COUNT(*) FROM formas_pagamento")
+    if cursor.fetchone()[0] == 0:
+        prazos_padrao = [
+            ('A vista', '0'),
+            ('Antecipado', '0'),
+            ('7 dias', '7'),
+            ('10 dias', '10'),
+            ('15 dias', '15'),
+            ('28 dias', '28'),
+            ('30 dias', '30'),
+            ('28/35 dias', '28,35'),
+            ('28/35/42 dias', '28,35,42'),
+            ('30/45/60 dias', '30,45,60'),
+            ('30/60 dias', '30,60'),
+            ('30/60/90 dias', '30,60,90'),
+            ('45 dias', '45'),
+            ('60 dias', '60')
+        ]
+        for nome_f, parc_f in prazos_padrao:
+            cursor.execute("INSERT INTO formas_pagamento (nome, parcelas) VALUES (?, ?)", (nome_f, parc_f))
+
     # Criar índices de desempenho para otimização de consultas (Fase 1)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_mov_produto ON estoque_movimentos(produto_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_mov_lote ON estoque_movimentos(lote_origem_id)")
@@ -844,7 +875,9 @@ def _create_tables_internal(conn):
         "ALTER TABLE rh_pagamentos ADD COLUMN adiantamento REAL DEFAULT 0.0",
         "ALTER TABLE clientes ADD COLUMN chave_pix TEXT",
         "ALTER TABLE fornecedores ADD COLUMN chave_pix TEXT",
-        "ALTER TABLE fornecedores ADD COLUMN plano_conta_id INTEGER"
+        "ALTER TABLE fornecedores ADD COLUMN plano_conta_id INTEGER",
+        "ALTER TABLE clientes ADD COLUMN forma_pagamento_id INTEGER",
+        "ALTER TABLE vendas ADD COLUMN forma_pagamento_id INTEGER"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)

@@ -9,10 +9,10 @@ carregar_estilo()
 
 st.title("📝 Cadastros Inteligentes")
 
-tab_empresa, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab_ft = st.tabs([
+tab_empresa, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab_fp, tab_ft = st.tabs([
     "🏢 Minha Empresa", "Produtos", "Clientes", "Fornecedores", "Regras de Comissão", 
     "Plano de Contas", "Contas Bancárias", "Maquinário", "Usuários", "Redes e Grupos",
-    "🧪 Fichas Técnicas"
+    "💳 Formas de Pagamento", "🧪 Fichas Técnicas"
 ])
 
 with tab_empresa:
@@ -376,16 +376,23 @@ with tab2:
                                     rep_nome = row.get('Representante', '')
                                     rep_id = rep_id_map.get(rep_nome, None) if rep_nome else None
                                     
+                                    # Tentar achar correspondência para prazo_pag
+                                    fp_id_val = None
+                                    if prazo_pag:
+                                        df_match = fetch_all("SELECT id FROM formas_pagamento WHERE UPPER(TRIM(nome)) = ?", (prazo_pag.strip().upper(),))
+                                        if not df_match.empty:
+                                            fp_id_val = int(df_match.iloc[0]['id'])
+
                                     query_insert = """INSERT INTO clientes 
                                                (nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual, 
                                                 bairro, cep, cidade, uf, email, observacoes, status, rede_clientes, 
-                                                grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix) 
-                                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                                                grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix, forma_pagamento_id) 
+                                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
                                     
                                     run_query(query_insert, (
                                         razao, telefone, endereco, nome_fantasia, cnpj, insc_estadual,
                                         bairro, cep, cidade, uf, email, observacoes, status_val, rede_val,
-                                        grupo_val, prazo_pag, rep_id, None, 30, 0.0, "", chave_pix_val
+                                        grupo_val, prazo_pag, rep_id, None, 30, 0.0, "", chave_pix_val, fp_id_val
                                     ))
                                     imported_count += 1
                                     
@@ -437,8 +444,29 @@ with tab2:
         chave_pix = c_pix.text_input("Código Pix")
         
         c14, c15, c16, c17 = st.columns(4)
-        prazo_pagamento = c14.text_input("Prazo Pagt. Texto (Ex: 30/60)")
-        prazo_pagamento_dias = c15.number_input("Prazo Faturamento (Dias)", min_value=0, value=30, step=1, help="Usado para vencimento automático")
+        # Buscar formas de pagamento
+        df_fp_list = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
+        fp_opts = {}
+        if not df_fp_list.empty:
+            for _, r in df_fp_list.iterrows():
+                fp_opts[r['nome']] = (r['id'], r['parcelas'])
+
+        c14, c15, c16, c17 = st.columns(4)
+        fp_selecionada = c14.selectbox("Forma de Pagamento Padrão", list(fp_opts.keys()))
+        
+        if fp_selecionada:
+            fp_id_val, fp_parc_val = fp_opts[fp_selecionada]
+            import re
+            first_day = 0
+            nums = re.findall(r'\d+', fp_parc_val)
+            if nums:
+                first_day = int(nums[0])
+        else:
+            fp_id_val = None
+            fp_selecionada = ""
+            first_day = 30
+            
+        prazo_pagamento_dias = c15.number_input("Prazo Faturamento (Dias)", min_value=0, value=first_day, step=1, help="Usado para vencimento automático", disabled=True)
         rep_nome = c16.selectbox("Representante Responsável", rep_options)
         observacoes = c17.text_input("Observações")
         
@@ -451,22 +479,38 @@ with tab2:
         
         if st.form_submit_button("Cadastrar Cliente"):
             if nome:
-                req_id = rep_dict.get(rep_nome, None)
-                rede_val = rede_dinamica if rede_dinamica != "(Nenhuma)" else ""
-                grupo_val = grupo_lojas if grupo_lojas != "(Nenhum)" else ""
+                nome_limpo = nome.strip().upper()
+                # 1. Validar se o nome já existe
+                chk_nome = fetch_all("SELECT id FROM clientes WHERE UPPER(TRIM(nome)) = ?", (nome_limpo,))
                 
-                query = """INSERT INTO clientes 
-                           (nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual, 
-                            bairro, cep, cidade, uf, email, observacoes, status, rede_clientes, 
-                            grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                # 2. Validar CNPJ/CPF se preenchido
+                chk_cnpj = pd.DataFrame()
+                cnpj_val = cnpj_cpf.strip() if cnpj_cpf else ""
+                if cnpj_val:
+                    chk_cnpj = fetch_all("SELECT id FROM clientes WHERE TRIM(cnpj_cpf) = ?", (cnpj_val,))
                 
-                run_query(query, (
-                    nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual,
-                    bairro, cep, cidade, uf, email, observacoes, status, rede_val,
-                    grupo_val, prazo_pagamento, req_id, nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix
-                ))
-                st.success("Cliente cadastrado com sucesso!")
+                if not chk_nome.empty:
+                    st.error(f"⚠️ Já existe um cliente cadastrado com o nome '{nome.strip()}'. Se forem clientes diferentes, diferencie-os no nome (ex: '{nome.strip()} RJ', '{nome.strip()} - Filial').")
+                elif not chk_cnpj.empty:
+                    st.error(f"⚠️ Já existe um cliente cadastrado com o CNPJ/CPF '{cnpj_val}'.")
+                else:
+                    req_id = rep_dict.get(rep_nome, None)
+                    rede_val = rede_dinamica if rede_dinamica != "(Nenhuma)" else ""
+                    grupo_val = grupo_lojas if grupo_lojas != "(Nenhum)" else ""
+                    
+                    query = """INSERT INTO clientes 
+                               (nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual, 
+                                bairro, cep, cidade, uf, email, observacoes, status, rede_clientes, 
+                                grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix, forma_pagamento_id) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                    
+                    run_query(query, (
+                        nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual,
+                        bairro, cep, cidade, uf, email, observacoes, status, rede_val,
+                        grupo_val, fp_selecionada, req_id, nascimento, first_day, taxa_descarga, regras_descarga, chave_pix, fp_id_val
+                    ))
+                    st.success("Cliente cadastrado com sucesso!")
+                    import time; time.sleep(1); st.rerun()
             else:
                 st.error("Por favor, preencha a Razão Social.")
                 
@@ -530,9 +574,40 @@ with tab2:
                         egrupo_lojas = ec13.text_input("Grupo (Sub-rede)", cb['grupo_lojas'] if cb['grupo_lojas'] else "")
                         echave_pix = ec_pix.text_input("Código Pix", cb['chave_pix'] if cb['chave_pix'] else "")
                         
+                        # Buscar formas de pagamento
+                        df_fp_list_edit = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
+                        fp_opts_edit = {}
+                        if not df_fp_list_edit.empty:
+                            for _, r in df_fp_list_edit.iterrows():
+                                fp_opts_edit[r['nome']] = (r['id'], r['parcelas'])
+                        
+                        # Pegar valor atual
+                        fp_atual_nome = cb['prazo_pagamento']
+                        if cb['forma_pagamento_id']:
+                            df_cur_fp = fetch_all("SELECT nome FROM formas_pagamento WHERE id=?", (int(cb['forma_pagamento_id']),))
+                            if not df_cur_fp.empty:
+                                fp_atual_nome = df_cur_fp.iloc[0]['nome']
+                        
+                        idx_fp = 0
+                        if fp_atual_nome in fp_opts_edit:
+                            idx_fp = list(fp_opts_edit.keys()).index(fp_atual_nome)
+                        
                         ec14, ec15, ec16, ec17 = st.columns(4)
-                        eprazo = ec14.text_input("Prazo Padrão", cb['prazo_pagamento'] if cb['prazo_pagamento'] else "")
-                        eprazo_dias = ec15.number_input("Prazo Faturamento (Dias)", value=int(cb['prazo_pagamento_dias']) if pd.notnull(cb['prazo_pagamento_dias']) else 30)
+                        efp_selecionada = ec14.selectbox("Forma de Pagamento Padrão", list(fp_opts_edit.keys()), index=idx_fp, key=f"efp_{cid}")
+                        
+                        if efp_selecionada:
+                            efp_id_val, efp_parc_val = fp_opts_edit[efp_selecionada]
+                            import re
+                            efirst_day = 0
+                            nums = re.findall(r'\d+', efp_parc_val)
+                            if nums:
+                                efirst_day = int(nums[0])
+                        else:
+                            efp_id_val = None
+                            efp_selecionada = ""
+                            efirst_day = 30
+                            
+                        eprazo_dias = ec15.number_input("Prazo Faturamento (Dias)", value=int(efirst_day), disabled=True, key=f"epd_{cid}")
                         
                         rep_default = rep_reverse_dict_edit.get(cb['representante_id'], "(Nenhum/Direto)")
                         idx_rep = rep_options_edit.index(rep_default) if rep_default in rep_options_edit else 0
@@ -550,21 +625,37 @@ with tab2:
                         eregras = ec_l2.text_input("Regras/Horários de Descarga", cb['regras_descarga'] if cb['regras_descarga'] else "")
                         
                         if st.form_submit_button("Salvar Cliente"):
-                            nasc_str = enascimento.strftime("%Y-%m-%d") if enascimento else None
-                            rep_id_val = rep_dict_edit.get(erep_nome, None) if erep_nome != "(Nenhum/Direto)" else None
+                            enome_limpo = enome.strip().upper()
+                            # 1. Validar se o nome já existe em outro cliente
+                            chk_nome_edit = fetch_all("SELECT id FROM clientes WHERE UPPER(TRIM(nome)) = ? AND id != ?", (enome_limpo, cid))
                             
-                            run_query("""
-                                UPDATE clientes 
-                                SET nome=?, nome_fantasia=?, cnpj_cpf=?, data_nascimento=?, inscricao_estadual=?,
-                                    telefone=?, email=?, endereco=?, bairro=?, cidade=?, uf=?, cep=?, rede_clientes=?, grupo_lojas=?,
-                                    status=?, chave_pix=?, prazo_pagamento=?, prazo_pagamento_dias=?, representante_id=?,
-                                    observacoes=?, taxa_descarga=?, regras_descarga=? 
-                                WHERE id=?
-                            """, (enome, enome_fantasia, edoc, nasc_str, eie,
-                                  etelefone, eemail, eendereco, ebairro, ecidade, euf, ecep, erede, egrupo_lojas,
-                                  estatus, echave_pix, eprazo, eprazo_dias, rep_id_val,
-                                  eobs, etaxa, eregras, cid))
-                            st.success("Cliente alterado!")
+                            # 2. Validar se o CNPJ/CPF já existe em outro cliente
+                            chk_cnpj_edit = pd.DataFrame()
+                            edoc_val = edoc.strip() if edoc else ""
+                            if edoc_val:
+                                chk_cnpj_edit = fetch_all("SELECT id FROM clientes WHERE TRIM(cnpj_cpf) = ? AND id != ?", (edoc_val, cid))
+                            
+                            if not chk_nome_edit.empty:
+                                st.error(f"⚠️ Já existe outro cliente cadastrado com o nome '{enome.strip()}'. Para salvar, diferencie-o (ex: '{enome.strip()} RJ', '{enome.strip()} - Filial').")
+                            elif not chk_cnpj_edit.empty:
+                                st.error(f"⚠️ Já existe outro cliente cadastrado com o CNPJ/CPF '{edoc_val}'.")
+                            else:
+                                nasc_str = enascimento.strftime("%Y-%m-%d") if enascimento else None
+                                rep_id_val = rep_dict_edit.get(erep_nome, None) if erep_nome != "(Nenhum/Direto)" else None
+                                
+                                run_query("""
+                                    UPDATE clientes 
+                                    SET nome=?, nome_fantasia=?, cnpj_cpf=?, data_nascimento=?, inscricao_estadual=?,
+                                        telefone=?, email=?, endereco=?, bairro=?, cidade=?, uf=?, cep=?, rede_clientes=?, grupo_lojas=?,
+                                        status=?, chave_pix=?, prazo_pagamento=?, prazo_pagamento_dias=?, representante_id=?,
+                                        observacoes=?, taxa_descarga=?, regras_descarga=?, forma_pagamento_id=? 
+                                    WHERE id=?
+                                """, (enome, enome_fantasia, edoc, nasc_str, eie,
+                                      etelefone, eemail, eendereco, ebairro, ecidade, euf, ecep, erede, egrupo_lojas,
+                                      estatus, echave_pix, efp_selecionada, efirst_day, rep_id_val,
+                                      eobs, etaxa, eregras, efp_id_val, cid))
+                                st.success("Cliente alterado com sucesso!")
+                                import time; time.sleep(1); st.rerun()
                             import time; time.sleep(1); st.rerun()
 
 # ======= FORNECEDORES =======
@@ -1053,6 +1144,64 @@ with tab9:
 
 
 
+
+# ======= FORMAS DE PAGAMENTO =======
+with tab_fp:
+    st.subheader("💳 Cadastro de Formas de Pagamento")
+    st.markdown("Gerencie as condições e prazos de pagamento disponíveis no ERP para vendas e faturamento.")
+    
+    col_fp_1, col_fp_2 = st.columns(2)
+    
+    with col_fp_1:
+        with st.form("form_forma_pagto", clear_on_submit=True):
+            st.markdown("##### ➕ Nova Forma de Pagamento")
+            fp_nome = st.text_input("Nome da Forma (Ex: 30/45/60 dias)")
+            fp_parcelas = st.text_input("Regra de Dias (Ex: 30,45,60)", help="Valores em dias separados por vírgula. Ex: À vista use 0. 30 dias use 30. 30 e 60 dias use 30,60")
+            
+            if st.form_submit_button("Salvar Forma de Pagamento"):
+                if fp_nome and fp_parcelas:
+                    import re
+                    regra_limpa = fp_parcelas.strip().replace(" ", "")
+                    if not re.match(r'^\d+(,\d+)*$', regra_limpa):
+                        st.error("⚠️ A regra de dias deve conter apenas números separados por vírgulas (Ex: '0' ou '30' ou '30,60,90').")
+                    else:
+                        chk = fetch_all("SELECT id FROM formas_pagamento WHERE nome=?", (fp_nome.strip(),))
+                        if chk.empty:
+                            run_query("INSERT INTO formas_pagamento (nome, parcelas) VALUES (?, ?)", (fp_nome.strip(), regra_limpa))
+                            st.success("Forma de pagamento cadastrada com sucesso!")
+                            import time; time.sleep(1); st.rerun()
+                        else:
+                            st.error("⚠️ Já existe uma forma de pagamento com este nome.")
+                else:
+                    st.error("⚠️ Preencha todos os campos obrigatórios.")
+                    
+    with col_fp_2:
+        st.markdown("##### Prazos Ativos no Sistema")
+        df_fp = fetch_all("SELECT id, nome as 'Descrição', parcelas as 'Regra (Dias)' FROM formas_pagamento ORDER BY id ASC")
+        if not df_fp.empty:
+            st.dataframe(df_fp, hide_index=True, use_container_width=True)
+            
+            fp_ids = df_fp['id'].tolist()
+            fp_descricoes = df_fp['Descrição'].tolist()
+            dict_fp_del = dict(zip(fp_descricoes, fp_ids))
+            
+            st.markdown("---")
+            st.markdown("##### 🗑️ Excluir Forma de Pagamento")
+            fp_para_excluir = st.selectbox("Selecione para excluir:", ["-- SELECIONE --"] + fp_descricoes, key="sb_fp_delete")
+            if fp_para_excluir != "-- SELECIONE --":
+                fp_id_del = dict_fp_del[fp_para_excluir]
+                if st.button("Confirmar Exclusão", type="primary", key="btn_fp_delete"):
+                    chk_uso_cli = fetch_all("SELECT id FROM clientes WHERE forma_pagamento_id=?", (fp_id_del,))
+                    chk_uso_ven = fetch_all("SELECT id FROM vendas WHERE forma_pagamento_id=?", (fp_id_del,))
+                    
+                    if not chk_uso_cli.empty or not chk_uso_ven.empty:
+                        st.error("⚠️ Não é permitido excluir esta forma de pagamento pois ela já está vinculada a clientes ou vendas cadastrados.")
+                    else:
+                        run_query("DELETE FROM formas_pagamento WHERE id=?", (fp_id_del,))
+                        st.success("Forma de pagamento excluída com sucesso!")
+                        import time; time.sleep(1); st.rerun()
+        else:
+            st.info("Nenhuma forma de pagamento cadastrada.")
 
 # ======= FICHAS TÉCNICAS (BOM) =======
 with tab_ft:

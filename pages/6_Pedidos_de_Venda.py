@@ -16,10 +16,11 @@ def format_brl(val):
         return "R$ 0,00"
     return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-df_clientes = fetch_all("SELECT id, nome, rede_clientes, prazo_pagamento, representante_id FROM clientes WHERE status='ATIVO'")
+df_clientes = fetch_all("SELECT id, nome, rede_clientes, prazo_pagamento, representante_id, forma_pagamento_id FROM clientes WHERE status='ATIVO'")
 df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%'")
 df_produtos = fetch_all("SELECT id, nome, preco_venda_base FROM produtos WHERE is_materia_prima = FALSE")
 df_regras = fetch_all("SELECT vendedor_id, produto_id, rede_clientes, percentual FROM comissoes_regras")
+df_fp = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
 
 tab1, tab_deg, tab2, tab_rastrear = st.tabs(["🛒 Lançar Novo Pedido", "🍇 Degustação & Amostras", "📋 Meus Pedidos Abertos", "🔍 Rastrear Pedido"])
 
@@ -33,6 +34,8 @@ with tab1:
         st.session_state['carrinho_vendedor_nome'] = None
     if 'carrinho_data' not in st.session_state:
         st.session_state['carrinho_data'] = None
+    if 'carrinho_fp_id' not in st.session_state:
+        st.session_state['carrinho_fp_id'] = None
 
     if df_clientes.empty or df_vendedores.empty or df_produtos.empty:
         st.warning("Cadastre Clientes, Vendedores e Produtos antes de iniciar as vendas!")
@@ -43,17 +46,30 @@ with tab1:
         
         col1, col2 = st.columns([1, 2])
         
+        fp_opts = {r['nome']: r['id'] for _, r in df_fp.iterrows()} if not df_fp.empty else {}
+        fp_list = list(fp_opts.keys())
+        
         if carrinho_ativo:
             data_venda = col1.date_input("Data do Pedido", value=st.session_state['carrinho_data'], disabled=True)
             cliente_sel = col2.selectbox("Cliente Destino (Ativos)", list(c_opts.keys()), index=list(c_opts.keys()).index(st.session_state['carrinho_cliente_nome']), disabled=True)
-            vendedor_sel = st.selectbox("Vendedor / Representante", list(v_opts.keys()), index=list(v_opts.keys()).index(st.session_state['carrinho_vendedor_nome']), disabled=True)
-            st.info("💡 **Informação:** Para alterar o cliente, vendedor ou data do pedido, limpe o carrinho atual abaixo.")
+            
+            c_v1, c_v2 = st.columns(2)
+            vendedor_sel = c_v1.selectbox("Vendedor / Representante", list(v_opts.keys()), index=list(v_opts.keys()).index(st.session_state['carrinho_vendedor_nome']), disabled=True)
+            
+            cur_fp_nome = ""
+            if st.session_state.get('carrinho_fp_id'):
+                df_cur_fp = df_fp[df_fp['id'] == int(st.session_state['carrinho_fp_id'])]
+                if not df_cur_fp.empty:
+                    cur_fp_nome = df_cur_fp.iloc[0]['nome']
+            c_v2.selectbox("Forma de Pagamento acordada", [cur_fp_nome] if cur_fp_nome else ["(Padrão)"], disabled=True)
+            st.info("💡 **Informação:** Para alterar o cliente, vendedor, forma de pagamento ou data do pedido, limpe o carrinho atual abaixo.")
         else:
             data_venda = col1.date_input("Data do Pedido", value=date.today())
             cliente_sel = col2.selectbox("Cliente Destino (Ativos)", list(c_opts.keys()))
             
             cli_selecionado = c_opts[cliente_sel]
             rep_id = cli_selecionado['representante_id']
+            cli_fp_id = cli_selecionado['forma_pagamento_id']
             
             default_index = 0
             if pd.notna(rep_id) and not df_vendedores.empty:
@@ -63,7 +79,19 @@ with tab1:
                     if rep_nome in v_opts:
                         default_index = list(v_opts.keys()).index(rep_nome)
                         
-            vendedor_sel = st.selectbox("Vendedor / Representante", list(v_opts.keys()), index=default_index)
+            c_v1, c_v2 = st.columns(2)
+            vendedor_sel = c_v1.selectbox("Vendedor / Representante", list(v_opts.keys()), index=default_index)
+            
+            fp_default_index = 0
+            if pd.notna(cli_fp_id) and not df_fp.empty:
+                df_match_fp = df_fp[df_fp['id'] == int(cli_fp_id)]
+                if not df_match_fp.empty:
+                    fp_match_nome = df_match_fp.iloc[0]['nome']
+                    if fp_match_nome in fp_opts:
+                        fp_default_index = fp_list.index(fp_match_nome)
+                        
+            fp_sel = c_v2.selectbox("Forma de Pagamento acordada", fp_list, index=fp_default_index)
+            st.session_state['carrinho_fp_id'] = fp_opts.get(fp_sel)
         
         st.markdown("##### Informações do Produto")
         col3, col4, col_tipo, col5 = st.columns([2, 1, 1.2, 1.2])
@@ -241,6 +269,7 @@ with tab1:
                 st.session_state['carrinho_cliente_nome'] = None
                 st.session_state['carrinho_vendedor_nome'] = None
                 st.session_state['carrinho_data'] = None
+                st.session_state['carrinho_fp_id'] = None
                 st.toast("Carrinho esvaziado!", icon="🗑️")
                 st.rerun()
                 
@@ -248,14 +277,15 @@ with tab1:
                 cli = c_opts[st.session_state['carrinho_cliente_nome']]
                 ven = v_opts[st.session_state['carrinho_vendedor_nome']]
                 data_v = st.session_state['carrinho_data']
+                fp_id_val = st.session_state['carrinho_fp_id']
                 
                 vids_criados = []
                 for item in st.session_state['carrinho_venda']:
                     run_query(
                         """INSERT INTO vendas 
-                           (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, comissao_valor, custo_acordos_rede, is_bonificacao, status) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO')""",
-                        (data_v.strftime("%Y-%m-%d"), cli['id'], ven['id'], item['produto_id'], item['quantidade'], item['valor_unitario'], item['valor_total'], item['comissao_valor'], item['custo_acordos_rede'], item['is_bonificacao'])
+                           (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, comissao_valor, custo_acordos_rede, is_bonificacao, status, forma_pagamento_id) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO', ?)""",
+                        (data_v.strftime("%Y-%m-%d"), cli['id'], ven['id'], item['produto_id'], item['quantidade'], item['valor_unitario'], item['valor_total'], item['comissao_valor'], item['custo_acordos_rede'], item['is_bonificacao'], fp_id_val)
                     )
                     v_id_df = fetch_all("SELECT MAX(id) as lg FROM vendas")
                     vids_criados.append(str(int(v_id_df.iloc[0]['lg'])))
@@ -266,6 +296,7 @@ with tab1:
                 st.session_state['carrinho_cliente_nome'] = None
                 st.session_state['carrinho_vendedor_nome'] = None
                 st.session_state['carrinho_data'] = None
+                st.session_state['carrinho_fp_id'] = None
                 
                 import time
                 time.sleep(2)
