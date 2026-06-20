@@ -320,7 +320,8 @@ def _create_tables_internal(conn):
         plano_de_contas TEXT,
         status TEXT,
         prazo_pagamento TEXT,
-        chave_pix TEXT
+        chave_pix TEXT,
+        plano_conta_id INTEGER
     )
     ''')
     
@@ -842,7 +843,8 @@ def _create_tables_internal(conn):
         "ALTER TABLE rh_pagamentos ADD COLUMN desc_vr REAL DEFAULT 0.0",
         "ALTER TABLE rh_pagamentos ADD COLUMN adiantamento REAL DEFAULT 0.0",
         "ALTER TABLE clientes ADD COLUMN chave_pix TEXT",
-        "ALTER TABLE fornecedores ADD COLUMN chave_pix TEXT"
+        "ALTER TABLE fornecedores ADD COLUMN chave_pix TEXT",
+        "ALTER TABLE fornecedores ADD COLUMN plano_conta_id INTEGER"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)

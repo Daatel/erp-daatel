@@ -25,7 +25,7 @@ if 'parcelas_temp' not in st.session_state:
 
 # ─── PRÉ-REQUISITOS ───────────────────────────────────────────────────────────
 df_fornecedores = fetch_all(
-    "SELECT id, nome_fantasia, nome, plano_de_contas, prazo_pagamento FROM fornecedores WHERE status='ATIVO' ORDER BY nome_fantasia")
+    "SELECT id, nome_fantasia, nome, plano_de_contas, prazo_pagamento, plano_conta_id FROM fornecedores WHERE status='ATIVO' ORDER BY nome_fantasia")
 df_produtos = fetch_all(
     "SELECT id, nome, unidade_medida, is_materia_prima, custo_unidade, unidades_por_fardo FROM produtos ORDER BY nome")
 
@@ -383,10 +383,9 @@ if st.session_state.itens_nf:
                             cursor = conn.cursor()
 
                             fid = int(frn_data['id'])
-                            plano_nome = frn_data['plano_de_contas']
-                            plano_id = None
-                            if plano_nome:
-                                cursor.execute("SELECT id FROM planos_de_contas WHERE nome=?", (plano_nome,))
+                            plano_id = int(frn_data['plano_conta_id']) if 'plano_conta_id' in frn_data and pd.notnull(frn_data['plano_conta_id']) else None
+                            if not plano_id and frn_data['plano_de_contas']:
+                                cursor.execute("SELECT id FROM planos_de_contas WHERE nome=?", (frn_data['plano_de_contas'],))
                                 res = cursor.fetchone()
                                 if res:
                                     plano_id = res[0]
