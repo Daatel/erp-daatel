@@ -640,6 +640,19 @@ try:
             </style>
             """, unsafe_allow_html=True)
 
+            if st.session_state.get("cap_limpar_formulario", False):
+                st.session_state["cap_forn_sel"] = list(op_forn.keys())[0]
+                st.session_state["cap_pc_sel"] = list(op_pc.keys())[0]
+                st.session_state["cap_desc_p"] = ""
+                st.session_state["cap_val_p"] = 0.01
+                st.session_state["cap_venc_p"] = date.today() + timedelta(days=30)
+                st.session_state["cap_is_vinc"] = False
+                st.session_state["cap_cli_sel"] = list(op_cli.keys())[0]
+                st.session_state["cap_num_parcelas"] = 1
+                st.session_state["cap_periodicidade"] = "Mensal (Mesmo dia do mês)"
+                st.session_state["cap_dias_intervalo"] = 30
+                st.session_state["cap_limpar_formulario"] = False
+
             col_m1, col_m2 = st.columns(2)
             forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()), key="cap_forn_sel")
             pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()), key="cap_pc_sel")
@@ -734,27 +747,8 @@ try:
                         
                         st.session_state["cap_clique_bloqueado"] = False
                         
-                        # Limpa chaves do session state
-                        if "cap_forn_sel" in st.session_state:
-                            st.session_state["cap_forn_sel"] = list(op_forn.keys())[0]
-                        if "cap_pc_sel" in st.session_state:
-                            st.session_state["cap_pc_sel"] = list(op_pc.keys())[0]
-                        if "cap_desc_p" in st.session_state:
-                            st.session_state["cap_desc_p"] = ""
-                        if "cap_val_p" in st.session_state:
-                            st.session_state["cap_val_p"] = 0.01
-                        if "cap_venc_p" in st.session_state:
-                            st.session_state["cap_venc_p"] = date.today() + timedelta(days=30)
-                        if "cap_is_vinc" in st.session_state:
-                            st.session_state["cap_is_vinc"] = False
-                        if "cap_cli_sel" in st.session_state:
-                            st.session_state["cap_cli_sel"] = list(op_cli.keys())[0]
-                        if "cap_num_parcelas" in st.session_state:
-                            st.session_state["cap_num_parcelas"] = 1
-                        if "cap_periodicidade" in st.session_state:
-                            st.session_state["cap_periodicidade"] = "Mensal (Mesmo dia do mês)"
-                        if "cap_dias_intervalo" in st.session_state:
-                            st.session_state["cap_dias_intervalo"] = 30
+                        # Define flag para limpar os campos na próxima execução (antes da renderização dos widgets)
+                        st.session_state["cap_limpar_formulario"] = True
                         
                         if n_parcelas > 1:
                             st.success(f"✅ {n_parcelas} duplicatas a pagar lançadas com sucesso!")
