@@ -712,239 +712,237 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
 """, unsafe_allow_html=True)
 
     # JavaScript executado diretamente no contexto do pai (parent DOM) via injeção por onerror (evita bloqueios de CORS do iframe components.html)
-    st.markdown("""
-<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" onerror="
-    if (!window.__loginScriptInjected) {
-        window.__loginScriptInjected = true;
-        const script = document.createElement('script');
-        script.textContent = `
-            (function() {
-                const doc = document;
+    js_code = """
+    (function() {
+        const doc = document;
 
-                function togglePasswordVisibility() {
-                    const passwordInput = doc.getElementById('custom-password');
-                    const toggleButton = doc.getElementById('custom-password-toggle') || doc.querySelector('.password-toggle');
-                    if (passwordInput && toggleButton) {
-                        if (passwordInput.type === 'password') {
-                            passwordInput.type = 'text';
-                            toggleButton.classList.add('visible');
-                        } else {
-                            passwordInput.type = 'password';
-                            toggleButton.classList.remove('visible');
-                        }
-                    }
+        function togglePasswordVisibility() {
+            const passwordInput = doc.getElementById('custom-password');
+            const toggleButton = doc.getElementById('custom-password-toggle') || doc.querySelector('.password-toggle');
+            if (passwordInput && toggleButton) {
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    toggleButton.classList.add('visible');
+                } else {
+                    passwordInput.type = 'password';
+                    toggleButton.classList.remove('visible');
                 }
+            }
+        }
 
-                function getNativeForm() {
-                    const allInputs = doc.querySelectorAll('input[placeholder=\\'Digite seu e-mail\\']');
-                    for (let i = 0; i < allInputs.length; i++) {
-                        if (!allInputs[i].closest('.custom-login-container')) {
-                            const form = allInputs[i].closest('[data-testid=\\'stForm\\']');
-                            if (form) return form;
-                        }
-                    }
-                    return doc.querySelector('div[data-testid=\\'stForm\\']');
+        function getNativeForm() {
+            const allInputs = doc.querySelectorAll('input[placeholder=\\'Digite seu e-mail\\']');
+            for (let i = 0; i < allInputs.length; i++) {
+                if (!allInputs[i].closest('.custom-login-container')) {
+                    const form = allInputs[i].closest('[data-testid=\\'stForm\\']');
+                    if (form) return form;
                 }
+            }
+            return doc.querySelector('div[data-testid=\\'stForm\\']');
+        }
 
-                function getNativeEmail(nativeForm) {
-                    if (!nativeForm) return null;
-                    return nativeForm.querySelector('input[placeholder=\\'Digite seu e-mail\\']') ||
-                        nativeForm.querySelector('input[type=\\'text\\']');
-                }
+        function getNativeEmail(nativeForm) {
+            if (!nativeForm) return null;
+            return nativeForm.querySelector('input[placeholder=\\'Digite seu e-mail\\']') ||
+                nativeForm.querySelector('input[type=\\'text\\']');
+        }
 
-                function getNativeSenha(nativeForm) {
-                    if (!nativeForm) return null;
-                    return nativeForm.querySelector('input[placeholder=\\'Digite sua senha\\']') ||
-                        nativeForm.querySelector('input[type=\\'password\\']');
-                }
+        function getNativeSenha(nativeForm) {
+            if (!nativeForm) return null;
+            return nativeForm.querySelector('input[placeholder=\\'Digite sua senha\\']') ||
+                nativeForm.querySelector('input[type=\\'password\\']');
+        }
 
-                function getNativeSubmit(nativeForm) {
-                    if (!nativeForm) return null;
-                    return nativeForm.querySelector('div[data-testid=\\'stFormSubmitButton\\'] button') ||
-                        nativeForm.querySelector('button[kind=\\'formSubmit\\']') ||
-                        nativeForm.querySelector('button[type=\\'submit\\']') ||
-                        nativeForm.querySelector('button') ||
-                        doc.querySelector('div[data-testid=\\'stFormSubmitButton\\'] button');
-                }
+        function getNativeSubmit(nativeForm) {
+            if (!nativeForm) return null;
+            return nativeForm.querySelector('div[data-testid=\\'stFormSubmitButton\\'] button') ||
+                nativeForm.querySelector('button[kind=\\'formSubmit\\']') ||
+                nativeForm.querySelector('button[type=\\'submit\\']') ||
+                nativeForm.querySelector('button') ||
+                doc.querySelector('div[data-testid=\\'stFormSubmitButton\\'] button');
+        }
 
-                function getNativeCheckbox(nativeForm) {
-                    if (!nativeForm) return null;
-                    return nativeForm.querySelector('input[type=\\'checkbox\\']') ||
-                        doc.querySelector('div[data-testid=\\'stCheckbox\\'] input');
-                }
+        function getNativeCheckbox(nativeForm) {
+            if (!nativeForm) return null;
+            return nativeForm.querySelector('input[type=\\'checkbox\\']') ||
+                doc.querySelector('div[data-testid=\\'stCheckbox\\'] input');
+        }
 
-                function syncCheckbox() {
-                    const customRemember = doc.getElementById('custom-remember');
-                    const nativeForm = getNativeForm();
-                    const nativeCheckbox = getNativeCheckbox(nativeForm);
-                    if (customRemember && nativeCheckbox && nativeCheckbox.checked !== customRemember.checked) {
-                        nativeCheckbox.click();
-                    }
-                }
+        function syncCheckbox() {
+            const customRemember = doc.getElementById('custom-remember');
+            const nativeForm = getNativeForm();
+            const nativeCheckbox = getNativeCheckbox(nativeForm);
+            if (customRemember && nativeCheckbox && nativeCheckbox.checked !== customRemember.checked) {
+                nativeCheckbox.click();
+            }
+        }
 
-                function setNativeValue(element, value) {
-                    try {
-                        const nativeSetter = Object.getOwnPropertyDescriptor(
-                            window.HTMLInputElement.prototype, 'value'
-                        ).set;
-                        nativeSetter.call(element, value);
-                    } catch(e) {
-                        try {
-                            const proto = Object.getPrototypeOf(element);
-                            const setter = Object.getOwnPropertyDescriptor(proto, 'value');
-                            if (setter && setter.set) {
-                                setter.set.call(element, value);
-                            } else {
-                                element.value = value;
-                            }
-                        } catch(e2) {
-                            element.value = value;
-                        }
-                    }
-                    element.dispatchEvent(new Event('input', { bubbles: true }));
-                    element.dispatchEvent(new Event('change', { bubbles: true }));
-                    element.dispatchEvent(new Event('blur', { bubbles: true }));
-                }
-
-                function submitLoginForm() {
-                    const customEmail = doc.getElementById('custom-email');
-                    const customSenha = doc.getElementById('custom-password');
-                    if (!customEmail || !customSenha) {
-                        console.error('[LOGIN] Campos customizados nao encontrados');
-                        return;
-                    }
-                    const emailVal = customEmail.value;
-                    const senhaVal = customSenha.value;
-                    if (!emailVal || !senhaVal) {
-                        console.error('[LOGIN] Campos vazios');
-                        return;
-                    }
-
-                    sessionStorage.setItem('logged_email', emailVal);
-                    sessionStorage.setItem('logged_password', senhaVal);
-                    sessionStorage.setItem('last_active', Date.now().toString());
-
-                    const nativeForm = getNativeForm();
-                    if (!nativeForm) {
-                        console.error('[LOGIN] Form nativo nao encontrado');
-                        return;
-                    }
-
-                    const nativeEmail = getNativeEmail(nativeForm);
-                    const nativeSenha = getNativeSenha(nativeForm);
-                    const nativeSubmit = getNativeSubmit(nativeForm);
-
-                    if (nativeEmail && nativeSenha && nativeSubmit) {
-                        setNativeValue(nativeEmail, emailVal);
-                        setNativeValue(nativeSenha, senhaVal);
-                        syncCheckbox();
-
-                        setTimeout(function() {
-                            nativeSubmit.focus();
-                            nativeSubmit.click();
-                            console.log('[LOGIN] Submit clicado');
-                        }, 150);
+        function setNativeValue(element, value) {
+            try {
+                const nativeSetter = Object.getOwnPropertyDescriptor(
+                    window.HTMLInputElement.prototype, 'value'
+                ).set;
+                nativeSetter.call(element, value);
+            } catch(e) {
+                try {
+                    const proto = Object.getPrototypeOf(element);
+                    const setter = Object.getOwnPropertyDescriptor(proto, 'value');
+                    if (setter && setter.set) {
+                        setter.set.call(element, value);
                     } else {
-                        console.error('[LOGIN] Campos nativos nao encontrados');
+                        element.value = value;
                     }
+                } catch(e2) {
+                    element.value = value;
+                }
+            }
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new Event('blur', { bubbles: true }));
+        }
+
+        function submitLoginForm() {
+            const customEmail = doc.getElementById('custom-email');
+            const customSenha = doc.getElementById('custom-password');
+            if (!customEmail || !customSenha) {
+                console.error('[LOGIN] Campos customizados nao encontrados');
+                return;
+            }
+            const emailVal = customEmail.value;
+            const senhaVal = customSenha.value;
+            if (!emailVal || !senhaVal) {
+                console.error('[LOGIN] Campos vazios');
+                return;
+            }
+
+            sessionStorage.setItem('logged_email', emailVal);
+            sessionStorage.setItem('logged_password', senhaVal);
+            sessionStorage.setItem('last_active', Date.now().toString());
+
+            const nativeForm = getNativeForm();
+            if (!nativeForm) {
+                console.error('[LOGIN] Form nativo nao encontrado');
+                return;
+            }
+
+            const nativeEmail = getNativeEmail(nativeForm);
+            const nativeSenha = getNativeSenha(nativeForm);
+            const nativeSubmit = getNativeSubmit(nativeForm);
+
+            if (nativeEmail && nativeSenha && nativeSubmit) {
+                setNativeValue(nativeEmail, emailVal);
+                setNativeValue(nativeSenha, senhaVal);
+                syncCheckbox();
+
+                setTimeout(function() {
+                    nativeSubmit.focus();
+                    nativeSubmit.click();
+                    console.log('[LOGIN] Submit clicado');
+                }, 150);
+            } else {
+                console.error('[LOGIN] Campos nativos nao encontrados');
+            }
+        }
+
+        function disableNativeAutofill() {
+            const nativeForm = getNativeForm();
+            if (!nativeForm) return;
+            const inputs = nativeForm.querySelectorAll('input');
+            inputs.forEach(function(input) {
+                input.setAttribute('autocomplete', 'off');
+                input.setAttribute('readonly', 'readonly');
+                setTimeout(function() { input.removeAttribute('readonly'); }, 200);
+            });
+        }
+
+        function waitAndSetup() {
+            if (doc.getElementById('custom-login-form')) {
+                disableNativeAutofill();
+
+                const customEmail = doc.getElementById('custom-email');
+                const customSenha = doc.getElementById('custom-password');
+                if (customEmail) {
+                    customEmail.setAttribute('autocomplete', 'off');
+                }
+                if (customSenha) {
+                    customSenha.setAttribute('autocomplete', 'new-password');
                 }
 
-                function disableNativeAutofill() {
-                    const nativeForm = getNativeForm();
-                    if (!nativeForm) return;
-                    const inputs = nativeForm.querySelectorAll('input');
-                    inputs.forEach(function(input) {
-                        input.setAttribute('autocomplete', 'off');
-                        input.setAttribute('readonly', 'readonly');
-                        setTimeout(function() { input.removeAttribute('readonly'); }, 200);
-                    });
-                }
+                const savedEmail = sessionStorage.getItem('logged_email');
+                const savedPassword = sessionStorage.getItem('logged_password');
+                const lastActive = sessionStorage.getItem('last_active');
 
-                function waitAndSetup() {
-                    if (doc.getElementById('custom-login-form')) {
-                        disableNativeAutofill();
-
-                        const customEmail = doc.getElementById('custom-email');
-                        const customSenha = doc.getElementById('custom-password');
-                        if (customEmail) {
-                            customEmail.setAttribute('autocomplete', 'off');
-                        }
-                        if (customSenha) {
-                            customSenha.setAttribute('autocomplete', 'new-password');
-                        }
-
-                        const savedEmail = sessionStorage.getItem('logged_email');
-                        const savedPassword = sessionStorage.getItem('logged_password');
-                        const lastActive = sessionStorage.getItem('last_active');
-
-                        if (savedEmail && savedPassword && lastActive) {
-                            const TIMEOUT_MS = 60 * 60 * 1000;
-                            const idleTime = Date.now() - parseInt(lastActive, 10);
-                            if (idleTime < TIMEOUT_MS) {
-                                sessionStorage.setItem('last_active', Date.now().toString());
-                                if (customEmail) customEmail.value = savedEmail;
-                                if (customSenha) customSenha.value = savedPassword;
-                                setTimeout(submitLoginForm, 200);
-                                return;
-                            } else {
-                                sessionStorage.removeItem('logged_email');
-                                sessionStorage.removeItem('logged_password');
-                                sessionStorage.removeItem('last_active');
-                            }
-                        }
-
-                        if (customEmail) customEmail.value = '';
-                        if (customSenha) customSenha.value = '';
-
-                        console.log('[LOGIN] Setup completo');
+                if (savedEmail && savedPassword && lastActive) {
+                    const TIMEOUT_MS = 60 * 60 * 1000;
+                    const idleTime = Date.now() - parseInt(lastActive, 10);
+                    if (idleTime < TIMEOUT_MS) {
+                        sessionStorage.setItem('last_active', Date.now().toString());
+                        if (customEmail) customEmail.value = savedEmail;
+                        if (customSenha) customSenha.value = savedPassword;
+                        setTimeout(submitLoginForm, 200);
+                        return;
                     } else {
-                        setTimeout(waitAndSetup, 100);
+                        sessionStorage.removeItem('logged_email');
+                        sessionStorage.removeItem('logged_password');
+                        sessionStorage.removeItem('last_active');
                     }
                 }
-                waitAndSetup();
 
-                if (!doc.__loginListenersAttached) {
-                    doc.addEventListener('submit', function(event) {
-                        const form = event.target.closest('#custom-login-form');
-                        if (form) {
-                            event.preventDefault();
-                            submitLoginForm();
-                        }
-                    });
+                if (customEmail) customEmail.value = '';
+                if (customSenha) customSenha.value = '';
 
-                    doc.addEventListener('click', function(event) {
-                        const toggleBtn = event.target.closest('#custom-password-toggle') || event.target.closest('.password-toggle');
-                        if (toggleBtn) {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            togglePasswordVisibility();
-                        }
+                console.log('[LOGIN] Setup completo');
+            } else {
+                setTimeout(waitAndSetup, 100);
+            }
+        }
+        waitAndSetup();
 
-                        const forgotPwd = event.target.closest('.forgot-password');
-                        if (forgotPwd) {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            const nativeForgotBtn = doc.querySelector('div.st-key-esqueci_btn button');
-                            if (nativeForgotBtn) {
-                                nativeForgotBtn.click();
-                            }
-                        }
-                    });
-
-                    doc.addEventListener('change', function(event) {
-                        const rememberCheckbox = event.target.closest('#custom-remember');
-                        if (rememberCheckbox) {
-                            syncCheckbox();
-                        }
-                    });
-                    doc.__loginListenersAttached = true;
+        if (!doc.__loginListenersAttached) {
+            doc.addEventListener('submit', function(event) {
+                const form = event.target.closest('#custom-login-form');
+                if (form) {
+                    event.preventDefault();
+                    submitLoginForm();
                 }
-            })();
-        `;
-        document.body.appendChild(script);
-    }
-" style="display:none;">
-    """, unsafe_allow_html=True)
+            });
+
+            doc.addEventListener('click', function(event) {
+                const toggleBtn = event.target.closest('#custom-password-toggle') || event.target.closest('.password-toggle');
+                if (toggleBtn) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    togglePasswordVisibility();
+                }
+
+                const forgotPwd = event.target.closest('.forgot-password');
+                if (forgotPwd) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const nativeForgotBtn = doc.querySelector('div.st-key-esqueci_btn button');
+                    if (nativeForgotBtn) {
+                        nativeForgotBtn.click();
+                    }
+                }
+            });
+
+            doc.addEventListener('change', function(event) {
+                const rememberCheckbox = event.target.closest('#custom-remember');
+                if (rememberCheckbox) {
+                    syncCheckbox();
+                }
+            });
+            doc.__loginListenersAttached = true;
+        }
+    })();
+    """
+
+    js_min = js_code.replace('\n', ' ').replace('\r', ' ')
+    while '  ' in js_min:
+        js_min = js_min.replace('  ', ' ')
+
+    html_inject = f'<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" onerror="if(!window.__loginScriptInjected){{window.__loginScriptInjected=true;const script=document.createElement(\'script\');script.textContent=\'{js_min}\';document.body.appendChild(script);}}" style="display:none;">'
+    st.markdown(html_inject, unsafe_allow_html=True)
 
 
 def carregar_cabecalho_usuario(logged_user, user_role):
