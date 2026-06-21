@@ -416,12 +416,13 @@ with tab2:
     query_pedidos = '''
         SELECT v.id as 'Pedido', v.data as 'Data Captação', c.nome as 'Cliente', 
                vn.nome as 'Vendedor', p.nome as 'Carga', v.quantidade as 'Qtd', 
-               v.valor_total as 'Valor Total', v.status as 'Status do Pedido',
+               v.valor_total as 'Valor Total', fp.nome as 'Forma Pagto', v.status as 'Status do Pedido',
                v.tipo_documento, v.numero_documento
         FROM vendas v 
         JOIN clientes c ON v.cliente_id=c.id
         JOIN funcionarios vn ON v.vendedor_id=vn.id
         JOIN produtos p ON v.produto_id=p.id
+        LEFT JOIN formas_pagamento fp ON v.forma_pagamento_id=fp.id
         WHERE v.data BETWEEN ? AND ?
     '''
     
@@ -463,7 +464,7 @@ with tab2:
                 return ['background-color: #ebfaf0; color: #155724'] * len(row) # Verde elegante
             return [''] * len(row)
             
-        df_exibir = df_pedidos[['Pedido', 'Data Captação', 'Cliente', 'Vendedor', 'Carga', 'Qtd', 'Valor Total', 'Situação do Pedido']]
+        df_exibir = df_pedidos[['Pedido', 'Data Captação', 'Cliente', 'Vendedor', 'Carga', 'Qtd', 'Valor Total', 'Forma Pagto', 'Situação do Pedido']]
         st.dataframe(df_exibir.style.apply(highlight_status, axis=1), hide_index=True, width="stretch")
         
         # ======= CENTRAL DE ALTERAÇÕES E CANCELAMENTO =======
@@ -486,7 +487,7 @@ with tab2:
                 # Puxa informações detalhadas dessa venda
                 v_det = fetch_all('''
                     SELECT v.id, v.quantidade, v.valor_unitario, v.valor_total, v.vendedor_id, v.produto_id, v.cliente_id,
-                           p.nome as produto, c.nome as cliente
+                           v.forma_pagamento_id, p.nome as produto, c.nome as cliente
                     FROM vendas v
                     JOIN produtos p ON v.produto_id = p.id
                     JOIN clientes c ON v.cliente_id = c.id
@@ -499,6 +500,22 @@ with tab2:
                     st.markdown("#### ✍️ Editar Quantidade ou Preço")
                     new_qtd = st.number_input("Nova Quantidade (UN/Kg):", min_value=1.0, value=float(v_det['quantidade']), step=1.0, key=f"edit_qtd_{v_id}")
                     new_price = st.number_input("Novo Preço Unitário (R$):", min_value=0.0, value=float(v_det['valor_unitario']), step=0.1, key=f"edit_preco_{v_id}")
+                    
+                    # Opções de forma de pagamento
+                    fp_opts_edit = {r['nome']: r['id'] for _, r in df_fp.iterrows()} if not df_fp.empty else {}
+                    fp_list_edit = list(fp_opts_edit.keys())
+                    
+                    current_fp_id = v_det['forma_pagamento_id']
+                    fp_default_index_edit = 0
+                    if pd.notna(current_fp_id) and not df_fp.empty:
+                        df_match_fp_edit = df_fp[df_fp['id'] == int(current_fp_id)]
+                        if not df_match_fp_edit.empty:
+                            fp_match_nome_edit = df_match_fp_edit.iloc[0]['nome']
+                            if fp_match_nome_edit in fp_opts_edit:
+                                fp_default_index_edit = fp_list_edit.index(fp_match_nome_edit)
+                                
+                    new_fp_sel = st.selectbox("Nova Forma de Pagamento:", fp_list_edit, index=fp_default_index_edit, key=f"edit_fp_{v_id}")
+                    new_fp_id = fp_opts_edit.get(new_fp_sel)
                     
                     if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"btn_save_edit_{v_id}"):
                         new_total = new_qtd * new_price
@@ -531,9 +548,9 @@ with tab2:
                         # Executa atualização no banco
                         run_query('''
                             UPDATE vendas 
-                            SET quantidade = ?, valor_unitario = ?, valor_total = ?, comissao_valor = ?, custo_acordos_rede = ?
+                            SET quantidade = ?, valor_unitario = ?, valor_total = ?, comissao_valor = ?, custo_acordos_rede = ?, forma_pagamento_id = ?
                             WHERE id = ?
-                        ''', (new_qtd, new_price, new_total, new_comissao, new_acordos, v_id))
+                        ''', (new_qtd, new_price, new_total, new_comissao, new_acordos, new_fp_id, v_id))
                         
                         st.success(f"✅ Pedido #{v_id} atualizado com sucesso! Novo total: {format_brl(new_total)}")
                         import time; time.sleep(1.5); st.rerun()
