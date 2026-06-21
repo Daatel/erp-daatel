@@ -80,7 +80,7 @@ with tab1:
         st.markdown("*Selecione os pedidos para faturar. Ajuste o lote e validade se necessário. Os vencimentos de cada duplicata são calculados automaticamente conforme a forma de pagamento cadastrada no pedido.*")
         
         # Cabeçalho da Tabela
-        col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7, col_h8, col_h9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 0.8, 0.7, 0.7, 2.4])
+        col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7, col_h8, col_h9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 2.2])
         col_h1.markdown("**Faturar?**")
         col_h2.markdown("**Pedido**")
         col_h3.markdown("**Cliente**")
@@ -120,7 +120,7 @@ with tab1:
             default_validade = (date.today() + timedelta(days=90)).strftime('%d/%m/%Y')
             
             # Renderizar linha da tabela usando st.columns
-            col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 0.8, 0.7, 0.7, 2.4])
+            col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 2.2])
             
             faturar_check = col1.checkbox("Faturar", value=False, key=f"sel_{pid}", label_visibility="collapsed")
             col2.markdown(f"#{pid}")
@@ -132,23 +132,26 @@ with tab1:
             lote_val = col7.text_input("Lote", value=default_lote, key=f"lote_{pid}", label_visibility="collapsed")
             val_val = col8.text_input("Val.", value=default_validade, key=f"val_{pid}", label_visibility="collapsed")
             
-            # Calcular parcelas detalhadas/vencimentos em lista vertical
+            # Calcular parcelas detalhadas/vencimentos em formato horizontal compactado
             dias_list = [int(n) for n in re.findall(r'\d+', str(rule_str))]
             if not dias_list:
                 dias_list = [0]
             
             N = len(dias_list)
             val_p = round(valor_total_pedido / N, 2)
-            diff_p = round(valor_total_pedido - val_p * N, 2)
+            val_p_str = f"{val_p:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             
-            venc_lines = []
-            for i, dias in enumerate(dias_list):
-                v_p = val_p + (diff_p if i == N - 1 else 0.0)
-                dt_v = (date.today() + timedelta(days=dias)).strftime('%d/%m/%Y')
-                venc_lines.append(f"{i+1}/{N}: {dt_v} - {format_brl(v_p)}")
+            dates_venc_list = []
+            for dias in dias_list:
+                dt_v = date.today() + timedelta(days=dias)
+                # Formatar dia/mes sem zeros à esquerda e ano com 2 dígitos
+                dt_v_str = f"{dt_v.day}/{dt_v.month}/{dt_v.strftime('%y')}"
+                dates_venc_list.append(dt_v_str)
                 
-            venc_str_vertical = "<br>".join(venc_lines)
-            col9.markdown(f"<div style='font-size: 13px; line-height: 1.3; color: #292d77;'>{venc_str_vertical}</div>", unsafe_allow_html=True)
+            dates_str = ", ".join(dates_venc_list)
+            venc_str_horizontal = f"{N} x {val_p_str} ({dates_str})"
+            
+            col9.markdown(f"<div style='font-size: 14px; font-weight: bold; color: #292d77; white-space: nowrap;'>{venc_str_horizontal}</div>", unsafe_allow_html=True)
             
             st.markdown("<div style='margin-top: 5px; margin-bottom: 5px; border-top: 1px dashed #eee;'></div>", unsafe_allow_html=True)
             
