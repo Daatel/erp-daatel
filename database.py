@@ -1366,9 +1366,10 @@ def consumir_token_reset(usuario_id: int, nova_senha: str):
 SESSAO_TIMEOUT_MINUTOS = 15
 
 
-def verificar_sessao_ativa(usuario_id: int) -> bool:
+def verificar_sessao_ativa(usuario_id: int, token_atual: str = None) -> bool:
     """
-    Retorna True se houver sessão ativa (heartbeat < 15 min) para outro token.
+    Retorna True se houver outra sessão ativa (heartbeat < 15 min).
+    Se token_atual for passado, verifica se existe sessão com token DIFERENTE do atual.
     Limpa automaticamente sessões expiradas.
     """
     from datetime import datetime, timedelta
@@ -1376,7 +1377,13 @@ def verificar_sessao_ativa(usuario_id: int) -> bool:
     expiry = (datetime.now() - timedelta(minutes=SESSAO_TIMEOUT_MINUTOS)).strftime("%Y-%m-%d %H:%M:%S")
     run_query("DELETE FROM sessoes_ativas WHERE ultimo_heartbeat < ?", (expiry,))
     # Verifica se ainda existe sessão ativa para este usuário
-    df = fetch_all("SELECT id FROM sessoes_ativas WHERE usuario_id = ?", (usuario_id,))
+    if token_atual:
+        df = fetch_all(
+            "SELECT id FROM sessoes_ativas WHERE usuario_id = ? AND session_token != ?",
+            (usuario_id, token_atual)
+        )
+    else:
+        df = fetch_all("SELECT id FROM sessoes_ativas WHERE usuario_id = ?", (usuario_id,))
     return not df.empty
 
 

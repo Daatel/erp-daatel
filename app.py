@@ -101,7 +101,8 @@ def login_form_page():
         error_msg=st.session_state['login_error'], 
         logo_html=logo_html, 
         fundo_base64=fundo_base64,
-        fundo_largo_base64=fundo_largo_base64
+        fundo_largo_base64=fundo_largo_base64,
+        session_token=st.session_state.get('session_token')
     )
     
     with st.form("login_form"):
@@ -123,6 +124,7 @@ def login_form_page():
         
         email = st.text_input("E-mail", placeholder="Digite seu e-mail").strip()
         senha = st.text_input("Senha", type="password", placeholder="Digite sua senha").strip()
+        session_token_input = st.text_input("Session Token", placeholder="Session Token Placeholder", label_visibility="collapsed").strip()
         
         # Lembrar-me
         st.checkbox("Lembrar-me", value=True)
@@ -178,7 +180,7 @@ def login_form_page():
                     else:
                         uid = int(user_data['id'])
                         # 4. Verifica sessão simultânea
-                        if verificar_sessao_ativa(uid):
+                        if verificar_sessao_ativa(uid, session_token_input if session_token_input else None):
                             st.session_state['login_error'] = (
                                 "🔴 Acesso negado: este login já está em uso em outro dispositivo. "
                                 "Aguarde 15 minutos após o encerramento da outra sessão, ou peça ao administrador para verificar."

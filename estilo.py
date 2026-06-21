@@ -221,7 +221,7 @@ def carregar_estilo():
     """, unsafe_allow_html=True)
 
 
-def carregar_estilo_login(error_msg=None, logo_html="", fundo_base64="", fundo_largo_base64=""):
+def carregar_estilo_login(error_msg=None, logo_html="", fundo_base64="", fundo_largo_base64="", session_token=None):
     error_banner_html = ""
     if error_msg:
         error_banner_html = f"""<div class="login-error-banner"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><span>{error_msg}</span></div>"""
@@ -706,6 +706,7 @@ Lembrar-me
 Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
 </div>
 </div>
+<div id="session-token-holder" data-token="{session_token or ''}"></div>
 </div>
 </div>
 </div>
@@ -760,6 +761,11 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
                 nativeForm.querySelector('button[type=\\'submit\\']') ||
                 nativeForm.querySelector('button') ||
                 doc.querySelector('div[data-testid=\\'stFormSubmitButton\\'] button');
+        }
+
+        function getNativeSessionToken(nativeForm) {
+            if (!nativeForm) return null;
+            return nativeForm.querySelector('input[placeholder=\\'Session Token Placeholder\\']');
         }
 
         function getNativeCheckbox(nativeForm) {
@@ -828,10 +834,19 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
             const nativeEmail = getNativeEmail(nativeForm);
             const nativeSenha = getNativeSenha(nativeForm);
             const nativeSubmit = getNativeSubmit(nativeForm);
+            const nativeSessionToken = getNativeSessionToken(nativeForm);
 
             if (nativeEmail && nativeSenha && nativeSubmit) {
                 setNativeValue(nativeEmail, emailVal);
                 setNativeValue(nativeSenha, senhaVal);
+                
+                const savedToken = sessionStorage.getItem('session_token');
+                if (nativeSessionToken && savedToken) {
+                    setNativeValue(nativeSessionToken, savedToken);
+                } else if (nativeSessionToken) {
+                    setNativeValue(nativeSessionToken, '');
+                }
+
                 syncCheckbox();
 
                 setTimeout(function() {
@@ -857,6 +872,16 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
 
         function waitAndSetup() {
             if (doc.getElementById('custom-login-form')) {
+                // Prevenção de loop infinito quando há exibição de erro
+                if (doc.querySelector('.login-error-banner')) {
+                    console.log('[LOGIN] Erro de login detectado. Limpando sessionStorage para parar o loop.');
+                    sessionStorage.removeItem('logged_email');
+                    sessionStorage.removeItem('logged_password');
+                    sessionStorage.removeItem('last_active');
+                    sessionStorage.removeItem('session_token');
+                    return;
+                }
+
                 disableNativeAutofill();
 
                 const customEmail = doc.getElementById('custom-email');
@@ -866,6 +891,16 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
                 }
                 if (customSenha) {
                     customSenha.setAttribute('autocomplete', 'new-password');
+                }
+
+                // Captura e armazena o token de sessão atual gerado pelo backend se ele existir na página
+                const tokenHolder = doc.getElementById('session-token-holder');
+                if (tokenHolder) {
+                    const tokenVal = tokenHolder.getAttribute('data-token');
+                    if (tokenVal) {
+                        sessionStorage.setItem('session_token', tokenVal);
+                        console.log('[LOGIN] Token de sessao atualizado no sessionStorage');
+                    }
                 }
 
                 const savedEmail = sessionStorage.getItem('logged_email');
@@ -885,6 +920,7 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
                         sessionStorage.removeItem('logged_email');
                         sessionStorage.removeItem('logged_password');
                         sessionStorage.removeItem('last_active');
+                        sessionStorage.removeItem('session_token');
                     }
                 }
 
@@ -956,6 +992,7 @@ def limpar_session_storage_js():
     sessionStorage.removeItem('logged_email');
     sessionStorage.removeItem('logged_password');
     sessionStorage.removeItem('last_active');
+    sessionStorage.removeItem('session_token');
     console.log('[SESSION] sessionStorage limpo com sucesso.');
 </script>
 """, height=0)
@@ -981,7 +1018,6 @@ def carregar_rastreador_inatividade():
     doc.addEventListener('scroll', registrarAtividade);
     doc.addEventListener('touchstart', registrarAtividade);
     
-    // Registra a atividade inicial na carga da página
     if (!sessionStorage.getItem('last_active')) {
         registrarAtividade();
     }
@@ -999,6 +1035,7 @@ def carregar_rastreador_inatividade():
                 sessionStorage.removeItem('logged_email');
                 sessionStorage.removeItem('logged_password');
                 sessionStorage.removeItem('last_active');
+                sessionStorage.removeItem('session_token');
                 
                 // Procura e clica no botão "Sair" do Streamlit
                 const buttons = doc.querySelectorAll('button');
