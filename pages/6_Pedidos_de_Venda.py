@@ -397,7 +397,8 @@ with tab2:
         st.rerun()
 
     # Filtros interativos
-    col_f1, col_f2, col_f3 = st.columns([1, 1, 2])
+    # Filtros interativos
+    col_f1, col_f2, col_f3, col_f4 = st.columns([0.8, 0.8, 1.4, 2.0])
     
     dt_inicio = col_f1.date_input("Data de Início", value=st.session_state['vendas_dt_inicio'], key="vendas_dt_inicio_input")
     dt_fim = col_f2.date_input("Data de Fim", value=st.session_state['vendas_dt_fim'], key="vendas_dt_fim_input")
@@ -406,7 +407,17 @@ with tab2:
     st.session_state['vendas_dt_inicio'] = dt_inicio
     st.session_state['vendas_dt_fim'] = dt_fim
 
-    filtro_status = col_f3.radio(
+    # Buscar todos os clientes
+    df_todos_clientes = fetch_all("SELECT id, nome FROM clientes ORDER BY nome")
+    opcoes_clientes = {"-- TODOS --": None}
+    if not df_todos_clientes.empty:
+        for _, r in df_todos_clientes.iterrows():
+            opcoes_clientes[r['nome']] = r['id']
+            
+    cli_filtrado_nome = col_f3.selectbox("Filtrar por Cliente:", list(opcoes_clientes.keys()))
+    cli_id_filtro = opcoes_clientes[cli_filtrado_nome]
+
+    filtro_status = col_f4.radio(
         "Filtrar por Situação:",
         ["Todos", "🟡 Pendentes de Faturamento", "🟢 Faturados"],
         horizontal=True,
@@ -426,6 +437,11 @@ with tab2:
         WHERE v.data BETWEEN ? AND ?
     '''
     
+    params_pedidos = [dt_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")]
+    if cli_id_filtro is not None:
+        query_pedidos += " AND v.cliente_id = ?"
+        params_pedidos.append(cli_id_filtro)
+        
     if filtro_status == "🟡 Pendentes de Faturamento":
         query_pedidos += " AND v.status = 'APROVADO'"
     elif filtro_status == "🟢 Faturados":
@@ -433,7 +449,7 @@ with tab2:
         
     query_pedidos += " ORDER BY v.id DESC"
     
-    df_pedidos = fetch_all(query_pedidos, (dt_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")))
+    df_pedidos = fetch_all(query_pedidos, tuple(params_pedidos))
     
     if not df_pedidos.empty:
         df_pedidos['Data Captação'] = pd.to_datetime(df_pedidos['Data Captação'], errors='coerce').dt.strftime('%d/%m/%Y')
