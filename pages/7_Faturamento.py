@@ -54,10 +54,11 @@ with tab1:
     df_fila = fetch_all('''
         SELECT v.id as pedido_id, v.data as data_pedido, c.nome as cliente, c.uf as uf_cliente, 
                p.nome as produto, p.id as p_id, v.quantidade, v.valor_total, v.custo_acordos_rede,
-               v.forma_pagamento_id
+               v.forma_pagamento_id, fp.nome as forma_pagamento, fp.parcelas as rule_str
         FROM vendas v 
         JOIN clientes c ON v.cliente_id=c.id
         JOIN produtos p ON v.produto_id=p.id
+        LEFT JOIN formas_pagamento fp ON v.forma_pagamento_id=fp.id
         WHERE v.status = 'APROVADO'
         ORDER BY v.id ASC
     ''')
@@ -65,101 +66,101 @@ with tab1:
     if df_fila.empty:
         st.info("Nenhum pedido aguardando faturamento na fila. Todos os pedidos aprovados já foram faturados.")
     else:
-        # Limita para renderizar no máximo 25 cartões por motivos de performance
+        # Limita para renderizar no máximo 25 pedidos por motivos de performance
         max_exibir = 25
         total_pendentes = len(df_fila)
         df_exibir_fila = df_fila.head(max_exibir)
         
         if total_pendentes > max_exibir:
-            st.warning(f"⚠️ Mostrando apenas os primeiros {max_exibir} de {total_pendentes} pedidos pendentes para otimização de performance.")
+            st.warning(f"Mostrando apenas os primeiros {max_exibir} de {total_pendentes} pedidos pendentes para otimização de performance.")
             
         pedidos_selecionados_lista = []
         
-        st.markdown("### 📋 Fila de Pedidos para Faturamento")
-        st.markdown("*Configure e selecione os pedidos para faturar abaixo. As parcelas e vencimentos são atualizados automaticamente na linha ao alterar a forma de pagamento.*")
+        st.markdown("### Fila de Pedidos para Faturamento")
+        st.markdown("*Selecione os pedidos para faturar. Ajuste o lote e validade se necessário. Os vencimentos de cada duplicata são calculados automaticamente conforme a forma de pagamento cadastrada no pedido.*")
+        
+        # Cabeçalho da Tabela
+        col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7, col_h8 = st.columns([0.4, 0.6, 2.2, 1.2, 1.2, 1.2, 1.2, 2.0])
+        col_h1.markdown("**Faturar?**")
+        col_h2.markdown("**Pedido**")
+        col_h3.markdown("**Cliente**")
+        col_h4.markdown("**Total**")
+        col_h5.markdown("**Estoque**")
+        col_h6.markdown("**Lote Impresso**")
+        col_h7.markdown("**Validade**")
+        col_h8.markdown("**Vencimentos**")
+        st.markdown("<div style='margin-top: -10px; margin-bottom: 10px; border-top: 1px solid #ccc;'></div>", unsafe_allow_html=True)
         
         import re
         for idx, row in df_exibir_fila.iterrows():
             pid = int(row['pedido_id'])
             p_id = int(row['p_id'])
-            data_p = pd.to_datetime(row['data_pedido']).strftime('%d/%m/%Y')
             cliente_nome = row['cliente']
             prod_nome = row['produto']
             qtd_pedida = float(row['quantidade'])
             valor_total_pedido = float(row['valor_total'])
-            cur_fp_id = row['forma_pagamento_id']
             
-            # 1. Obter saldo de estoque e farol
+            # 1. Obter saldo de estoque e farol (sem emojis)
             saldo_est = dict_saldos.get(p_id, 0.0)
             if saldo_est >= qtd_pedida:
-                farol = "🟢 OK"
+                farol = f"OK ({saldo_est:.0f})"
             elif saldo_est > 0:
-                farol = "🟡 Parcial"
+                farol = f"Parcial ({saldo_est:.0f})"
             else:
-                farol = "🔴 Sem Saldo"
+                farol = f"Sem Saldo ({saldo_est:.0f})"
                 
-            # 2. Obter forma de pagamento padrão pré-selecionada
-            default_fp_nome = fp_dict.get(cur_fp_id, "A vista")
-            if default_fp_nome not in fp_names:
-                default_fp_nome = fp_names[0] if fp_names else "A vista"
+            # 2. Obter forma de pagamento cadastrada no pedido
+            cur_fp_nome = row['forma_pagamento'] if pd.notna(row['forma_pagamento']) else "A vista"
+            rule_str = row['rule_str'] if pd.notna(row['rule_str']) else "0"
+            
+            # Lote e Validade padrões
+            default_lote = date.today().strftime('FAB %d/%m')
+            default_validade = (date.today() + timedelta(days=90)).strftime('%d/%m/%Y')
+            
+            # Renderizar linha da tabela usando st.columns
+            col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([0.4, 0.6, 2.2, 1.2, 1.2, 1.2, 1.2, 2.0])
+            
+            faturar_check = col1.checkbox("Faturar", value=False, key=f"sel_{pid}", label_visibility="collapsed")
+            col2.markdown(f"#{pid}")
+            col3.markdown(cliente_nome)
+            col4.markdown(format_brl(valor_total_pedido))
+            col5.markdown(farol)
+            
+            lote_val = col6.text_input("Lote", value=default_lote, key=f"lote_{pid}", label_visibility="collapsed")
+            val_val = col7.text_input("Validade", value=default_validade, key=f"val_{pid}", label_visibility="collapsed")
+            
+            # Calcular parcelas detalhadas/vencimentos em lista vertical
+            dias_list = [int(n) for n in re.findall(r'\d+', str(rule_str))]
+            if not dias_list:
+                dias_list = [0]
+            
+            N = len(dias_list)
+            val_p = round(valor_total_pedido / N, 2)
+            diff_p = round(valor_total_pedido - val_p * N, 2)
+            
+            venc_lines = []
+            for i, dias in enumerate(dias_list):
+                v_p = val_p + (diff_p if i == N - 1 else 0.0)
+                dt_v = (date.today() + timedelta(days=dias)).strftime('%d/%m/%Y')
+                venc_lines.append(f"{i+1}/{N}: {dt_v} - {format_brl(v_p)}")
                 
-            # Renderizar o container do cartão do pedido
-            with st.container(border=True):
-                # Linha 1: Informações comerciais e seleção
-                col_c1, col_c2, col_c3, col_c4, col_c5 = st.columns([0.8, 1.2, 2.5, 2.0, 1.5])
+            venc_str_vertical = "<br>".join(venc_lines)
+            col8.markdown(f"<div style='font-size: 13px; line-height: 1.3; color: #292d77;'>{venc_str_vertical}</div>", unsafe_allow_html=True)
+            
+            st.markdown("<div style='margin-top: 5px; margin-bottom: 5px; border-top: 1px dashed #eee;'></div>", unsafe_allow_html=True)
+            
+            if faturar_check:
+                pedidos_selecionados_lista.append({
+                    "pedido_id": pid,
+                    "cliente": cliente_nome,
+                    "produto": prod_nome,
+                    "quantidade": qtd_pedida,
+                    "valor_total": valor_total_pedido,
+                    "Forma de Pagamento": cur_fp_nome,
+                    "Lote Impresso (NF/DAV)": lote_val,
+                    "Validade (NF/DAV)": val_val
+                })
                 
-                # Checkbox de seleção
-                faturar_check = col_c1.checkbox("Faturar?", value=False, key=f"sel_{pid}")
-                
-                col_c2.markdown(f"**Pedido #{pid}**")
-                col_c3.markdown(f"👤 **Cliente:** {cliente_nome}\n\n📅 *Data:* {data_p}")
-                col_c4.markdown(f"📦 **Produto:** {prod_nome}\n\n🔢 *Qtd:* {qtd_pedida:.0f} UN")
-                
-                # Valor e Estoque Farol
-                col_c5.markdown(f"💰 **Total:** **{format_brl(valor_total_pedido)}**\n\nEstoque: **{farol}** *(Saldo: {saldo_est:.0f})*")
-                
-                # Linha 2: Configuração de faturamento
-                st.markdown("<div style='margin-top: -10px; margin-bottom: 5px; border-top: 1px dashed #eee;'></div>", unsafe_allow_html=True)
-                col_e1, col_e2, col_e3, col_e4 = st.columns([2.0, 3.0, 1.5, 1.5])
-                
-                # Seletor de forma de pagamento
-                idx_default = fp_names.index(default_fp_nome) if default_fp_nome in fp_names else 0
-                fp_selecionada = col_e1.selectbox(
-                    "Forma de Pagamento",
-                    fp_names,
-                    index=idx_default,
-                    key=f"fp_{pid}"
-                )
-                
-                # Lote e Validade JIT
-                default_lote = date.today().strftime('FAB %d/%m')
-                default_validade = (date.today() + timedelta(days=90)).strftime('%d/%m/%Y')
-                
-                lote_val = col_e2.text_input("📝 Lote Impresso", value=default_lote, key=f"lote_{pid}")
-                val_val = col_e3.text_input("📅 Validade", value=default_validade, key=f"val_{pid}")
-                
-                # Datas de vencimento dinâmicas
-                rule_str = fp_rule_dict.get(fp_selecionada, "30")
-                dias_list = [int(n) for n in re.findall(r'\d+', rule_str)]
-                if not dias_list:
-                    dias_list = [0]
-                dates_venc = [(date.today() + timedelta(days=d)).strftime('%d/%m/%Y') for d in dias_list]
-                venc_str = ", ".join(dates_venc)
-                
-                col_e4.markdown(f"<span style='font-size:12px;color:#666;'>VENCIMENTOS PREVISTOS</span><br><span style='font-size:13px;font-weight:bold;color:#292d77;'>{venc_str}</span>", unsafe_allow_html=True)
-                
-                if faturar_check:
-                    pedidos_selecionados_lista.append({
-                        "pedido_id": pid,
-                        "cliente": cliente_nome,
-                        "produto": prod_nome,
-                        "quantidade": qtd_pedida,
-                        "valor_total": valor_total_pedido,
-                        "Forma de Pagamento": fp_selecionada,
-                        "Lote Impresso (NF/DAV)": lote_val,
-                        "Validade (NF/DAV)": val_val
-                    })
-                    
         if pedidos_selecionados_lista:
             pedidos_selecionados = pd.DataFrame(pedidos_selecionados_lista)
         else:
