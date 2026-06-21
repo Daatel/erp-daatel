@@ -583,7 +583,42 @@ def _create_tables_internal(conn):
         FOREIGN KEY(funcionario_id) REFERENCES funcionarios(id)
     )
     ''')
-    
+
+    # 18b. Auditoria de Acessos ao Sistema
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS audit_log_acesso (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_hora TEXT NOT NULL,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        usuario_email TEXT,
+        acao TEXT NOT NULL,
+        detalhe TEXT,
+        ip_info TEXT
+    )
+    ''')
+
+    # 18c. Tokens de Reset de Senha (expiram em 30 min)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS tokens_reset_senha (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id INTEGER NOT NULL,
+        token TEXT NOT NULL,
+        criado_em TEXT NOT NULL,
+        usado INTEGER DEFAULT 0
+    )
+    ''')
+
+    # 18d. Sessões Ativas (controle de acesso simultâneo)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS sessoes_ativas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id INTEGER NOT NULL UNIQUE,
+        session_token TEXT NOT NULL,
+        ultimo_heartbeat TEXT NOT NULL
+    )
+    ''')
+
     # 19. Logística Reversa (Devoluções e Shelf Life)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS devolucoes (
@@ -1254,6 +1289,136 @@ def gerar_comissao_se_necessario(venda_id, momento_gatilho, cliente_nome=None):
     if comissao_val > 0.0:
         # Atualiza o valor na venda no banco para fins de DRE, auditoria e fechamento
         run_query("UPDATE vendas SET comissao_valor = ? WHERE id = ?", (comissao_val, venda_id))
+
+# ──────────────────────────────────────────────────────────────────────────────
+# AUDITORIA DE ACESSO
+# ──────────────────────────────────────────────────────────────────────────────
+
+def registrar_log_acesso(usuario_id, usuario_nome: str, usuario_email: str, acao: str, detalhe: str = ""):
+    """Registra uma ação de acesso/governança no audit_log_acesso."""
+    from datetime import datetime
+    try:
+        data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        run_query(
+            """
+            INSERT INTO audit_log_acesso (data_hora, usuario_id, usuario_nome, usuario_email, acao, detalhe)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (data_hora, usuario_id, str(usuario_nome), str(usuario_email), str(acao), str(detalhe))
+        )
+    except Exception as e:
+        logger.warning(f"[AUDIT] Falha ao registrar log de acesso: {e}")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# RESET DE SENHA VIA TOKEN TEMPORÁRIO
+# ──────────────────────────────────────────────────────────────────────────────
+
+def gerar_token_reset(usuario_id: int) -> str:
+    """Gera um token numérico de 6 dígitos com validade de 30 minutos para reset de senha."""
+    from datetime import datetime
+    import random
+    token = str(random.randint(100000, 999999))
+    criado_em = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Invalida tokens anteriores do mesmo usuário
+    run_query("UPDATE tokens_reset_senha SET usado = 1 WHERE usuario_id = ? AND usado = 0", (usuario_id,))
+    run_query(
+        "INSERT INTO tokens_reset_senha (usuario_id, token, criado_em, usado) VALUES (?, ?, ?, 0)",
+        (usuario_id, token, criado_em)
+    )
+    return token
+
+
+def validar_token_reset(email: str, token: str) -> int | None:
+    """Valida o token de reset. Retorna usuario_id se válido, None se inválido ou expirado (>30min)."""
+    from datetime import datetime, timedelta
+    df_user = fetch_all("SELECT id FROM usuarios WHERE email = ? AND status = 'ATIVO'", (email,))
+    if df_user.empty:
+        return None
+    usuario_id = int(df_user.iloc[0]['id'])
+    df_token = fetch_all(
+        "SELECT id, criado_em FROM tokens_reset_senha WHERE usuario_id = ? AND token = ? AND usado = 0",
+        (usuario_id, str(token))
+    )
+    if df_token.empty:
+        return None
+    criado_em_str = df_token.iloc[0]['criado_em']
+    try:
+        criado_em = datetime.strptime(criado_em_str, "%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return None
+    if datetime.now() - criado_em > timedelta(minutes=30):
+        return None
+    return usuario_id
+
+
+def consumir_token_reset(usuario_id: int, nova_senha: str):
+    """Marca o token como usado e atualiza a senha do usuário."""
+    hashed = hash_password(nova_senha)
+    run_query("UPDATE tokens_reset_senha SET usado = 1 WHERE usuario_id = ? AND usado = 0", (usuario_id,))
+    run_query("UPDATE usuarios SET senha = ? WHERE id = ?", (hashed, usuario_id))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CONTROLE DE SESSÕES ATIVAS (acesso simultâneo)
+# ──────────────────────────────────────────────────────────────────────────────
+
+SESSAO_TIMEOUT_MINUTOS = 15
+
+
+def verificar_sessao_ativa(usuario_id: int) -> bool:
+    """
+    Retorna True se houver sessão ativa (heartbeat < 15 min) para outro token.
+    Limpa automaticamente sessões expiradas.
+    """
+    from datetime import datetime, timedelta
+    # Limpa sessões expiradas de todos os usuários
+    expiry = (datetime.now() - timedelta(minutes=SESSAO_TIMEOUT_MINUTOS)).strftime("%Y-%m-%d %H:%M:%S")
+    run_query("DELETE FROM sessoes_ativas WHERE ultimo_heartbeat < ?", (expiry,))
+    # Verifica se ainda existe sessão ativa para este usuário
+    df = fetch_all("SELECT id FROM sessoes_ativas WHERE usuario_id = ?", (usuario_id,))
+    return not df.empty
+
+
+def abrir_sessao(usuario_id: int) -> str:
+    """Registra nova sessão para o usuário e retorna o token gerado."""
+    import secrets as _secrets
+    from datetime import datetime
+    token = _secrets.token_hex(16)
+    agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # UPSERT: substitui qualquer sessão anterior deste usuário
+    run_query("DELETE FROM sessoes_ativas WHERE usuario_id = ?", (usuario_id,))
+    run_query(
+        "INSERT INTO sessoes_ativas (usuario_id, session_token, ultimo_heartbeat) VALUES (?, ?, ?)",
+        (usuario_id, token, agora)
+    )
+    return token
+
+
+def renovar_heartbeat(usuario_id: int, session_token: str) -> bool:
+    """
+    Atualiza o timestamp da sessão ativa.
+    Retorna False se o token não pertence mais a este usuário
+    (sessão foi encerrada ou substituída).
+    """
+    from datetime import datetime
+    df = fetch_all(
+        "SELECT id FROM sessoes_ativas WHERE usuario_id = ? AND session_token = ?",
+        (usuario_id, session_token)
+    )
+    if df.empty:
+        return False  # Token inválido — sessão encerrada externamente
+    agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    run_query(
+        "UPDATE sessoes_ativas SET ultimo_heartbeat = ? WHERE usuario_id = ? AND session_token = ?",
+        (agora, usuario_id, session_token)
+    )
+    return True
+
+
+def encerrar_sessao(usuario_id: int):
+    """Remove a sessão ativa do usuário (logout)."""
+    run_query("DELETE FROM sessoes_ativas WHERE usuario_id = ?", (usuario_id,))
 
 def enviar_mensagem_telegram(mensagem: str) -> tuple[bool, str]:
     import urllib.request

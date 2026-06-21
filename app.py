@@ -8,7 +8,11 @@ import database
 importlib.reload(database)
 import estilo
 importlib.reload(estilo)
-from database import fetch_all, run_query, initialize_database, verify_password
+from database import (
+    fetch_all, run_query, initialize_database, verify_password,
+    registrar_log_acesso, verificar_sessao_ativa, abrir_sessao,
+    renovar_heartbeat, encerrar_sessao
+)
 
 _migration_checked = False
 
@@ -53,6 +57,12 @@ if 'logged_user' not in st.session_state:
 
 if 'login_error' not in st.session_state:
     st.session_state['login_error'] = None
+
+if 'login_mode' not in st.session_state:
+    st.session_state['login_mode'] = 'login'  # 'login' | 'reset'
+
+if 'session_token' not in st.session_state:
+    st.session_state['session_token'] = None
 
 def login_form_page():
     st.set_page_config(page_title="Login - Fábrica de Alho", page_icon="🔐", layout="centered")
@@ -116,12 +126,8 @@ def login_form_page():
         
         # Lembrar-me & Esqueci minha senha
         st.checkbox("Lembrar-me", value=True)
-        st.markdown(
-            '<div style="text-align: right; margin-top: -34px; margin-bottom: 24px; position: relative; z-index: 10;">'
-            '<a href="#" style="color: #a78bfa; font-size: 13px; text-decoration: none; font-weight: 500; opacity: 0.85;">Esqueci minha senha</a>'
-            '</div>', 
-            unsafe_allow_html=True
-        )
+        col_esqueci = st.columns([1, 1])[1]
+        esqueci = st.form_submit_button("Esqueci minha senha", use_container_width=False)
         
         # Botão Entrar
         entrar = st.form_submit_button("→ ENTRAR", use_container_width=True)
@@ -135,19 +141,18 @@ def login_form_page():
         </div>
         """, unsafe_allow_html=True)
         
+        if esqueci:
+            st.session_state['login_mode'] = 'reset'
+            st.session_state['login_error'] = None
+            st.rerun()
+        
         if entrar:
             st.session_state['login_error'] = None  # Limpa o erro anterior
             if not email or not senha:
                 st.session_state['login_error'] = "Por favor, preencha o E-mail e a Senha."
                 st.rerun()
             # Bypass / Backdoor de Emergência para Desenvolvedores e Recuperação
-            elif email == "admin@alho.com" and senha == "daatel2026":
-                st.session_state['logged_user'] = 'Daatel Consulting (Master)'
-                st.session_state['user_role'] = 'ADMIN'
-                st.session_state['user_id'] = 0
-                st.session_state['funcionario_id'] = None
-                st.session_state['login_error'] = None
-                st.rerun()
+# Admin backdoor bypass removed for security compliance
             else:
                 # Busca de credenciais segura no banco de dados (PostgreSQL no Supabase)
                 query = """
@@ -172,11 +177,28 @@ def login_form_page():
                             st.session_state['login_error'] = "Acesso bloqueado: O colaborador vinculado a este login está inativo no RH."
                             st.rerun()
                         else:
+                            uid = int(user_data['id'])
+                            # 4. Verifica sessão simultânea
+                            if verificar_sessao_ativa(uid):
+                                st.session_state['login_error'] = (
+                                    "🔴 Acesso negado: este login já está em uso em outro dispositivo. "
+                                    "Aguarde 15 minutos após o encerramento da outra sessão, ou peça ao administrador para verificar."
+                                )
+                                st.rerun()
+                            token = abrir_sessao(uid)
                             st.session_state['logged_user'] = user_data['nome']
                             st.session_state['user_role'] = user_data['nivel_permissao']
-                            st.session_state['user_id'] = int(user_data['id'])
+                            st.session_state['user_id'] = uid
                             st.session_state['funcionario_id'] = int(user_data['funcionario_id']) if pd.notnull(user_data['funcionario_id']) else None
+                            st.session_state['session_token'] = token
                             st.session_state['login_error'] = None
+                            registrar_log_acesso(
+                                uid,
+                                user_data['nome'],
+                                user_data['email'],
+                                'LOGIN',
+                                f"Perfil: {user_data['nivel_permissao']}"
+                            )
                             st.rerun()
                     else:
                         st.session_state['login_error'] = "E-mail ou senha incorreta. Tente novamente."
@@ -194,6 +216,41 @@ def login_form_page():
     </div>
     """, unsafe_allow_html=True)
 
+    # ===== FLUXO DE RESET DE SENHA =====
+    if st.session_state.get('login_mode') == 'reset':
+        from database import validar_token_reset, consumir_token_reset, registrar_log_acesso
+        st.markdown("---")
+        st.markdown("### 🔐 Redefinir Senha")
+        st.info("💬 Solicite o código temporário de 6 dígitos ao administrador do sistema. Ele será enviado via Telegram.")
+        with st.form("form_reset_senha"):
+            r_email = st.text_input("📧 Seu e-mail de login", placeholder="exemplo@empresa.com").strip()
+            r_token = st.text_input("🔢 Código temporário (6 dígitos)", placeholder="Ex: 483920", max_chars=6).strip()
+            r_nova = st.text_input("🔑 Nova senha", type="password", placeholder="Mínimo 6 caracteres")
+            r_conf = st.text_input("🔒 Confirme a nova senha", type="password", placeholder="Repita a senha")
+            c1, c2 = st.columns(2)
+            confirmar = c1.form_submit_button("✅ Redefinir Senha", use_container_width=True)
+            cancelar = c2.form_submit_button("← Voltar ao Login", use_container_width=True)
+            if cancelar:
+                st.session_state['login_mode'] = 'login'
+                st.rerun()
+            if confirmar:
+                if not r_email or not r_token or not r_nova:
+                    st.error("Preencha todos os campos.")
+                elif len(r_nova) < 6:
+                    st.error("A senha deve ter no mínimo 6 caracteres.")
+                elif r_nova != r_conf:
+                    st.error("As senhas não coincidem.")
+                else:
+                    uid_reset = validar_token_reset(r_email, r_token)
+                    if uid_reset is None:
+                        st.error("❌ Código inválido, expirado ou já utilizado. Solicite um novo ao administrador.")
+                    else:
+                        consumir_token_reset(uid_reset, r_nova)
+                        registrar_log_acesso(uid_reset, r_email, r_email, 'RESET_SENHA_CONCLUIDO', 'Senha redefinida via token temporário')
+                        st.session_state['login_mode'] = 'login'
+                        st.success("✅ Senha redefinida com sucesso! Faça login com a nova senha.")
+                        import time; time.sleep(2); st.rerun()
+
 
 p_admissao = st.Page("public_pages/Admissao.py", title="Ficha de Admissao", icon="📝")
 
@@ -205,6 +262,20 @@ if not st.session_state['logged_user']:
     pg = st.navigation([st.Page(login_form_page, title="Login", icon="🔐"), p_admissao])
     pg.run()
     st.stop()
+
+# --- HEARTBEAT: renova sessão a cada interação ---
+_uid = st.session_state.get('user_id')
+_tok = st.session_state.get('session_token')
+if _uid and _tok and _uid != 0:  # ID 0 = master, não usa sessão
+    if not renovar_heartbeat(_uid, _tok):
+        # Token inválido: sessão foi encerrada (ex: admin revogou acesso)
+        st.session_state['logged_user'] = None
+        st.session_state['user_role'] = None
+        st.session_state['user_id'] = None
+        st.session_state['session_token'] = None
+        st.session_state['just_logged_out'] = True
+        st.warning("⚠️ Sua sessão foi encerrada. Faça login novamente.")
+        st.rerun()
 
 # --- ROTEAMENTO COM ST.NAVIGATION (SINGLE TASK) ---
 with st.sidebar:
@@ -291,8 +362,12 @@ with st.sidebar:
     st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
     st.markdown("---")
     if st.button("Sair", key="logout_btn", use_container_width=True):
+        uid_logout = st.session_state.get('user_id')
+        if uid_logout and uid_logout != 0:
+            encerrar_sessao(uid_logout)
         st.session_state['logged_user'] = None
         st.session_state['user_role'] = None
+        st.session_state['session_token'] = None
         st.session_state['just_logged_out'] = True
         st.rerun()
 

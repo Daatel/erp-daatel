@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from database import run_query, fetch_all
+from database import run_query, fetch_all, registrar_log_acesso
 from estilo import carregar_estilo
 from datetime import date
 
@@ -1017,6 +1017,9 @@ with tab7:
 
 # ======= USUÁRIOS =======
 with tab8:
+    if st.session_state.get('user_role') != 'ADMIN':
+        st.warning("🔒 Acesso restrito. Somente Administradores podem gerenciar usuários do sistema.")
+        st.stop()
     st.subheader("Governança: Acessos ao Sistema")
     from database import hash_password
     
@@ -1080,6 +1083,11 @@ with tab8:
                                 INSERT INTO usuarios (nome, email, senha, nivel_permissao, status, funcionario_id)
                                 VALUES (?, ?, ?, ?, 'ATIVO', ?)
                             """, (nome_usr, mail_usr, hashed_pwd, role_code, func_id))
+                            registrar_log_acesso(
+                                st.session_state.get('user_id'), st.session_state.get('logged_user', ''),
+                                st.session_state.get('logged_user', ''),
+                                'CRIAR_USUARIO', f"Usuário criado: {mail_usr} | Perfil: {role_code} | Vinculado a func_id={func_id}"
+                            )
                             st.success("Licença ativada com sucesso!")
                             import time; time.sleep(1); st.rerun()
                     else:
@@ -1087,6 +1095,11 @@ with tab8:
                             INSERT INTO usuarios (nome, email, senha, nivel_permissao, status, funcionario_id)
                             VALUES (?, ?, ?, ?, 'ATIVO', NULL)
                         """, (nome_usr, mail_usr, hashed_pwd, role_code))
+                        registrar_log_acesso(
+                            st.session_state.get('user_id'), st.session_state.get('logged_user', ''),
+                            st.session_state.get('logged_user', ''),
+                            'CRIAR_USUARIO', f"Usuário criado: {mail_usr} | Perfil: {role_code} | Sem vínculo"
+                        )
                         st.success("Licença ativada com sucesso!")
                         import time; time.sleep(1); st.rerun()
 
@@ -1106,7 +1119,7 @@ with tab8:
         df_usr['Hierarquia'] = df_usr['Hierarquia_Cod'].map(lambda x: ROLE_LABELS.get(x, x))
         df_usr_display = df_usr[['id', 'Usuário', 'Login', 'Hierarquia', 'Colaborador Vinculado', 'Status']]
         st.dataframe(df_usr_display, hide_index=True, width="stretch")
-        
+
         # Área de Edição/Inativação de Usuários
         with st.expander("✏️ Editar ou Inativar Usuário"):
             opts_usr = {f"ID {r['id']} | {r['Usuário']} ({r['Login']})": r['id'] for _, r in df_usr.iterrows()}
@@ -1116,24 +1129,56 @@ with tab8:
                 u_data = fetch_all("SELECT * FROM usuarios WHERE id=?", (uid,))
                 if not u_data.empty:
                     ub = u_data.iloc[0]
+
+                    # --- Verifica vínculo e histórico FORA do form (banners contextuais antes de qualquer ação) ---
+                    func_id_atual = ub.get('funcionario_id')
+                    df_hist = fetch_all("SELECT COUNT(*) as total FROM audit_log_acesso WHERE usuario_id = ?", (uid,))
+                    tem_historico = not df_hist.empty and int(df_hist.iloc[0]['total']) > 0
+
+                    # Banner 1: colaborador vinculado (imutável)
+                    if func_id_atual:
+                        df_func_nome = fetch_all("SELECT nome, cargo FROM funcionarios WHERE id=?", (func_id_atual,))
+                        nome_func = f"{df_func_nome.iloc[0]['nome']} ({df_func_nome.iloc[0]['cargo']})" if not df_func_nome.empty else f"ID #{func_id_atual}"
+                        st.info(
+                            f"👤 **Colaborador vinculado:** {nome_func}\n\n"
+                            "🔒 O vínculo com o colaborador **não pode ser alterado**. "
+                            "Caso precise corrigir: inative este usuário e crie um novo com o vínculo correto."
+                        )
+                    else:
+                        st.info("👤 **Colaborador vinculado:** Nenhum (usuário interno/genérico)")
+
+                    # Banner 2: histórico de ações (define se exclusão está disponível)
+                    if tem_historico:
+                        st.warning(
+                            "📋 **Este usuário possui histórico de ações no sistema.**\n\n"
+                            "Para remover o acesso: use **Inativar** no campo Status abaixo. "
+                            "O botão Excluir está desabilitado para preservar a rastreabilidade."
+                        )
+                    else:
+                        st.success("✅ Sem histórico de ações. Este usuário pode ser **excluído permanentemente** se necessário.")
+
                     with st.form("edit_usr"):
                         eu1, eu2, eu3, eu4, eu5 = st.columns(5)
                         e_nome = eu1.text_input("Nome de Exibição", ub['nome'])
                         e_mail = eu2.text_input("Login/E-mail", ub['email'])
                         e_pwd = eu3.text_input("Nova Senha (deixe em branco para manter)", type="password")
-                        
-                        # Set default for selectbox
+
                         cur_role_label = ROLE_LABELS.get(ub['nivel_permissao'], "Administrador Geral")
                         role_list = list(ROLE_MAP.keys())
                         e_role_label = eu4.selectbox("Hierarquia", role_list, index=role_list.index(cur_role_label) if cur_role_label in role_list else 0)
-                        
+
                         stts_opts = ["ATIVO", "INATIVO"]
                         cur_status = ub['status'] if ub['status'] in stts_opts else "ATIVO"
                         e_status = eu5.selectbox("Status", stts_opts, index=stts_opts.index(cur_status))
-                        
-                        st.caption("Nota: O vínculo de funcionário é definitivo. Para alterá-lo, recadastre o usuário.")
-                        
-                        if st.form_submit_button("Salvar Alterações"):
+
+                        col_salvar, col_excluir = st.columns([3, 1])
+                        salvar = col_salvar.form_submit_button("Salvar Alterações", use_container_width=True)
+                        excluir = col_excluir.form_submit_button(
+                            "🗑️ Excluir", use_container_width=True,
+                            type="secondary", disabled=tem_historico
+                        )
+
+                        if salvar:
                             if not e_nome or not e_mail:
                                 st.error("Nome e E-mail de login são obrigatórios.")
                             else:
@@ -1141,18 +1186,71 @@ with tab8:
                                 if e_pwd.strip():
                                     hashed_pwd = hash_password(e_pwd.strip())
                                     run_query("""
-                                        UPDATE usuarios 
-                                        SET nome=?, email=?, senha=?, nivel_permissao=?, status=? 
+                                        UPDATE usuarios
+                                        SET nome=?, email=?, senha=?, nivel_permissao=?, status=?
                                         WHERE id=?
                                     """, (e_nome, e_mail, hashed_pwd, role_code, e_status, uid))
                                 else:
                                     run_query("""
-                                        UPDATE usuarios 
-                                        SET nome=?, email=?, nivel_permissao=?, status=? 
+                                        UPDATE usuarios
+                                        SET nome=?, email=?, nivel_permissao=?, status=?
                                         WHERE id=?
                                     """, (e_nome, e_mail, role_code, e_status, uid))
                                 st.success("Usuário atualizado com sucesso!")
+                                registrar_log_acesso(
+                                    st.session_state.get('user_id'), st.session_state.get('logged_user', ''),
+                                    st.session_state.get('logged_user', ''),
+                                    'EDITAR_USUARIO', f"Usuário editado: {e_mail} | Novo perfil: {role_code} | Status: {e_status}"
+                                )
                                 import time; time.sleep(1); st.rerun()
+
+                        if excluir:
+                            run_query("DELETE FROM usuarios WHERE id=?", (uid,))
+                            registrar_log_acesso(
+                                st.session_state.get('user_id'), st.session_state.get('logged_user', ''),
+                                st.session_state.get('logged_user', ''),
+                                'EXCLUIR_USUARIO', f"Usuário excluído: {ub['email']} | Nome: {ub['nome']}"
+                            )
+                            st.success(f"Usuário '{ub['nome']}' excluído com sucesso.")
+                            import time; time.sleep(1); st.rerun()
+
+# ======= RESET DE SENHA (apenas ADMIN) =======
+st.markdown("---")
+st.subheader("🔐 Reset de Senha de Usuário")
+st.caption("Gera um código temporário de 6 dígitos (válido por 30 minutos) enviado ao Telegram do administrador. Repasse o código ao colaborador para que ele mesmo defina a nova senha.")
+
+from database import gerar_token_reset, validar_token_reset, consumir_token_reset, enviar_mensagem_telegram
+
+with st.expander("📨 Gerar Código de Reset para um Colaborador"):
+    df_usr_reset = fetch_all("""
+        SELECT u.id, u.nome, u.email FROM usuarios u WHERE u.status = 'ATIVO' ORDER BY u.nome
+    """)
+    if not df_usr_reset.empty:
+        opts_reset = {f"{r['nome']} ({r['email']})": (int(r['id']), r['email'], r['nome']) for _, r in df_usr_reset.iterrows()}
+        u_reset_sel = st.selectbox("Selecione o usuário:", list(opts_reset.keys()), key="sel_reset_usr")
+        if st.button("📤 Gerar e Enviar Código via Telegram", key="btn_gerar_token"):
+            uid_r, email_r, nome_r = opts_reset[u_reset_sel]
+            token_r = gerar_token_reset(uid_r)
+            msg = (
+                f"🔐 <b>Reset de Senha — ERP Alho</b>\n"
+                f"Colaborador: <b>{nome_r}</b>\n"
+                f"Código temporário: <code>{token_r}</code>\n"
+                f"\u26a0️ Válido por <b>30 minutos</b>. Após usar, o código é descartado.\n"
+                f"Instrua o colaborador a acessar a tela de login e clicar em <i>Esqueci minha senha</i>."
+            )
+            ok, err = enviar_mensagem_telegram(msg)
+            if ok:
+                registrar_log_acesso(
+                    st.session_state.get('user_id'), st.session_state.get('logged_user', ''),
+                    st.session_state.get('logged_user', ''),
+                    'RESET_SENHA_SOLICITADO', f"Token gerado para: {email_r}"
+                )
+                st.success(f"✅ Código enviado ao Telegram! Repasse-o a {nome_r}.")
+            else:
+                st.warning(f"⚠️ Telegram não configurado ou erro no envio: {err}")
+                st.info(f"📝 Código gerado (anote e repasse manualmente): **{token_r}**")
+    else:
+        st.info("Nenhum usuário ativo encontrado.")
 
 # ======= REDES E GRUPOS =======
 with tab9:
