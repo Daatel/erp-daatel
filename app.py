@@ -98,11 +98,9 @@ def login_form_page():
 
     from estilo import carregar_estilo_login
     carregar_estilo_login(
-        error_msg=st.session_state['login_error'], 
-        logo_html=logo_html, 
+        logo_html=logo_html,
         fundo_base64=fundo_base64,
-        fundo_largo_base64=fundo_largo_base64,
-        session_token=st.session_state.get('session_token')
+        fundo_largo_base64=fundo_largo_base64
     )
     
     with st.form("login_form"):
@@ -122,9 +120,12 @@ def login_form_page():
         </div>
         """, unsafe_allow_html=True)
         
+        # Exibe erro de login dentro do card glassmorphic
+        if st.session_state.get('login_error'):
+            st.error(st.session_state['login_error'], icon="🔴")
+        
         email = st.text_input("E-mail", placeholder="Digite seu e-mail").strip()
         senha = st.text_input("Senha", type="password", placeholder="Digite sua senha").strip()
-        session_token_input = st.text_input("Session Token", placeholder="Session Token Placeholder", label_visibility="collapsed").strip()
         
         # Lembrar-me
         st.checkbox("Lembrar-me", value=True)
@@ -135,9 +136,8 @@ def login_form_page():
         # Rodapé interno do card
         st.markdown("""
         <div class="card-footer">
-            <span>🛡️ Ambiente Corporativo</span>
-            <span>|</span>
-            <span>Versão 1.7</span>
+            <span>🛡️ Ambiente Corporativo | Versão 1.7</span>
+            <div class="footer-signature">Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -180,7 +180,7 @@ def login_form_page():
                     else:
                         uid = int(user_data['id'])
                         # 4. Verifica sessão simultânea
-                        if verificar_sessao_ativa(uid, session_token_input if session_token_input else None):
+                        if verificar_sessao_ativa(uid):
                             st.session_state['login_error'] = (
                                 "🔴 Acesso negado: este login já está em uso em outro dispositivo. "
                                 "Aguarde 15 minutos após o encerramento da outra sessão, ou peça ao administrador para verificar."
