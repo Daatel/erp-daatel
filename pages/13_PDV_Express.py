@@ -23,6 +23,9 @@ df_bancos_pdv = fetch_all("SELECT id, nome FROM contas_bancarias WHERE status='A
 df_fp_all = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento")
 fp_rules_dict = dict(zip(df_fp_all['id'], df_fp_all['parcelas'])) if not df_fp_all.empty else {}
 fp_names_dict = dict(zip(df_fp_all['id'], df_fp_all['nome'])) if not df_fp_all.empty else {}
+fp_options_pdv = df_fp_all['nome'].tolist() if not df_fp_all.empty else []
+fp_ids_pdv = dict(zip(df_fp_all['nome'], df_fp_all['id'])) if not df_fp_all.empty else {}
+fp_rules_pdv = dict(zip(df_fp_all['nome'], df_fp_all['parcelas'])) if not df_fp_all.empty else {}
 
 if df_clientes.empty or df_produtos.empty or df_vendedores.empty:
     st.warning("Cadastre Clientes, Vendedores e Produtos primeiro!")
@@ -196,12 +199,16 @@ else:
             )
             run_query("UPDATE vendas SET custo_cmv_real = ? WHERE id = ?", (custo_cmv_real, nova_venda_id))
             
+            # Buscar plano de contas padrão para receita
+            df_pc_rec = fetch_all("SELECT id FROM planos_de_contas WHERE categoria LIKE '%Receita%' LIMIT 1")
+            pc_id_val = int(df_pc_rec.iloc[0]['id']) if not df_pc_rec.empty else None
+
             # 4. Grava Financeiro
             if is_a_vista_pdv:
                 run_query('''
-                    INSERT INTO contas_a_receber (cliente_id, descricao, valor, data_vencimento, status, data_recebimento, conta_bancaria_id, venda_id)
-                    VALUES (?, ?, ?, ?, 'RECEBIDO', ?, ?, ?)
-                ''', (cli_pdv['id'], f"{pdv_doc} #{numero_doc_pdv}", v_total_pdv, date.today().strftime("%Y-%m-%d"), date.today().strftime("%Y-%m-%d"), bCid, nova_venda_id))
+                    INSERT INTO contas_a_receber (cliente_id, plano_conta_id, descricao, valor, data_vencimento, status, data_recebimento, conta_bancaria_id, venda_id)
+                    VALUES (?, ?, ?, ?, ?, 'RECEBIDO', ?, ?, ?)
+                ''', (cli_pdv['id'], pc_id_val, f"{pdv_doc} #{numero_doc_pdv}", v_total_pdv, date.today().strftime("%Y-%m-%d"), date.today().strftime("%Y-%m-%d"), bCid, nova_venda_id))
                 
                 # 5. Lança no fluxo de caixa bancário imediatamente
                 desc_receita = f"REC. Balcão Cliente {cli_pdv['nome']}: {pdv_doc} #{numero_doc_pdv}"
@@ -231,9 +238,9 @@ else:
                     desc_p = f"{pdv_doc} #{numero_doc_pdv} (Parc. {i+1}/{N})"
                     
                     run_query('''
-                        INSERT INTO contas_a_receber (cliente_id, descricao, valor, data_vencimento, status, venda_id)
-                        VALUES (?, ?, ?, ?, 'PENDENTE', ?)
-                    ''', (cli_pdv['id'], desc_p, v_p, dt_v.strftime("%Y-%m-%d"), nova_venda_id))
+                        INSERT INTO contas_a_receber (cliente_id, plano_conta_id, descricao, valor, data_vencimento, status, venda_id)
+                        VALUES (?, ?, ?, ?, ?, 'PENDENTE', ?)
+                    ''', (cli_pdv['id'], pc_id_val, desc_p, v_p, dt_v.strftime("%Y-%m-%d"), nova_venda_id))
                 
                 # Dispara cálculo de comissão apenas para faturamento
                 gerar_comissao_se_necessario(nova_venda_id, 'FATURAMENTO', cli_pdv['nome'])

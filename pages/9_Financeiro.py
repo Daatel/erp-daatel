@@ -993,6 +993,16 @@ try:
                                             val_num = p_info['valor_num']
                                             
                                             p_c_id_default = titulos_para_acordo_f[0].get('plano_conta_id')
+                                            if not p_c_id_default or pd.isna(p_c_id_default):
+                                                # Buscar do fornecedor
+                                                df_forn_pc = fetch_all("SELECT plano_conta_id FROM fornecedores WHERE id = ?", (f_id_reneg,))
+                                                if not df_forn_pc.empty and pd.notna(df_forn_pc.iloc[0]['plano_conta_id']):
+                                                    p_c_id_default = int(df_forn_pc.iloc[0]['plano_conta_id'])
+                                            if not p_c_id_default or pd.isna(p_c_id_default):
+                                                # Fallback para o primeiro plano de custo/despesa
+                                                p_c_acordo = fetch_all("SELECT id FROM planos_de_contas WHERE categoria NOT IN ('RECEITA', 'RECEITA_NAO_OP') LIMIT 1")
+                                                p_c_id_default = int(p_c_acordo.iloc[0]['id']) if not p_c_acordo.empty else None
+                                                
                                             compra_id_default = titulos_para_acordo_f[0].get('compra_id')
                                             
                                             run_query(
@@ -1105,11 +1115,21 @@ try:
                                     else:
                                         d = data_inicio + timedelta(days=dias_entre * i)
                                     nova_desc_rp = f"{dup_data['descricao']} (Repar. {i+1}/{n_parc})"
+                                    p_c_id_rp = int(dup_data['plano_conta_id']) if pd.notna(dup_data['plano_conta_id']) else None
+                                    if not p_c_id_rp:
+                                        if pd.notna(dup_data['fornecedor_id']):
+                                            df_forn_pc = fetch_all("SELECT plano_conta_id FROM fornecedores WHERE id=?", (int(dup_data['fornecedor_id']),))
+                                            if not df_forn_pc.empty and pd.notna(df_forn_pc.iloc[0]['plano_conta_id']):
+                                                p_c_id_rp = int(df_forn_pc.iloc[0]['plano_conta_id'])
+                                    if not p_c_id_rp:
+                                        p_c_acordo = fetch_all("SELECT id FROM planos_de_contas WHERE categoria NOT IN ('RECEITA', 'RECEITA_NAO_OP') LIMIT 1")
+                                        p_c_id_rp = int(p_c_acordo.iloc[0]['id']) if not p_c_acordo.empty else None
+
                                     run_query(
                                         "INSERT INTO contas_a_pagar (fornecedor_id, compra_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
                                         (int(dup_data['fornecedor_id']) if pd.notna(dup_data['fornecedor_id']) else None,
                                          int(dup_data['compra_id']) if pd.notna(dup_data['compra_id']) else None,
-                                         int(dup_data['plano_conta_id']) if pd.notna(dup_data['plano_conta_id']) else None,
+                                         p_c_id_rp,
                                          nova_desc_rp, v, d.strftime("%Y-%m-%d")))
                                 st.success(f"Reparcelamento concluído! {n_parc} novas duplicatas criadas.")
                                 import time; time.sleep(1); st.rerun()
@@ -1128,29 +1148,33 @@ try:
                 for _,r in df_cli.iterrows(): op_cli[r['nome']] = r['id']
                 
             # Planos
-            df_planos = fetch_all("SELECT id, nome FROM planos_de_contas WHERE categoria LIKE '%Receita%'")
-            op_plan = {}
+            df_planos = fetch_all("SELECT id, codigo, nome FROM planos_de_contas WHERE categoria IN ('RECEITA', 'RECEITA_NAO_OP') ORDER BY codigo")
+            op_plan = {"-- SELECIONE O PLANO DE CONTAS --": None}
             if not df_planos.empty:
-                for _,r in df_planos.iterrows(): op_plan[r['nome']] = r['id']
+                for _,r in df_planos.iterrows():
+                    op_plan[f"{r['codigo']} - {r['nome']}"] = r['id']
                 
             with st.form("lancar_receber", clear_on_submit=True):
-                c1, c2 = st.columns(2)
+                c1, c2, c3 = st.columns(3)
                 cli_nome = c1.selectbox("Cliente", list(op_cli.keys()))
-                venc = c2.date_input("Vencimento", date.today() + timedelta(days=15))
+                plan_sel = c2.selectbox("Plano de Contas", list(op_plan.keys()))
+                venc = c3.date_input("Vencimento", date.today() + timedelta(days=15))
                 
-                c3, c4 = st.columns([2, 1])
-                desc = c3.text_input("Fatura (No. NF, Parcela, Referência)")
-                val_r = c4.number_input("Valor da Fatura (R$)", min_value=0.01)
+                c4, c5 = st.columns([2, 1])
+                desc = c4.text_input("Fatura (No. NF, Parcela, Referência)")
+                val_r = c5.number_input("Valor da Fatura (R$)", min_value=0.01)
                 
                 if st.form_submit_button("Lançar Promessa de Faturamento"):
                     if cli_nome == "-- SELECIONE O CLIENTE --":
                         st.error("Por favor, selecione um Cliente (ou 'Genérico / Não Cadastrado').")
+                    elif plan_sel == "-- SELECIONE O PLANO DE CONTAS --":
+                        st.error("Por favor, selecione um Plano de Contas.")
                     elif not desc:
                         st.error("Preencha a descrição.")
                     else:
                         with st.spinner("Registrando recebível..."):
-                            run_query("INSERT INTO contas_a_receber (cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, 'PENDENTE')",
-                                      (op_cli[cli_nome], desc, val_r, venc.strftime("%Y-%m-%d")))
+                            run_query("INSERT INTO contas_a_receber (cliente_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 'PENDENTE')",
+                                      (op_cli[cli_nome], op_plan[plan_sel], desc, val_r, venc.strftime("%Y-%m-%d")))
                         st.success("Boleto emitido (pendente)")
                         import time; time.sleep(1); st.rerun()
 
@@ -1234,7 +1258,7 @@ try:
                     c_id_reneg = opcoes_devedores[cli_renome]
                     # Buscar faturas pendentes do cliente
                     df_pend_reneg = fetch_all("""
-                        SELECT id, descricao, valor, data_vencimento 
+                        SELECT id, descricao, valor, data_vencimento, plano_conta_id 
                         FROM contas_a_receber 
                         WHERE cliente_id=? AND status='PENDENTE' 
                         ORDER BY data_vencimento ASC
@@ -1330,14 +1354,20 @@ try:
                                             (nota_cancelamento, t_id)
                                         )
                                     
+                                    p_c_id_default_r = titulos_para_acordo[0].get('plano_conta_id') if hasattr(titulos_para_acordo[0], 'get') else None
+                                    if not p_c_id_default_r or pd.isna(p_c_id_default_r):
+                                        # Buscar padrão
+                                        p_c_rec = fetch_all("SELECT id FROM planos_de_contas WHERE categoria LIKE '%Receita%' LIMIT 1")
+                                        p_c_id_default_r = int(p_c_rec.iloc[0]['id']) if not p_c_rec.empty else None
+
                                     for i, p_info in enumerate(preview_reneg):
                                         nova_desc = f"{desc_acordo} (Acordo #{acordo_id} - Parcela {p_info['Parcela']})"
                                         venc_str = p_info['venc_date'].strftime("%Y-%m-%d")
                                         val_num = p_info['valor_num']
                                         
                                         run_query(
-                                            "INSERT INTO contas_a_receber (cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, 'PENDENTE')",
-                                            (c_id_reneg, nova_desc, val_num, venc_str)
+                                            "INSERT INTO contas_a_receber (cliente_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                                            (c_id_reneg, p_c_id_default_r, nova_desc, val_num, venc_str)
                                         )
                                         
                                 st.success(f"🤝 Renegociação concluída com sucesso! Acordo #{acordo_id} registrado com {N} novas parcelas.")
@@ -1508,11 +1538,17 @@ try:
                                      v = valor_parc + (diff_parc if i == n_parc - 1 else 0)
                                      d = data_inicio + timedelta(days=dias_entre * i)
                                      nova_desc_rp = f"{rec_data['descricao']} (Repar. {i+1}/{n_parc})"
+                                     
+                                     p_c_id_rp_r = int(rec_data['plano_conta_id']) if pd.notna(rec_data['plano_conta_id']) else None
+                                     if not p_c_id_rp_r:
+                                         p_c_rec = fetch_all("SELECT id FROM planos_de_contas WHERE categoria LIKE '%Receita%' LIMIT 1")
+                                         p_c_id_rp_r = int(p_c_rec.iloc[0]['id']) if not p_c_rec.empty else None
+                                     
                                      run_query(
                                          "INSERT INTO contas_a_receber (cliente_id, venda_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
                                          (int(rec_data['cliente_id']) if pd.notna(rec_data['cliente_id']) else None,
                                           int(rec_data['venda_id']) if pd.notna(rec_data['venda_id']) else None,
-                                          int(rec_data['plano_conta_id']) if pd.notna(rec_data['plano_conta_id']) else None,
+                                          p_c_id_rp_r,
                                           nova_desc_rp, v, d.strftime("%Y-%m-%d")))
                                  st.success(f"Reparcelamento concluído! {n_parc} novos recebíveis criados.")
                                  import time; time.sleep(1); st.rerun()
