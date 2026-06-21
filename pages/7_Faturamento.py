@@ -52,7 +52,7 @@ with tab1:
 
     # Busca fila de pedidos abertos
     df_fila = fetch_all('''
-        SELECT v.id as pedido_id, v.data as data_pedido, c.nome as cliente, c.uf as uf_cliente, 
+        SELECT v.id as pedido_id, v.data as data_pedido, c.nome as cliente, c.uf as uf_cliente, c.cnpj_cpf as cnpj_cliente,
                p.nome as produto, p.id as p_id, v.quantidade, v.valor_total, v.custo_acordos_rede,
                v.forma_pagamento_id, fp.nome as forma_pagamento, fp.parcelas as rule_str
         FROM vendas v 
@@ -80,15 +80,16 @@ with tab1:
         st.markdown("*Selecione os pedidos para faturar. Ajuste o lote e validade se necessário. Os vencimentos de cada duplicata são calculados automaticamente conforme a forma de pagamento cadastrada no pedido.*")
         
         # Cabeçalho da Tabela
-        col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7, col_h8 = st.columns([0.4, 0.6, 2.2, 1.2, 1.2, 1.2, 1.2, 2.0])
+        col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7, col_h8, col_h9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 0.8, 0.7, 0.7, 2.4])
         col_h1.markdown("**Faturar?**")
         col_h2.markdown("**Pedido**")
         col_h3.markdown("**Cliente**")
-        col_h4.markdown("**Total**")
-        col_h5.markdown("**Estoque**")
-        col_h6.markdown("**Lote Impresso**")
-        col_h7.markdown("**Validade**")
-        col_h8.markdown("**Vencimentos**")
+        col_h4.markdown("**CNPJ**")
+        col_h5.markdown("**Total**")
+        col_h6.markdown("**Estoque**")
+        col_h7.markdown("**Lote**")
+        col_h8.markdown("**Val.**")
+        col_h9.markdown("**Vencimentos**")
         st.markdown("<div style='margin-top: -10px; margin-bottom: 10px; border-top: 1px solid #ccc;'></div>", unsafe_allow_html=True)
         
         import re
@@ -96,18 +97,19 @@ with tab1:
             pid = int(row['pedido_id'])
             p_id = int(row['p_id'])
             cliente_nome = row['cliente']
+            cnpj_val = row['cnpj_cliente'] if pd.notna(row['cnpj_cliente']) else ""
             prod_nome = row['produto']
             qtd_pedida = float(row['quantidade'])
             valor_total_pedido = float(row['valor_total'])
             
-            # 1. Obter saldo de estoque e farol (sem emojis)
+            # 1. Obter saldo de estoque e farol (sem números de saldo)
             saldo_est = dict_saldos.get(p_id, 0.0)
             if saldo_est >= qtd_pedida:
-                farol = f"OK ({saldo_est:.0f})"
+                farol = "🟢 Saldo Ok"
             elif saldo_est > 0:
-                farol = f"Parcial ({saldo_est:.0f})"
+                farol = "🟡 Parcial"
             else:
-                farol = f"Sem Saldo ({saldo_est:.0f})"
+                farol = "🔴 Sem Saldo"
                 
             # 2. Obter forma de pagamento cadastrada no pedido
             cur_fp_nome = row['forma_pagamento'] if pd.notna(row['forma_pagamento']) else "A vista"
@@ -118,16 +120,17 @@ with tab1:
             default_validade = (date.today() + timedelta(days=90)).strftime('%d/%m/%Y')
             
             # Renderizar linha da tabela usando st.columns
-            col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([0.4, 0.6, 2.2, 1.2, 1.2, 1.2, 1.2, 2.0])
+            col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 0.8, 0.7, 0.7, 2.4])
             
             faturar_check = col1.checkbox("Faturar", value=False, key=f"sel_{pid}", label_visibility="collapsed")
             col2.markdown(f"#{pid}")
             col3.markdown(cliente_nome)
-            col4.markdown(format_brl(valor_total_pedido))
-            col5.markdown(farol)
+            col4.markdown(cnpj_val)
+            col5.markdown(format_brl(valor_total_pedido))
+            col6.markdown(farol)
             
-            lote_val = col6.text_input("Lote", value=default_lote, key=f"lote_{pid}", label_visibility="collapsed")
-            val_val = col7.text_input("Validade", value=default_validade, key=f"val_{pid}", label_visibility="collapsed")
+            lote_val = col7.text_input("Lote", value=default_lote, key=f"lote_{pid}", label_visibility="collapsed")
+            val_val = col8.text_input("Val.", value=default_validade, key=f"val_{pid}", label_visibility="collapsed")
             
             # Calcular parcelas detalhadas/vencimentos em lista vertical
             dias_list = [int(n) for n in re.findall(r'\d+', str(rule_str))]
@@ -145,7 +148,7 @@ with tab1:
                 venc_lines.append(f"{i+1}/{N}: {dt_v} - {format_brl(v_p)}")
                 
             venc_str_vertical = "<br>".join(venc_lines)
-            col8.markdown(f"<div style='font-size: 13px; line-height: 1.3; color: #292d77;'>{venc_str_vertical}</div>", unsafe_allow_html=True)
+            col9.markdown(f"<div style='font-size: 13px; line-height: 1.3; color: #292d77;'>{venc_str_vertical}</div>", unsafe_allow_html=True)
             
             st.markdown("<div style='margin-top: 5px; margin-bottom: 5px; border-top: 1px dashed #eee;'></div>", unsafe_allow_html=True)
             
@@ -418,7 +421,33 @@ with tab1:
                 
     st.markdown("---")
     with st.expander("🖨️ Reimpressão e Visualização de Documentos (DAV)"):
-        df_fat = fetch_all("SELECT v.id, c.nome, v.tipo_documento, v.numero_documento, v.data FROM vendas v JOIN clientes c ON v.cliente_id=c.id WHERE v.status='FATURADO' ORDER BY v.id DESC LIMIT 30")
+        st.markdown("Busque pela venda digitando o ID do Pedido ou Número da NF/DAV. Se o campo de busca estiver vazio, serão exibidas as 10 faturas mais recentes.")
+        busca_reimp = st.text_input("Buscar Pedido ou NF/DAV (ID ou Número)", key="busca_reimpressao_doc").strip()
+        
+        # Constrói query dinâmica com base na busca
+        if busca_reimp:
+            q_reimp = '''
+                SELECT v.id, c.nome, v.tipo_documento, v.numero_documento, v.data 
+                FROM vendas v 
+                JOIN clientes c ON v.cliente_id=c.id 
+                WHERE v.status='FATURADO' 
+                  AND (v.id = ? OR v.numero_documento LIKE ?)
+                ORDER BY v.id DESC 
+                LIMIT 50
+            '''
+            search_id = int(busca_reimp) if busca_reimp.isdigit() else -1
+            search_doc = f"%{busca_reimp}%"
+            df_fat = fetch_all(q_reimp, (search_id, search_doc))
+        else:
+            df_fat = fetch_all('''
+                SELECT v.id, c.nome, v.tipo_documento, v.numero_documento, v.data 
+                FROM vendas v 
+                JOIN clientes c ON v.cliente_id=c.id 
+                WHERE v.status='FATURADO' 
+                ORDER BY v.id DESC 
+                LIMIT 10
+            ''')
+            
         if not df_fat.empty:
             opcoes_fat = {}
             for _, r in df_fat.iterrows():
@@ -426,7 +455,7 @@ with tab1:
                 doc_desc = f" - Nº {num_doc}" if num_doc and str(num_doc).strip() else ""
                 label = f"Venda #{r['id']} - {r['nome']} ({r['tipo_documento']}{doc_desc})"
                 opcoes_fat[label] = r['id']
-            v_sel = st.selectbox("Selecione o pedido faturado para visualizar/imprimir:", ["-- SELECIONE --"] + list(opcoes_fat.keys()))
+            v_sel = st.selectbox("Selecione o pedido faturado para visualizar/imprimir:", ["-- SELECIONE --"] + list(opcoes_fat.keys()), key="sb_reimpressao_venda")
             if v_sel != "-- SELECIONE --":
                 vid = opcoes_fat[v_sel]
                 
