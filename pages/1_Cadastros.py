@@ -403,7 +403,7 @@ with tab2:
     # --- FIM DO NOVO IMPORTADOR ---
     
     df_reps = fetch_all("SELECT id, nome FROM funcionarios WHERE cargo LIKE '%Representante%' OR cargo LIKE '%Vendedor%'")
-    rep_options = ["(Nenhum/Direto)"] + df_reps['nome'].tolist() if not df_reps.empty else ["(Nenhum/Direto)"]
+    rep_options = ["-- SELECIONE --"] + df_reps['nome'].tolist() if not df_reps.empty else ["-- SELECIONE --"]
     rep_dict = dict(zip(df_reps['nome'], df_reps['id'])) if not df_reps.empty else {}
     
     df_redes_bd = fetch_all("SELECT id, nome FROM redes_clientes ORDER BY nome")
@@ -480,6 +480,8 @@ with tab2:
                 st.error("Por favor, preencha a Razão Social.")
             elif not fp_selecionada or fp_selecionada == "-- SELECIONE --":
                 st.error("Por favor, selecione a Forma de Pagamento Padrão.")
+            elif not rep_nome or rep_nome == "-- SELECIONE --":
+                st.error("Por favor, selecione o Representante Responsável.")
             else:
                 nome_limpo = nome.strip().upper()
                 # 1. Validar se o nome já existe
