@@ -219,7 +219,7 @@ def login_form_page():
 
     # ===== FLUXO DE RESET DE SENHA =====
     if st.session_state.get('login_mode') == 'reset':
-        from database import validar_token_reset, consumir_token_reset, registrar_log_acesso
+        from database import validar_token_reset, consumir_token_reset
         st.markdown("---")
         st.markdown("### 🔐 Redefinir Senha")
         st.info("💬 Solicite o código temporário de 6 dígitos ao administrador do sistema. Ele será enviado via Telegram.")
