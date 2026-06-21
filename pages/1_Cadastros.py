@@ -443,7 +443,7 @@ with tab2:
         status = c13.selectbox("Status", ["ATIVO", "INATIVO"])
         chave_pix = c_pix.text_input("Código Pix")
         
-        c14, c15, c16, c17 = st.columns(4)
+        c14, c16, c17 = st.columns(3)
         # Buscar formas de pagamento
         df_fp_list = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
         fp_opts = {}
@@ -465,7 +465,6 @@ with tab2:
             fp_selecionada = ""
             first_day = 30
             
-        prazo_pagamento_dias = c15.number_input("Prazo Faturamento (Dias)", min_value=0, value=first_day, step=1, help="Usado para vencimento automático", disabled=True)
         rep_nome = c16.selectbox("Representante Responsável", rep_options)
         observacoes = c17.text_input("Observações")
         
@@ -593,7 +592,7 @@ with tab2:
                         if fp_atual_nome in fp_opts_edit:
                             idx_fp = list(fp_opts_edit.keys()).index(fp_atual_nome)
                         
-                        ec14, ec15, ec16, ec17 = st.columns(4)
+                        ec14, ec16, ec17 = st.columns(3)
                         efp_selecionada = ec14.selectbox("Forma de Pagamento Padrão", list(fp_opts_edit.keys()), index=idx_fp, key=f"efp_{cid}")
                         
                         if efp_selecionada:
@@ -608,8 +607,6 @@ with tab2:
                             efp_selecionada = ""
                             efirst_day = 30
                             
-                        eprazo_dias = ec15.number_input("Prazo Faturamento (Dias)", value=int(efirst_day), disabled=True, key=f"epd_{cid}")
-                        
                         rep_default = rep_reverse_dict_edit.get(cb['representante_id'], "(Nenhum/Direto)")
                         idx_rep = rep_options_edit.index(rep_default) if rep_default in rep_options_edit else 0
                         erep_nome = ec16.selectbox("Vendedor Responsável", rep_options_edit, index=idx_rep)
