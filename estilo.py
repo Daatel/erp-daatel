@@ -249,7 +249,7 @@ display: none !important;
 [data-testid="collapsedSidebar"] {{
 display: none !important;
 }}
-div[data-testid="stForm"] {{
+div[data-testid="stForm"], div.st-key-esqueci_btn {{
 position: absolute !important;
 left: -9999px !important;
 top: -9999px !important;
@@ -937,6 +937,19 @@ Powered by <strong>DAATEL</strong> &bull; Wisdom into Tech
                 event.preventDefault();
                 event.stopPropagation();
                 togglePasswordVisibility();
+            }
+
+            const forgotPwd = event.target.closest('.forgot-password');
+            if (forgotPwd) {
+                event.preventDefault();
+                event.stopPropagation();
+                const nativeForgotBtn = doc.querySelector('div.st-key-esqueci_btn button');
+                if (nativeForgotBtn) {
+                    nativeForgotBtn.click();
+                    console.log('[LOGIN] Esqueci minha senha clicado!');
+                } else {
+                    console.error('[LOGIN] Botão nativo de esqueci senha não encontrado!');
+                }
             }
         });
 

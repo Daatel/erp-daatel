@@ -124,10 +124,8 @@ def login_form_page():
         email = st.text_input("E-mail", placeholder="Digite seu e-mail").strip()
         senha = st.text_input("Senha", type="password", placeholder="Digite sua senha").strip()
         
-        # Lembrar-me & Esqueci minha senha
+        # Lembrar-me
         st.checkbox("Lembrar-me", value=True)
-        col_esqueci = st.columns([1, 1])[1]
-        esqueci = st.form_submit_button("Esqueci minha senha", use_container_width=False)
         
         # Botão Entrar
         entrar = st.form_submit_button("→ ENTRAR", use_container_width=True)
@@ -141,10 +139,12 @@ def login_form_page():
         </div>
         """, unsafe_allow_html=True)
         
-        if esqueci:
-            st.session_state['login_mode'] = 'reset'
-            st.session_state['login_error'] = None
-            st.rerun()
+    esqueci = st.button("Esqueci minha senha", key="esqueci_btn")
+    
+    if esqueci:
+        st.session_state['login_mode'] = 'reset'
+        st.session_state['login_error'] = None
+        st.rerun()
         
         if entrar:
             st.session_state['login_error'] = None  # Limpa o erro anterior
