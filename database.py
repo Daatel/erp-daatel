@@ -1363,7 +1363,7 @@ def consumir_token_reset(usuario_id: int, nova_senha: str):
 # CONTROLE DE SESSÕES ATIVAS (acesso simultâneo)
 # ──────────────────────────────────────────────────────────────────────────────
 
-SESSAO_TIMEOUT_MINUTOS = 15
+SESSAO_TIMEOUT_MINUTOS = 5  # Sessões sem heartbeat expiram em 5 min (ex: aba fechada, F5)
 
 
 def verificar_sessao_ativa(usuario_id: int, token_atual: str = None) -> bool:

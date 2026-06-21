@@ -130,6 +130,15 @@ def login_form_page():
         # Lembrar-me
         st.checkbox("Lembrar-me", value=True)
         
+        # Checkbox de forçar login - aparece apenas quando há conflito de sessão
+        _conflito = 'outro dispositivo' in str(st.session_state.get('login_error', ''))
+        forcar_login = False
+        if _conflito:
+            forcar_login = st.checkbox(
+                "🔓 Sou eu mesmo — encerrar sessão anterior e entrar assim mesmo",
+                key="force_login_check"
+            )
+        
         # Botão Entrar
         entrar = st.form_submit_button("→ ENTRAR", use_container_width=True)
         
@@ -179,11 +188,11 @@ def login_form_page():
                         st.rerun()
                     else:
                         uid = int(user_data['id'])
-                        # 4. Verifica sessão simultânea
-                        if verificar_sessao_ativa(uid):
+                        # 4. Verifica sessão simultânea (ignorada se usuário marcou forçar login)
+                        if verificar_sessao_ativa(uid) and not forcar_login:
                             st.session_state['login_error'] = (
                                 "🔴 Acesso negado: este login já está em uso em outro dispositivo. "
-                                "Aguarde 15 minutos após o encerramento da outra sessão, ou peça ao administrador para verificar."
+                                "Se foi você mesmo que fechou a janela ou fez F5, marque a opção abaixo e clique em ENTRAR novamente."
                             )
                             st.rerun()
                         token = abrir_sessao(uid)
