@@ -451,9 +451,9 @@ with tab2:
             for _, r in df_fp_list.iterrows():
                 fp_opts[r['nome']] = (r['id'], r['parcelas'])
 
-        fp_selecionada = c14.selectbox("Forma de Pagamento Padrão", list(fp_opts.keys()))
+        fp_selecionada = c14.selectbox("Forma de Pagamento Padrão", ["-- SELECIONE --"] + list(fp_opts.keys()))
         
-        if fp_selecionada:
+        if fp_selecionada and fp_selecionada != "-- SELECIONE --":
             fp_id_val, fp_parc_val = fp_opts[fp_selecionada]
             import re
             first_day = 0
@@ -476,7 +476,11 @@ with tab2:
         regras_descarga = c19.text_input("Regras e Horários de Descarga", help="Ex: Descarga Paletizada, Horário Noturno, Agendamento.")
         
         if st.form_submit_button("Cadastrar Cliente"):
-            if nome:
+            if not nome:
+                st.error("Por favor, preencha a Razão Social.")
+            elif not fp_selecionada or fp_selecionada == "-- SELECIONE --":
+                st.error("Por favor, selecione a Forma de Pagamento Padrão.")
+            else:
                 nome_limpo = nome.strip().upper()
                 # 1. Validar se o nome já existe
                 chk_nome = fetch_all("SELECT id FROM clientes WHERE UPPER(TRIM(nome)) = ?", (nome_limpo,))
@@ -509,8 +513,6 @@ with tab2:
                     ))
                     st.success("Cliente cadastrado com sucesso!")
                     import time; time.sleep(1); st.rerun()
-            else:
-                st.error("Por favor, preencha a Razão Social.")
                 
     st.markdown("---")
     st.subheader("Clientes Cadastrados")
