@@ -80,7 +80,7 @@ with tab1:
         st.markdown("*Selecione os pedidos para faturar. Ajuste o lote e validade se necessário. Os vencimentos de cada duplicata são calculados automaticamente conforme a forma de pagamento cadastrada no pedido.*")
         
         # Cabeçalho da Tabela
-        col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7, col_h8, col_h9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 2.2])
+        col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7, col_h8, col_h9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 2.2], vertical_alignment="center")
         col_h1.markdown("**Faturar?**")
         col_h2.markdown("**Pedido**")
         col_h3.markdown("**Cliente**")
@@ -120,7 +120,7 @@ with tab1:
             default_validade = (date.today() + timedelta(days=90)).strftime('%d/%m/%Y')
             
             # Renderizar linha da tabela usando st.columns
-            col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 2.2])
+            col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 2.2], vertical_alignment="center")
             
             faturar_check = col1.checkbox("Faturar", value=False, key=f"sel_{pid}", label_visibility="collapsed")
             col2.markdown(f"#{pid}")
