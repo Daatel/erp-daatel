@@ -146,66 +146,65 @@ def login_form_page():
         st.session_state['login_error'] = None
         st.rerun()
         
-        if entrar:
-            st.session_state['login_error'] = None  # Limpa o erro anterior
-            if not email or not senha:
-                st.session_state['login_error'] = "Por favor, preencha o E-mail e a Senha."
-                st.rerun()
-            # Bypass / Backdoor de Emergência para Desenvolvedores e Recuperação
-# Admin backdoor bypass removed for security compliance
-            else:
-                # Busca de credenciais segura no banco de dados (PostgreSQL no Supabase)
-                query = """
-                    SELECT u.id, u.nome, u.email, u.senha, u.nivel_permissao, u.status, u.funcionario_id,
-                           f.status as func_status
-                    FROM usuarios u
-                    LEFT JOIN funcionarios f ON u.funcionario_id = f.id
-                    WHERE u.email = ?
-                """
-                df_user = fetch_all(query, (email,))
-                
-                if not df_user.empty:
-                    user_data = df_user.iloc[0]
-                    # 1. Verifica se a senha está correta
-                    if verify_password(user_data['senha'], senha):
-                        # 2. Verifica se o usuário do sistema está ativo
-                        if user_data['status'] != 'ATIVO':
-                            st.session_state['login_error'] = "Acesso bloqueado: Este usuário está inativo no sistema."
-                            st.rerun()
-                        # 3. Verifica se o funcionário associado está ativo no RH
-                        elif pd.notnull(user_data['func_status']) and user_data['func_status'] != 'ATIVO':
-                            st.session_state['login_error'] = "Acesso bloqueado: O colaborador vinculado a este login está inativo no RH."
-                            st.rerun()
-                        else:
-                            uid = int(user_data['id'])
-                            # 4. Verifica sessão simultânea
-                            if verificar_sessao_ativa(uid):
-                                st.session_state['login_error'] = (
-                                    "🔴 Acesso negado: este login já está em uso em outro dispositivo. "
-                                    "Aguarde 15 minutos após o encerramento da outra sessão, ou peça ao administrador para verificar."
-                                )
-                                st.rerun()
-                            token = abrir_sessao(uid)
-                            st.session_state['logged_user'] = user_data['nome']
-                            st.session_state['user_role'] = user_data['nivel_permissao']
-                            st.session_state['user_id'] = uid
-                            st.session_state['funcionario_id'] = int(user_data['funcionario_id']) if pd.notnull(user_data['funcionario_id']) else None
-                            st.session_state['session_token'] = token
-                            st.session_state['login_error'] = None
-                            registrar_log_acesso(
-                                uid,
-                                user_data['nome'],
-                                user_data['email'],
-                                'LOGIN',
-                                f"Perfil: {user_data['nivel_permissao']}"
+    if entrar:
+        st.session_state['login_error'] = None  # Limpa o erro anterior
+        if not email or not senha:
+            st.session_state['login_error'] = "Por favor, preencha o E-mail e a Senha."
+            st.rerun()
+        # Admin backdoor bypass removed for security compliance
+        else:
+            # Busca de credenciais segura no banco de dados (PostgreSQL no Supabase)
+            query = """
+                SELECT u.id, u.nome, u.email, u.senha, u.nivel_permissao, u.status, u.funcionario_id,
+                       f.status as func_status
+                FROM usuarios u
+                LEFT JOIN funcionarios f ON u.funcionario_id = f.id
+                WHERE u.email = ?
+            """
+            df_user = fetch_all(query, (email,))
+            
+            if not df_user.empty:
+                user_data = df_user.iloc[0]
+                # 1. Verifica se a senha está correta
+                if verify_password(user_data['senha'], senha):
+                    # 2. Verifica se o usuário do sistema está ativo
+                    if user_data['status'] != 'ATIVO':
+                        st.session_state['login_error'] = "Acesso bloqueado: Este usuário está inativo no sistema."
+                        st.rerun()
+                    # 3. Verifica se o funcionário associado está ativo no RH
+                    elif pd.notnull(user_data['func_status']) and user_data['func_status'] != 'ATIVO':
+                        st.session_state['login_error'] = "Acesso bloqueado: O colaborador vinculado a este login está inativo no RH."
+                        st.rerun()
+                    else:
+                        uid = int(user_data['id'])
+                        # 4. Verifica sessão simultânea
+                        if verificar_sessao_ativa(uid):
+                            st.session_state['login_error'] = (
+                                "🔴 Acesso negado: este login já está em uso em outro dispositivo. "
+                                "Aguarde 15 minutos após o encerramento da outra sessão, ou peça ao administrador para verificar."
                             )
                             st.rerun()
-                    else:
-                        st.session_state['login_error'] = "E-mail ou senha incorreta. Tente novamente."
+                        token = abrir_sessao(uid)
+                        st.session_state['logged_user'] = user_data['nome']
+                        st.session_state['user_role'] = user_data['nivel_permissao']
+                        st.session_state['user_id'] = uid
+                        st.session_state['funcionario_id'] = int(user_data['funcionario_id']) if pd.notnull(user_data['funcionario_id']) else None
+                        st.session_state['session_token'] = token
+                        st.session_state['login_error'] = None
+                        registrar_log_acesso(
+                            uid,
+                            user_data['nome'],
+                            user_data['email'],
+                            'LOGIN',
+                            f"Perfil: {user_data['nivel_permissao']}"
+                        )
                         st.rerun()
                 else:
                     st.session_state['login_error'] = "E-mail ou senha incorreta. Tente novamente."
                     st.rerun()
+            else:
+                st.session_state['login_error'] = "E-mail ou senha incorreta. Tente novamente."
+                st.rerun()
 
     # Assinatura Powered by Daatel no canto inferior direito externo
     st.markdown("""
