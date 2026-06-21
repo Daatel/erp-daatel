@@ -451,7 +451,6 @@ with tab2:
             for _, r in df_fp_list.iterrows():
                 fp_opts[r['nome']] = (r['id'], r['parcelas'])
 
-        c14, c15, c16, c17 = st.columns(4)
         fp_selecionada = c14.selectbox("Forma de Pagamento Padrão", list(fp_opts.keys()))
         
         if fp_selecionada:
