@@ -48,6 +48,7 @@ with tab1:
     df_fp = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
     fp_dict = dict(zip(df_fp['id'], df_fp['nome'])) if not df_fp.empty else {}
     fp_names = df_fp['nome'].tolist() if not df_fp.empty else []
+    fp_rule_dict = dict(zip(df_fp['nome'], df_fp['parcelas'])) if not df_fp.empty else {}
 
     # Busca fila de pedidos abertos
     df_fila = fetch_all('''
@@ -83,11 +84,24 @@ with tab1:
         
         df_grid['Forma de Pagamento'] = df_grid['forma_pagamento_id'].map(fp_dict).fillna("A vista")
         
+        # Calcular os vencimentos previstos para exibição
+        def calc_vencimentos_row(row):
+            import re
+            fp_nome = row['Forma de Pagamento']
+            rule_str = fp_rule_dict.get(fp_nome, "30")
+            dias_list = [int(n) for n in re.findall(r'\d+', rule_str)]
+            if not dias_list:
+                dias_list = [0]
+            dates = [(date.today() + timedelta(days=d)).strftime('%d/%m/%Y') for d in dias_list]
+            return ", ".join(dates)
+            
+        df_grid['Vencimentos Previstos'] = df_grid.apply(calc_vencimentos_row, axis=1)
+        
         # Formatações visuais
         df_grid['data_pedido'] = pd.to_datetime(df_grid['data_pedido']).dt.strftime('%d/%m/%Y')
         df_grid['Valor Pedido'] = df_grid['valor_total'].apply(format_brl)
         
-        df_view = df_grid[['Selecionar', 'pedido_id', 'data_pedido', 'cliente', 'produto', 'quantidade', 'Saldo em Estoque', 'Farol (Status Físico)', 'Valor Pedido', 'Forma de Pagamento', 'Lote Impresso (NF/DAV)', 'Validade (NF/DAV)']]
+        df_view = df_grid[['Selecionar', 'pedido_id', 'data_pedido', 'cliente', 'produto', 'quantidade', 'Saldo em Estoque', 'Farol (Status Físico)', 'Valor Pedido', 'Forma de Pagamento', 'Vencimentos Previstos', 'Lote Impresso (NF/DAV)', 'Validade (NF/DAV)']]
         
         st.markdown("### Selecione os Pedidos para Expedição")
         st.markdown("*Dica Comercial:* Digite ou aceite o Lote e Validade que a fábrica vai imprimir hoje à noite. Essa informação não trava o sistema contábil, apenas sai no papel para o cliente.")
@@ -99,7 +113,7 @@ with tab1:
                                        "Lote Impresso (NF/DAV)": st.column_config.TextColumn("📝 Lote (Editar)"),
                                        "Validade (NF/DAV)": st.column_config.TextColumn("📅 Validade (Editar)")
                                    },
-                                   disabled=["pedido_id", "data_pedido", "cliente", "produto", "quantidade", "Saldo em Estoque", "Farol (Status Físico)", "Valor Pedido"]
+                                   disabled=["pedido_id", "data_pedido", "cliente", "produto", "quantidade", "Saldo em Estoque", "Farol (Status Físico)", "Valor Pedido", "Vencimentos Previstos"]
                                   )
         
         pedidos_selecionados = edited_df[edited_df['Selecionar'] == True]
@@ -127,8 +141,6 @@ with tab1:
             # Lógica de geração de parcelas para a prévia
             import re
             insts = []
-            
-            fp_rule_dict = dict(zip(df_fp['nome'], df_fp['parcelas'])) if not df_fp.empty else {}
             
             for _, row in pedidos_selecionados.iterrows():
                 pid = int(row['pedido_id'])
@@ -166,9 +178,10 @@ with tab1:
                             "Valor Original": float(v_total)
                         })
             
-            sel_ids = sorted(pedidos_selecionados['pedido_id'].tolist())
+            # Cria uma chave única que inclui o ID de cada pedido e a Forma de Pagamento selecionada nele
+            sel_ids_and_fps = sorted([(int(row['pedido_id']), row['Forma de Pagamento']) for _, row in pedidos_selecionados.iterrows()], key=lambda x: x[0])
             sobrescreveu_flag = f"{sobrescrever}_{venc_boleto_override}"
-            session_key_ids = f"last_sel_{sel_ids}_{sobrescreveu_flag}"
+            session_key_ids = f"last_sel_{sel_ids_and_fps}_{sobrescreveu_flag}"
             if st.session_state.get('last_selected_combo') != session_key_ids:
                 st.session_state['parcelas_faturamento'] = insts
                 st.session_state['last_selected_combo'] = session_key_ids
