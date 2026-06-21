@@ -518,10 +518,12 @@ with tab2:
     st.subheader("Clientes Cadastrados")
     df_clientes = fetch_all("""
         SELECT c.id, c.nome as 'Razão Social', c.cnpj_cpf as 'CNPJ/CPF', c.cidade as 'Cidade', c.uf as 'UF', 
-               c.rede_clientes as 'Rede', c.grupo_lojas as 'Grupo', c.status as 'Status', f.nome as 'Representante',
+               c.rede_clientes as 'Rede', c.grupo_lojas as 'Grupo', COALESCE(fp.nome, c.prazo_pagamento) as 'Forma Pagto',
+               c.status as 'Status', f.nome as 'Representante',
                c.taxa_descarga as 'Taxa Descarga (R$)', c.regras_descarga as 'Regras Descarga', c.chave_pix as 'Código Pix'
         FROM clientes c
         LEFT JOIN funcionarios f ON c.representante_id = f.id
+        LEFT JOIN formas_pagamento fp ON c.forma_pagamento_id = fp.id
     """)
     if not df_clientes.empty:
         export_btn(df_clientes, 'clientes.csv')
