@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import time
 from datetime import date, timedelta
 from database import (
     run_query, fetch_all, gerar_comissao_se_necessario,
