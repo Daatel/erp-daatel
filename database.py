@@ -2,6 +2,7 @@ import sqlite3
 import pandas as pd
 import os
 import streamlit as st
+from streamlit.runtime.scriptrunner import RerunException, StopException
 import hashlib
 import secrets
 import logging
@@ -82,6 +83,11 @@ def db_transaction():
     try:
         yield conn
         conn.commit()
+    except (RerunException, StopException):
+        # Controle de fluxo do Streamlit, não é erro de negócio.
+        # Comita o que já foi feito antes de deixar a exceção propagar.
+        conn.commit()
+        raise
     except Exception as e:
         try:
             conn.rollback()

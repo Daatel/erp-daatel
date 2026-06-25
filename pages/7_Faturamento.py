@@ -300,6 +300,9 @@ with tab1:
                 p_c = fetch_all("SELECT id FROM planos_de_contas WHERE categoria LIKE '%Receita%' LIMIT 1")
                 pc_id = int(p_c.iloc[0]['id']) if not p_c.empty else None
                 
+                sucesso = False
+                qtd_processada = 0
+                
                 try:
                     # Envolve tudo em uma transação atômica
                     with db_transaction() as conn:
@@ -417,11 +420,16 @@ with tab1:
                             # 6. Comissão
                             gerar_comissao_se_necessario_tx(cursor, pid, 'FATURAMENTO', cli_nome)
                         
-                        st.success(f"✅ {len(pedidos_selecionados)} Pedido(s) Faturados com Sucesso! Estoque e Financeiro atualizados de forma consistente.")
-                        time.sleep(2)
-                        st.rerun()
+                        qtd_processada = len(pedidos_selecionados)
+                    
+                    sucesso = True
                 except Exception as e:
                     st.error(f"🛑 Erro ao processar faturamento (Operação cancelada/revertida): {str(e)}")
+                
+                if sucesso:
+                    st.success(f"✅ {qtd_processada} Pedido(s) Faturados com Sucesso! Estoque e Financeiro atualizados de forma consistente.")
+                    time.sleep(2)
+                    st.rerun()
                 
     st.markdown("---")
     with st.expander("🖨️ Reimpressão e Visualização de Documentos (DAV)"):
