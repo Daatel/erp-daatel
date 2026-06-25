@@ -786,6 +786,28 @@ def _create_tables_internal(conn):
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     ''')
+
+    # 28. Configurações do Sistema
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS configuracoes_sistema (
+        chave VARCHAR(50) PRIMARY KEY,
+        valor VARCHAR(50) NOT NULL
+    )
+    ''')
+
+    # Inicializar modo_estoque padrão se não existir
+    is_pg = init_connection_pool() is not None
+    if is_pg:
+        cursor.execute(
+            """INSERT INTO configuracoes_sistema (chave, valor)
+               VALUES ('modo_estoque', 'SIMPLIFICADO')
+               ON CONFLICT (chave) DO NOTHING"""
+        )
+    else:
+        cursor.execute(
+            """INSERT OR IGNORE INTO configuracoes_sistema (chave, valor)
+               VALUES ('modo_estoque', 'SIMPLIFICADO')"""
+        )
     
     # Inserir empresa padrão se não existir
     cursor.execute("SELECT COUNT(*) FROM empresa_config")
@@ -920,7 +942,9 @@ def _create_tables_internal(conn):
         "ALTER TABLE clientes ADD COLUMN forma_pagamento_id INTEGER",
         "ALTER TABLE vendas ADD COLUMN forma_pagamento_id INTEGER",
         "ALTER TABLE fornecedores ADD COLUMN forma_pagamento_id INTEGER",
-        "ALTER TABLE compras ADD COLUMN forma_pagamento_id INTEGER"
+        "ALTER TABLE compras ADD COLUMN forma_pagamento_id INTEGER",
+        "ALTER TABLE produtos ADD COLUMN custo_medio REAL DEFAULT 0.0",
+        "ALTER TABLE vendas ADD COLUMN cmv_metodo TEXT DEFAULT 'LOTE'"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)
@@ -1025,10 +1049,49 @@ def fetch_all_tx(cursor, query, params=()):
         return pd.DataFrame(data, columns=cols)
     return pd.DataFrame()
 
-def consumir_estoque_fifo_tx(cursor, produto_id, quantidade, data_mov, origem, doc_ref):
+def _get_modo_estoque(cursor, is_pg: bool) -> str:
+    cursor.execute(
+        "SELECT valor FROM configuracoes_sistema WHERE chave = %s" if is_pg else
+        "SELECT valor FROM configuracoes_sistema WHERE chave = ?",
+        ("modo_estoque",)
+    )
+    row = cursor.fetchone()
+    return row[0] if row else "LOTE"
+
+def consumir_estoque_fifo_tx(cursor, produto_id, quantidade, data_mov, origem, doc_ref, modo_estoque=None):
     """
     Consome o estoque utilizando o algoritmo FIFO dentro de uma transação com FOR UPDATE.
+    Se o modo_estoque for SIMPLIFICADO, calcula pelo custo_medio (com fallback para custo_unidade)
+    e registra a saída em estoque_movimentos com lote_origem_id = NULL.
+    Retorna: (custo_total, is_estimado, cmv_metodo, custo_ausente)
     """
+    is_pg = init_connection_pool() is not None
+    modo = modo_estoque if modo_estoque is not None else _get_modo_estoque(cursor, is_pg)
+    
+    if modo == "SIMPLIFICADO":
+        cursor.execute(
+            "SELECT COALESCE(custo_medio, 0.0), COALESCE(custo_unidade, 0.0) FROM produtos WHERE id = %s" if is_pg else
+            "SELECT COALESCE(custo_medio, 0.0), COALESCE(custo_unidade, 0.0) FROM produtos WHERE id = ?",
+            (produto_id,)
+        )
+        row_cost = cursor.fetchone()
+        custo_medio = float(row_cost[0]) if row_cost else 0.0
+        custo_unidade = float(row_cost[1]) if row_cost else 0.0
+        
+        custo_final = custo_medio if custo_medio > 0.0 else custo_unidade
+        custo_ausente = custo_final == 0.0
+        custo_total = custo_final * float(quantidade)
+        
+        run_query_tx(
+            cursor,
+            """INSERT INTO estoque_movimentos 
+               (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+               VALUES (?, ?, 'Saída', ?, ?, ?, NULL)""",
+            (data_mov, produto_id, quantidade, origem, doc_ref)
+        )
+        
+        return custo_total, False, "SIMPLIFICADO", custo_ausente
+
     query_lotes = """
         SELECT pd.id, pd.custo_unitario_lote, pd.data, pd.produto_final_kg,
                (pd.produto_final_kg - COALESCE((
@@ -1096,7 +1159,7 @@ def consumir_estoque_fifo_tx(cursor, produto_id, quantidade, data_mov, origem, d
         )
         custo_acumulado += quantidade_restante * custo_padrao
         
-    return custo_acumulado, is_estimado
+    return custo_acumulado, is_estimado, "LOTE", False
 
 def gerar_comissao_se_necessario_tx(cursor, venda_id, momento_gatilho, cliente_nome=None):
     """
@@ -1153,11 +1216,35 @@ def gerar_comissao_se_necessario_tx(cursor, venda_id, momento_gatilho, cliente_n
     if comissao_val > 0.0:
         run_query_tx(cursor, "UPDATE vendas SET comissao_valor = ? WHERE id = ?", (comissao_val, venda_id))
 
-def consumir_estoque_fifo(produto_id, quantidade, data_mov, origem, doc_ref):
+def consumir_estoque_fifo(produto_id, quantidade, data_mov, origem, doc_ref, modo_estoque=None):
     """
     Consome o estoque utilizando o algoritmo FIFO.
-    Retorna uma tupla: (custo_total_acumulado, is_estimado)
+    Retorna uma tupla: (custo_total_acumulado, is_estimado, cmv_metodo, custo_ausente)
     """
+    is_pg = init_connection_pool() is not None
+    modo = modo_estoque
+    if modo is None:
+        df_mode = fetch_all("SELECT valor FROM configuracoes_sistema WHERE chave = ?", ("modo_estoque",))
+        modo = df_mode.iloc[0]['valor'] if not df_mode.empty else "LOTE"
+
+    if modo == "SIMPLIFICADO":
+        df_cost = fetch_all("SELECT COALESCE(custo_medio, 0.0) as custo_medio, COALESCE(custo_unidade, 0.0) as custo_unidade FROM produtos WHERE id = ?", (produto_id,))
+        custo_medio = float(df_cost.iloc[0]['custo_medio']) if not df_cost.empty else 0.0
+        custo_unidade = float(df_cost.iloc[0]['custo_unidade']) if not df_cost.empty else 0.0
+
+        custo_final = custo_medio if custo_medio > 0.0 else custo_unidade
+        custo_ausente = custo_final == 0.0
+        custo_total = custo_final * float(quantidade)
+
+        run_query(
+            """INSERT INTO estoque_movimentos 
+               (data, produto_id, tipo_movimento, quantidade, origem, documento_referencia, lote_origem_id) 
+               VALUES (?, ?, 'Saída', ?, ?, ?, NULL)""",
+            (data_mov, produto_id, quantidade, origem, doc_ref)
+        )
+
+        return custo_total, False, "SIMPLIFICADO", custo_ausente
+
     # 1. Obter os lotes ativos com saldo físico disponível > 0 ordenados por data/ID (FIFO)
     query_lotes = """
         SELECT pd.id, pd.custo_unitario_lote, pd.data, pd.produto_final_kg,
@@ -1228,7 +1315,7 @@ def consumir_estoque_fifo(produto_id, quantidade, data_mov, origem, doc_ref):
         custo_acumulado += quantidade_restante * custo_padrao
         quantidade_restante = 0.0
         
-    return custo_acumulado, is_estimado
+    return custo_acumulado, is_estimado, "LOTE", False
 
 def gerar_comissao_se_necessario(venda_id, momento_gatilho, cliente_nome=None):
     """

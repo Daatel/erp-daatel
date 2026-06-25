@@ -82,6 +82,42 @@ with tab_empresa:
                 enviar_relatorio_resumo_executivo_async()
                 st.success("✅ Solicitado! O resumo executivo do CEO está sendo gerado em background. Verifique seu Telegram em alguns instantes.")
 
+    st.markdown("---")
+    st.markdown("### 📦 Parâmetros de Estoque & CMV")
+    
+    is_pg = "DATABASE_URL" in st.secrets
+    from database import db_connection
+    with db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT valor FROM configuracoes_sistema WHERE chave = %s" if is_pg else "SELECT valor FROM configuracoes_sistema WHERE chave = ?", ("modo_estoque",))
+        row = cursor.fetchone()
+        modo_atual = row[0] if row else "LOTE"
+        
+    novo_modo = st.selectbox(
+        "Modo de controle de estoque / CMV",
+        options=["SIMPLIFICADO", "LOTE"],
+        index=0 if modo_atual == "SIMPLIFICADO" else 1,
+        help="SIMPLIFICADO: usa custo cadastrado no produto, sem controle de lote (Recomendado para Fase 1). LOTE: controle FIFO por lote físico (Fase 2+)."
+    )
+    
+    if novo_modo == "LOTE":
+        st.warning("⚠️ **Atenção:** A ativação do modo **LOTE** (Fase 2) exige o controle rigoroso de rastreabilidade física de OPs e compras. É **obrigatoriamente necessário realizar um inventário físico de abertura** para registrar os saldos e validades reais no estoque antes de iniciar a operação nesse modo.")
+    else:
+        st.info("💡 **Modo Simplificado Ativo:** O CMV será apurado com base no Custo Médio (ou Custo Padrão/Unitário) cadastrado no Produto, simplificando a operação de faturamento e PDV na Fase 1.")
+        
+    if st.button("Salvar Configuração de Estoque", type="primary"):
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE configuracoes_sistema SET valor = %s WHERE chave = 'modo_estoque'" if is_pg else
+                "UPDATE configuracoes_sistema SET valor = ? WHERE chave = 'modo_estoque'",
+                (novo_modo,)
+            )
+            conn.commit()
+        st.success(f"Configuração atualizada! Modo de estoque definido como: **{novo_modo}**")
+        st.cache_data.clear()
+        import time; time.sleep(1.5); st.rerun()
+
 def export_btn(df, filename, label="📥 Exportar Lista (CSV)"):
     if not df.empty:
         csv = df.to_csv(index=False, sep=';').encode('utf-8-sig')
@@ -109,6 +145,9 @@ with tab1:
         preco_venda_base = col10.number_input("Preço Venda Base (R$)", min_value=0.0, step=0.01)
         is_materia_prima = col_m.checkbox("É Matéria-Prima (Ex: Alho Cru)?")
         
+        col_c1, col_c2, _ = st.columns(3)
+        custo_medio = col_c1.number_input("Custo Médio Simplificado (R$)", min_value=0.0, step=0.01, help="Utilizado no cálculo do CMV no modo SIMPLIFICADO.")
+        
         unidade_medida_sintetico = unidade_compra if unidade_compra else "un"
         tipo_embalagem = unidade_compra 
         
@@ -118,10 +157,10 @@ with tab1:
                     """INSERT INTO produtos 
                        (nome, unidade_medida, preco_venda_base, is_materia_prima, 
                         marca, peso_volume, referencia, ean, unidades_por_fardo, 
-                        tipo_embalagem, embalagem_master, cod_emb_master) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", 
+                        tipo_embalagem, embalagem_master, cod_emb_master, custo_medio) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", 
                     (nome_produto, unidade_medida_sintetico, preco_venda_base, True if is_materia_prima else False,
-                     marca, peso_volume, referencia, ean, unidades_por_fardo, tipo_embalagem, embalagem_master, cod_emb_master)
+                     marca, peso_volume, referencia, ean, unidades_por_fardo, tipo_embalagem, embalagem_master, cod_emb_master, custo_medio)
                 )
                 st.success(f"Produto '{nome_produto}' cadastrado com sucesso!")
             else:
@@ -129,7 +168,7 @@ with tab1:
                 
     st.markdown("---")
     st.subheader("Produtos Cadastrados")
-    df_produtos = fetch_all("SELECT id, nome, marca, referencia, ean, peso_volume as 'Peso/Vol', unidade_medida as 'Unidade', embalagem_master as 'Emb. Master', unidades_por_fardo as 'Qtd. Master', custo_unidade as 'Custo Und', custo_fardo as 'Custo Master', preco_venda_base as 'Preço Venda', is_materia_prima FROM produtos")
+    df_produtos = fetch_all("SELECT id, nome, marca, referencia, ean, peso_volume as 'Peso/Vol', unidade_medida as 'Unidade', embalagem_master as 'Emb. Master', unidades_por_fardo as 'Qtd. Master', custo_unidade as 'Custo Und', custo_medio as 'Custo Médio', custo_fardo as 'Custo Master', preco_venda_base as 'Preço Venda', is_materia_prima FROM produtos")
     if not df_produtos.empty:
         df_produtos['is_materia_prima'] = df_produtos['is_materia_prima'].map({1: 'Sim', 0: 'Não', True: 'Sim', False: 'Não'})
         
@@ -141,6 +180,7 @@ with tab1:
             
         df_produtos_view = df_produtos.copy()
         df_produtos_view['Custo Und'] = df_produtos_view['Custo Und'].apply(format_brl)
+        df_produtos_view['Custo Médio'] = df_produtos_view['Custo Médio'].apply(format_brl)
         df_produtos_view['Custo Master'] = df_produtos_view['Custo Master'].apply(format_brl)
         df_produtos_view['Preço Venda'] = df_produtos_view['Preço Venda'].apply(format_brl)
         
@@ -180,9 +220,12 @@ with tab1:
                         emateria = ep10.checkbox("É Matéria-Prima?", value=bool(pb['is_materia_prima']))
                         eestoque_min = ep11.number_input("Estoque Mínimo (Alerta)", value=float(pb['estoque_minimo']) if pb['estoque_minimo'] else 0.0, min_value=0.0)
                         
+                        ep_c1, _ = st.columns(2)
+                        ecusto_medio = ep_c1.number_input("Custo Médio Simplificado (R$)", value=float(pb.get('custo_medio') or 0.0), min_value=0.0, step=0.01)
+                        
                         if st.form_submit_button("Atualizar Produto"):
-                            run_query("UPDATE produtos SET nome=?, marca=?, preco_venda_base=?, unidade_medida=?, unidades_por_fardo=?, peso_volume=?, referencia=?, is_materia_prima=?, estoque_minimo=?, embalagem_master=?, cod_emb_master=? WHERE id=?", 
-                                      (enome, emarca, epreco, eunidade, efator, epeso, eref, True if emateria else False, eestoque_min, eembalagem_master, ecod_master, pid))
+                            run_query("UPDATE produtos SET nome=?, marca=?, preco_venda_base=?, unidade_medida=?, unidades_por_fardo=?, peso_volume=?, referencia=?, is_materia_prima=?, estoque_minimo=?, embalagem_master=?, cod_emb_master=?, custo_medio=? WHERE id=?", 
+                                      (enome, emarca, epreco, eunidade, efator, epeso, eref, True if emateria else False, eestoque_min, eembalagem_master, ecod_master, ecusto_medio, pid))
                             st.success("Produto atualizado!")
                             import time; time.sleep(1); st.rerun()
 

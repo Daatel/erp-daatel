@@ -308,6 +308,11 @@ with tab1:
                     with db_transaction() as conn:
                         cursor = conn.cursor()
                         
+                        from database import _get_modo_estoque
+                        is_pg = "DATABASE_URL" in st.secrets
+                        modo = _get_modo_estoque(cursor, is_pg)
+                        alertas_custo_ausente = []
+                        
                         for _, row in pedidos_selecionados.iterrows():
                             pid = int(row['pedido_id'])
                             
@@ -350,18 +355,22 @@ with tab1:
                                 run_query_tx(cursor, "UPDATE vendas SET status='FATURADO', tipo_documento=?, lote_impresso=?, validade_impressa=? WHERE id=?", (tipo_doc, lote_impresso, validade_impressa, pid))
                             
                             # 2. Baixa de Estoque via FIFO na transação
-                            custo_cmv_real, is_estimado = consumir_estoque_fifo_tx(
+                            custo_cmv_real, is_estimado, cmv_metodo, custo_ausente = consumir_estoque_fifo_tx(
                                 cursor=cursor,
                                 produto_id=prod_id,
                                 quantidade=qtd,
                                 data_mov=date.today().strftime("%Y-%m-%d"),
                                 origem=f'Expedição {tipo_doc}',
-                                doc_ref=f"Venda Lote #{pid}"
+                                doc_ref=f"Venda Lote #{pid}",
+                                modo_estoque=modo
                             )
                             
-                            run_query_tx(cursor, "UPDATE vendas SET custo_cmv_real = ? WHERE id = ?", (custo_cmv_real, pid))
+                            run_query_tx(cursor, "UPDATE vendas SET custo_cmv_real = ?, cmv_metodo = ? WHERE id = ?", (custo_cmv_real, cmv_metodo, pid))
                             
-                            if is_estimado:
+                            if custo_ausente:
+                                alertas_custo_ausente.append(prod_nome)
+                            
+                            if is_estimado and cmv_metodo != 'SIMPLIFICADO':
                                 st.warning(f"⚠️ O CMV do Pedido #{pid} ({cli_nome}) foi estimado por falta de lote correspondente no estoque (Estoque Negativo).")
                             
                             # 3. Lançamento Financeiro
@@ -428,7 +437,12 @@ with tab1:
                 
                 if sucesso:
                     st.success(f"✅ {qtd_processada} Pedido(s) Faturados com Sucesso! Estoque e Financeiro atualizados de forma consistente.")
-                    time.sleep(2)
+                    if alertas_custo_ausente:
+                        produtos_unicos = ", ".join(sorted(set(alertas_custo_ausente)))
+                        st.warning(f"⚠️ Produto(s) sem custo cadastrado (CMV registrado como zero): {produtos_unicos}. Cadastre o custo em Produtos.")
+                        time.sleep(4)
+                    else:
+                        time.sleep(2)
                     st.rerun()
                 
     st.markdown("---")

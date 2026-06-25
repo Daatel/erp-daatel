@@ -190,15 +190,20 @@ else:
             
             # 3. Baixa de Estoque via FIFO
             from database import consumir_estoque_fifo
-            custo_cmv_real, is_estimado = consumir_estoque_fifo(
+            custo_cmv_real, is_estimado, cmv_metodo, custo_ausente = consumir_estoque_fifo(
                 produto_id=prod_id_pdv,
                 quantidade=pdv_qtd,
                 data_mov=date.today().strftime("%Y-%m-%d"),
                 origem=f'Venda Balcão Express ({pdv_doc})',
                 doc_ref=f"Venda Balcão #{nova_venda_id}"
             )
-            run_query("UPDATE vendas SET custo_cmv_real = ? WHERE id = ?", (custo_cmv_real, nova_venda_id))
+            run_query("UPDATE vendas SET custo_cmv_real = ?, cmv_metodo = ? WHERE id = ?", (custo_cmv_real, cmv_metodo, nova_venda_id))
             
+            if custo_ausente:
+                st.warning("⚠️ Este produto não possui custo cadastrado (CMV registrado como zero). Cadastre o custo em Produtos.")
+            elif is_estimado and cmv_metodo != 'SIMPLIFICADO':
+                st.warning("⚠️ O CMV desta venda foi estimado por falta de lote correspondente no estoque (Estoque Negativo).")
+
             # Buscar plano de contas padrão para receita
             df_pc_rec = fetch_all("SELECT id FROM planos_de_contas WHERE categoria LIKE '%Receita%' LIMIT 1")
             pc_id_val = int(df_pc_rec.iloc[0]['id']) if not df_pc_rec.empty else None
@@ -247,4 +252,9 @@ else:
                 
                 st.success(f"Venda Balcão #{nova_venda_id} faturada a prazo. Documento emitido: {pdv_doc} #{numero_doc_pdv}. Estoque JIT baixado e duplicatas ({N} parcela(s)) lançadas em carteira para o cliente.")
                 
-            import time; time.sleep(2.0); st.rerun()
+            import time
+            if custo_ausente or (is_estimado and cmv_metodo != 'SIMPLIFICADO'):
+                time.sleep(4.0)
+            else:
+                time.sleep(2.0)
+            st.rerun()

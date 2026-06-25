@@ -343,7 +343,7 @@ with tab_deg:
             doc_ref = f"Amostra/Degustação: {cli_deg['nome']}"
             
             # 1. Rodar FIFO
-            custo_total, is_estimado = consumir_estoque_fifo(
+            custo_total, is_estimado, cmv_metodo, custo_ausente = consumir_estoque_fifo(
                 produto_id=int(prod_deg['id']),
                 quantidade=float(qtd_deg),
                 data_mov=data_acao.strftime("%Y-%m-%d"),
@@ -366,8 +366,16 @@ with tab_deg:
             st.success(f"✔️ Remessa registrada com sucesso! Saída física executada via FIFO.")
             st.info(f"📊 **Custo Real FIFO apurado:** R$ {custo_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             
-            if is_estimado:
+            if custo_ausente:
+                st.warning("⚠️ O produto selecionado não possui custo cadastrado (CMV registrado como zero). Cadastre o custo em Produtos.")
+            elif is_estimado and cmv_metodo != 'SIMPLIFICADO':
                 st.warning("⚠️ **Atenção:** O estoque físico no sistema estava insuficiente/zerado. O custo foi estimado provisoriamente usando o custo de cadastro do produto.")
+            
+            import time
+            if custo_ausente or (is_estimado and cmv_metodo != 'SIMPLIFICADO'):
+                time.sleep(4.0)
+            else:
+                time.sleep(2.0)
             st.rerun()
 
 # ======= 2. GESTÃO DE PEDIDOS =======

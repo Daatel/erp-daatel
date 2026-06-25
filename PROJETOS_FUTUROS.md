@@ -1,310 +1,330 @@
-# ?? Projetos Futuros & Roadmap ERP do Alho
+# ?? Projetos Futuros & Roadmap ERP do Alho
+
+Este documento registra as ideias, necessidades e m√≥dulos planejados para futuras itera√ß√µes do sistema ERP da F√°brica de Alho.
+
+> **Crit√©rio de prioriza√ß√£o:** Projetos s√£o ordenados por impacto operacional imediato √ó custo de implementa√ß√£o, n√£o por sofistica√ß√£o t√©cnica. Iniciativas que reduzem esfor√ßo di√°rio de todos os usu√°rios precedem expans√µes funcionais que beneficiam poucos.
+
+---
+
 
-Este documento registra as ideias, necessidades e mÛdulos planejados para futuras iteraÁıes do sistema ERP da F·brica de Alho.
+## üó∫Ô∏è Plano de Implanta√ß√£o Gradual do ERP & Transi√ß√µes
 
-> **CritÈrio de priorizaÁ„o:** Projetos s„o ordenados por impacto operacional imediato ◊ custo de implementaÁ„o, n„o por sofisticaÁ„o tÈcnica. Iniciativas que reduzem esforÁo di·rio de todos os usu·rios precedem expansıes funcionais que beneficiam poucos.
+Para garantir o sucesso e a ader√™ncia da equipe ao sistema, o ERP est√° sendo implantado de forma gradual, permitindo que a opera√ß√£o comercial e financeira ganhe tra√ß√£o antes da introdu√ß√£o de controles r√≠gidos de ch√£o de f√°brica.
 
----
+### üìç Fase 1: Foco Comercial, Financeiro e Opera√ß√£o Simplificada *(Em Execu√ß√£o)*
+* **Objetivo:** Captar pedidos de venda, faturar (SEFAZ), realizar vendas diretas (PDV Express) e processar o contas a receber/pagar e DRE sem fric√ß√£o.
+* **Abordagem de Estoque Transit√≥ria (Modo SIMPLIFICADO):**
+  * Implementamos um **switch de controle de estoque/CMV** que permite ao ERP rodar em modo `SIMPLIFICADO`.
+  * Neste modo, o CMV √© apurado com base no **Custo M√©dio Simplificado** (ou custo padr√£o cadastrado no produto), sem exigir que cada sa√≠da seja amarrada a um lote de produ√ß√£o f√≠sica ativo (PEPS/FIFO).
+  * A baixa de estoque √© registrada com `lote_origem_id = NULL` nas sa√≠das f√≠sicas, evitando avisos recorrentes de estoque negativo e CMV estimado na interface de faturamento que geravam ru√≠do operacional na Fase 1.
 
-## P1 ó Produtividade Operacional
-> **Meta:** Reduzir cliques, erros e tempo de treinamento. Esses projetos afetam praticamente todos os usu·rios todos os dias.
-
----
-
-### ??? 1. Central de Trabalho *(NOVO)*
-
-* **Objetivo:** Transformar o ERP em um sistema orientado a tarefas, eliminando a necessidade do usu·rio "caÁar" o que precisa fazer.
-* **Escopo:**
-  * Painel unificado de pendÍncias por perfil de acesso, exibindo automaticamente o que requer aÁ„o do usu·rio.
-  * Exemplos de cards por ·rea:
-    * Notas fiscais aguardando lanÁamento
-    * Boletos aguardando pagamento
-    * DepÛsitos aguardando conciliaÁ„o
-    * Pedidos aguardando faturamento
-    * Rotas aguardando fechamento
-  * Cada card È clic·vel e leva diretamente ao registro correspondente.
-* **Impacto:** AltÌssimo ó reduz navegaÁ„o, erros por esquecimento e tempo de treinamento de novos usu·rios.
-* **Complexidade:** MÈdia
-* **P˙blico-alvo:** Todos os perfis.
+### üìç Fase 2: Ativa√ß√£o Completa de Estoque, Produ√ß√£o e Compras *(Fase Futura)*
+* **Objetivo:** Habilitar a rastreabilidade completa de lotes de produ√ß√£o (FIFO real), controle r√≠gido de mat√©rias-primas e insumos.
+* **Gatilho de Transi√ß√£o (Modo LOTE):**
+  * Para virar a chave para o modo `LOTE`, a f√°brica de alho **exigir√° obrigatoriamente um invent√°rio f√≠sico de abertura**.
+  * Esse invent√°rio servir√° para cadastrar e alinhar no banco de dados todos os saldos e datas de validade reais dos lotes presentes no galp√£o, garantindo que o algoritmo FIFO apure o CMV real de forma precisa desde o primeiro dia.
+  * O switch de configura√ß√£o na aba *Minha Empresa* apresenta um alerta est√©tico destacando esse requisito antes de qualquer altera√ß√£o acidental.
 
 ---
-
-### ?? 2. Cadastro Inteligente
-
-* **Objetivo:** Eliminar digitaÁ„o manual e erros de cadastro via automaÁ„o por API p˙blica.
-* **Escopo:**
-  * Preenchimento autom·tico de cadastro de **clientes** por CNPJ (Receita Federal).
-  * Preenchimento autom·tico de cadastro de **fornecedores** por CNPJ.
-  * Preenchimento autom·tico de **endereÁos** por CEP (ViaCEP).
-  * ValidaÁ„o de CNPJ/CPF em tempo real na interface.
-* **Impacto:** Muito Alto
-* **Complexidade:** Baixa
-* **P˙blico-alvo:** Todos os perfis com acesso a cadastros.
-
----
-
-### ?? 3. LanÁamento Inteligente de NF
-
-* **Objetivo:** Evoluir o recebimento fiscal de digitaÁ„o manual para conferÍncia assistida.
-* **Escopo:**
-  * Upload de XML da NF-e diretamente na tela de recebimento.
-  * ConferÍncia autom·tica de itens, quantidades e valores contra o pedido de compra vinculado.
-  * ValidaÁ„o de preÁos: alerta quando o preÁo da nota diverge do custo histÛrico ou do pedido.
-  * ValidaÁ„o de prazo: verificaÁ„o dos vencimentos dos tÌtulos gerados contra o que foi negociado.
-  * Sugest„o autom·tica de cadastro de novos produtos ou fornecedores detectados no XML.
-* **Impacto:** Muito Alto
-* **Complexidade:** MÈdia
-* **P˙blico-alvo:** Perfil `FINANCEIRO` e `ADMIN`.
-
----
-
-### ?? 4. ConciliaÁ„o Banc·ria Assistida
-
-* **Objetivo:** Substituir a conciliaÁ„o manual por um fluxo semi-autom·tico onde o usu·rio valida exceÁıes, n„o executa o processo inteiro.
-* **Escopo:**
-  * ImportaÁ„o de extrato banc·rio (OFX/CSV).
-  * Motor de sugest„o autom·tica: o ERP associa cada lanÁamento do extrato ao registro interno mais prov·vel (boleto, pagamento, transferÍncia).
-  * O usu·rio revisa apenas os lanÁamentos n„o associados automaticamente.
-  * GeraÁ„o de relatÛrio de conciliaÁ„o com aprovaÁ„o por usu·rio respons·vel.
-* **Impacto:** Muito Alto ó base de qualidade para qualquer BI financeiro futuro.
-* **Complexidade:** MÈdia
-* **P˙blico-alvo:** Perfil `FINANCEIRO`.
-
----
-
-### ?? 5. Painel Operacional do Dia *(NOVO)*
-
-* **Objetivo:** Dar ao gestor uma vis„o consolidada do dia em menos de 10 segundos.
-* **Escopo:**
-  * Widget na tela inicial (por perfil) com os n˙meros mais crÌticos do dia corrente.
-  * Exemplos de indicadores:
-    * Pagamentos com vencimento hoje
-    * CobranÁas previstas para hoje
-    * Pedidos em aberto aguardando faturamento
-    * PendÍncias financeiras n„o resolvidas
-  * Design minimalista, sem necessidade de navegaÁ„o para acessar.
-* **Impacto:** Alto
-* **Complexidade:** Baixa
-* **P˙blico-alvo:** Perfis `ADMIN` e `FINANCEIRO`.
-
-### 6. Provisionamento Recorrente (ProvisÛrio vs. Efetivo)
-
-* **Objetivo:** LanÁar previsıes de despesas ou receitas recorrentes de valor estimado (Ex: Luz, ¡gua, Telefone) para atÈ 12 meses, permitindo uma projeÁ„o de fluxo de caixa muito mais realista.
-* **Escopo:**
-  * CriaÁ„o de bot„o/opÁ„o "LanÁamento Recorrente (ProvisÛrio)" nas telas de Contas a Pagar e Receber.
-  * GeraÁ„o autom·tica em lote de atÈ 12 parcelas com data de vencimento incremental e valor fixo/estimado.
-  * AtribuiÁ„o de uma tag/flag de status: `PROVIS”RIO` (para estimativas) e `EFETIVO` (para quando o valor real da fatura chega).
-  * Possibilidade de editar o valor e mudar o status para `EFETIVO` de forma r·pida ao receber a conta real.
-  * IntegraÁ„o dos provisionamentos provisÛrios na visualizaÁ„o e nos gr·ficos de ProjeÁ„o de Fluxo de Caixa (com opÁ„o de ativ·-los/desativ·-los no gr·fico).
-* **Impacto:** Muito Alto - Fornece previsibilidade real para o fluxo de caixa, evitando surpresas com contas recorrentes que ainda n„o foram faturadas.
-* **Complexidade:** Baixa-MÈdia
-* **P˙blico-alvo:** Perfil `FINANCEIRO` e `ADMIN`.
-
-
----
-
-## P2 ó InteligÍncia Operacional
-> **Meta:** Fazer o ERP ajudar a decidir, n„o apenas registrar.
-
----
-
-### ?? 6. Painel Comercial (BI de Vendas)
-
-* **Objetivo:** Criar um ambiente completo de Business Intelligence voltado para o time comercial e representantes de vendas.
-* **Escopo:**
-  * Substituir a visualizaÁ„o de abas gerais por um cockpit unificado de performance comercial.
-  * Gr·ficos din‚micos de faturamento por representante, evoluÁ„o mensal de metas, ranking de produtos mais vendidos e clientes inativos.
-  * Indicadores de positivaÁ„o de carteira de clientes.
-* **DependÍncia:** Funciona melhor apÛs a Central de Trabalho e o Cadastro Inteligente estabilizarem a qualidade dos dados comerciais.
-* **P˙blico-alvo:** Perfil `VENDAS` (Comercial / Rotas).
-
----
-
-### [CONCLUIDO] 7. Painel Financeiro (BI Financeiro Operacional)
-
-* **Objetivo:** Criar um ambiente de Business Intelligence focado na operaÁ„o financeira di·ria e fluxo de caixa.
-* **Escopo:**
-  * Cockpit focado na sa˙de financeira e fluxo de caixa operacional.
-  * Indicadores visuais de contas a pagar e receber, taxa de inadimplÍncia de boletos e previsibilidade de saldo de caixa.
-  * **Previs„o de Fluxo de Caixa** em 30, 60 e 90 dias com base em tÌtulos em aberto e histÛrico de recebimentos.
-* **DependÍncia:** Requer ConciliaÁ„o Banc·ria Assistida (P1.4) em operaÁ„o. BI financeiro sobre dados n„o conciliados gera relatÛrios n„o confi·veis.
-* **P˙blico-alvo:** Perfil `FINANCEIRO` (Tesouraria).
-
----
-
-### 8. Reforma do Painel Executivo (CEO Cockpit)
-
-* **Objetivo:** Transformar o atual Dashboard em uma central de inteligÍncia estratÈgica para o gestor geral / CEO.
-* **Escopo:**
-  * AgregaÁ„o de dados consolidados de todas as ·reas: DRE, Rentabilidade Geral, EBITDA, Margem de ContribuiÁ„o, EvoluÁ„o de Estoque Ativo, Lucratividade LÌquida e Comissıes a Pagar.
-  * Exclusividade de acesso: apenas perfil `ADMIN`.
-  * **An·lise por Regi„o (Geogr·fica):** IntegraÁ„o do campo **Regi„o** no cadastro de clientes, contemplando as 10 macro-regiıes de atendimento (*Centro/Sul, Norte, Oeste, Sudoeste, Baixada, NiterÛi/S. GonÁalo, Lagos, N. Fluminense, S. Fluminense e Costa Verde*), permitindo agrupamento de faturamento, positivaÁ„o e rentabilidade geogr·fica.
-  * **Rentabilidade Geogr·fica:** Receita, margem, positivaÁ„o e ticket mÈdio por regi„o.
-* **DependÍncia:** Requer PainÈis Comercial (P2.6) e Financeiro (P2.7) como base de dados.
-* **Conceito Visual Desenvolvido:**
-  ![Conceitos do BI Painel Executivo](PAINEL%20EXECUTIVO.png)
-* **P˙blico-alvo:** Perfil `ADMIN` (Diretoria / Gest„o Geral).
-
----
-
-### ?? 9. CNAB 240 / PIX em Lote *(reposicionado do P4)*
-
-* **Objetivo:** Automatizar pagamentos em lote de fornecedores, sal·rios e benefÌcios via integraÁ„o banc·ria.
-* **Escopo:**
-  * GeraÁ„o de arquivos de remessa banc·ria no padr„o FEBRABAN (CNAB 240) para pagamentos em lote.
-  * Suporte a lotes de pagamento PIX via JSON API.
-  * ConciliaÁ„o autom·tica dos pagamentos confirmados pelo banco.
-* **Nota:** Projeto financeiro, n„o de RH ó o benefÌcio se estende a pagamentos de fornecedores e qualquer saÌda em lote, n„o apenas folha.
-* **P˙blico-alvo:** Perfil `FINANCEIRO` e `ADMIN`.
-
----
-
-### ?? 10. Sistema de Alertas Inteligentes *(NOVO)*
-
-* **Objetivo:** Fazer o ERP notificar proativamente, sem que o usu·rio precise consultar relatÛrios.
-* **Escopo:**
-  * Motor de regras configur·vel pelo administrador.
-  * Exemplos de alertas:
-    * Cliente X dias sem realizar compra
-    * Estoque abaixo do ponto de reposiÁ„o
-    * FÈrias vencendo nos prÛximos Y dias
-    * Conta banc·ria sem conciliaÁ„o h· Z dias
-    * Boleto vencido sem baixa
-  * Entrega via interface do ERP (notificaÁ„o interna) e, futuramente, via Telegram/WhatsApp.
-* **P˙blico-alvo:** Todos os perfis (alertas segmentados por perfil).
-
----
-
-## P3 ó AutomaÁ„o e IA
-> **Meta:** Fazer o ERP executar tarefas, n„o apenas informar.
-
----
-
-### ?? 11. Assistente Operacional IA *(anteriormente: Agente Cognitivo Telegram)*
-
-* **Objetivo:** Transformar o Bot do Telegram em uma interface bidirecional e ativa, capaz de receber comandos, fotos e ·udios para operar o ERP de forma autom·tica e inteligente.
-* **Escopo:**
-  * **Input por ¡udio (Speech-to-Text/LLM):** Notas de voz de representantes e operadores. A IA transcreve, interpreta a intenÁ„o e executa a transaÁ„o (ex: lanÁar pedido de venda por ·udio).
-  * **Feedback Interativo:** ConfirmaÁıes detalhadas de lanÁamentos e alertas proativos no chat do usu·rio.
-* **Nota sobre nomenclatura:** O nome "Assistente Operacional IA" foi adotado intencionalmente. A inteligÍncia È mais importante que o canal de entrega ó futuramente pode operar via Telegram, WhatsApp, app prÛprio ou portal web.
-* **P˙blico-alvo:** Diretoria, Equipe Administrativa, Representantes de Venda e Operadores de F·brica.
-
----
-
-### ?? 12. Processamento de Documentos por IA *(NOVO ó separado do Assistente)*
-
-* **Objetivo:** Extrair dados estruturados de documentos fÌsicos ou digitais enviados pelo usu·rio, eliminando digitaÁ„o manual.
-* **Escopo:**
-  * **Input por Imagem (OCR/LLM):** Upload de fotos de notas fiscais, boletos, comprovantes de pagamento ou fichas de cadastro. O sistema extrai dados e realiza inserÁ„o/cadastro autom·tico no banco de dados.
-  * Entradas suportadas: Nota Fiscal (papel ou PDF), boleto banc·rio, comprovante de pagamento/transferÍncia, ficha de cadastro de cliente.
-  * SaÌda: dados estruturados, sugest„o de cadastro, lanÁamentos prontos para aprovaÁ„o do usu·rio.
-* **Nota:** Separado do Assistente Operacional por ser um projeto tÈcnico independente (pipeline OCR + LLM + validaÁ„o), com lÛgica e equipe distintas.
-* **P˙blico-alvo:** Equipe Administrativa, Financeiro e Representantes de Venda.
-
----
-
-### ??? 13. ERP Conversacional *(NOVO)*
-
-* **Objetivo:** Permitir que o usu·rio consulte o ERP em linguagem natural, sem precisar navegar por relatÛrios.
-* **Escopo:**
-  * Barra de busca inteligente acessÌvel de qualquer tela.
-  * Exemplos de consultas:
-    * *"Quanto vendi para o cliente X este mÍs?"*
-    * *"Quais clientes est„o sem comprar h· mais de 30 dias?"*
-    * *"Qual foi minha margem de contribuiÁ„o ontem?"*
-    * *"Qual o saldo atual da conta Bradesco?"*
-  * Respostas em linguagem natural com opÁ„o de abrir o relatÛrio completo correspondente.
-* **DependÍncia:** Requer qualidade de dados garantida pelas iniciativas de P1 e P2.
-* **P˙blico-alvo:** Perfis `ADMIN`, `FINANCEIRO` e `VENDAS`.
-
----
-
-### ??? 14. OperaÁ„o por Voz *(NOVO)*
-
-* **Objetivo:** Permitir o registro de pedidos e apontamentos por comando de voz, especialmente para representantes em campo.
-* **Escopo:**
-  * Representante fala: *"Pedido para Supermercado Silva: 10 caixas de produto A, 5 de produto B."*
-  * Sistema transcreve, interpreta e gera o rascunho do pedido para confirmaÁ„o.
-  * Integrado ao Assistente Operacional IA (P3.11).
-* **P˙blico-alvo:** Representantes de Venda (Comercial / Rotas).
-
----
-
-## P4 ó Expans„o Corporativa
-> **Meta:** Tornar o ERP mais completo para gest„o de pessoas e compliance trabalhista.
-
----
-
-### ?? 15. MÛdulo de Recursos Humanos AvanÁado (Fases 3, 4 e 5)
-
-* **Objetivo:** Expandir o mÛdulo Pessoas para um sistema completo de gest„o de RH.
-* **Escopo:**
-  * **Controle de FÈrias:** Rastreamento automatizado de perÌodos aquisitivos e concessivos. Alertas visuais e jobs para notificar fÈrias vencidas ou prÛximas do vencimento (evitando multas de fÈrias em dobro). Tabela de reduÁ„o de fÈrias por faltas injustificadas.
-  * **C·lculo RescisÛrio Autom·tico:** Motor para c·lculo de verbas rescisÛrias conforme tipo de desligamento (sem justa causa, com justa causa, pedido de demiss„o, acordo m˙tuo). GeraÁ„o do TRCT com provisıes de 13∫ proporcional, fÈrias proporcionais + 1/3, aviso prÈvio e multa do FGTS (40% ou 20%).
-  * **Tabelas Fiscais Din‚micas:** MigraÁ„o das faixas e alÌquotas de INSS, IRRF e sal·rio mÌnimo para tabelas do banco de dados, permitindo atualizaÁ„o anual via tela administrativa sem deploy de cÛdigo.
-* **Nota:** O mÛdulo de CNAB/PIX em Lote foi reposicionado para P2 por ser um projeto financeiro com escopo mais amplo que RH.
-* **P˙blico-alvo:** Perfis `ADMIN` e `FINANCEIRO` (Recursos Humanos e Diretoria).
-
----
-
-### ? 16. MÛdulo de Controle de Ponto EletrÙnico (Portaria 671/2021)
-
-* **Objetivo:** Integrar um sistema de controle de ponto eletrÙnico digital e homologado para os colaboradores da f·brica.
-* **Escopo:**
-  * **API de Ponto (FastAPI):** Registro de batidas com detecÁ„o inteligente de tipo (Entrada, SaÌda, Intervalo), c·lculo em tempo real de horas trabalhadas no dia e suporte a registros tempor·rios offline.
-  * **Terminal de Batida Kiosk (Tablet):** Interface web otimizada para tablets na recepÁ„o da f·brica, permitindo batida de ponto via QR Code do crach· (c‚mera integrada com jsQR) ou PIN numÈrico individual de 4 dÌgitos.
-  * **RelatÛrio de Espelho de Ponto:** GeraÁ„o autom·tica e exportaÁ„o do histÛrico mensal detalhado para assinatura do colaborador, em conformidade com as diretrizes do MTE.
-* **P˙blico-alvo:** Todos os colaboradores (CLT e Diaristas) e equipe de RH/Diretoria.
-
----
-
-## Projetos Adicionais Identificados
-
-> Iniciativas de alto valor estratÈgico ainda sem fase definida. Ser„o incorporadas ao roadmap conforme maturidade operacional das fases anteriores.
-
----
-
-### ?? Planejamento de Compras *(NOVO)*
-
-* **Objetivo:** Substituir a compra por intuiÁ„o por sugestıes baseadas em dados.
-* **Escopo:**
-  * Sistema de sugest„o de compras com base em estoque atual, histÛrico de consumo e previs„o de produÁ„o.
-  * GeraÁ„o de rascunho de pedido de compra para aprovaÁ„o do gestor.
-
----
-
-### ??? Rentabilidade Geogr·fica *(NOVO)*
-
-* **Objetivo:** Mostrar onde o negÛcio È mais e menos lucrativo geograficamente.
-* **Escopo:**
-  * Aproveitamento do campo Regi„o j· previsto no Painel Executivo (P2.8).
-  * Indicadores por regi„o: Receita, Margem de ContribuiÁ„o, PositivaÁ„o de Carteira e Ticket MÈdio.
-  * IdentificaÁ„o de regiıes com queda de performance para aÁ„o comercial direcionada.
-
----
-
-###  ???  Para transformar seu sistema em um SaaS de mercado, vocÍ n„o precisa abandonar o Python. VocÍ precisa apenas separar o Frontend (a tela) do Backend (a lÛgica e o processamento).
-
-*A evoluÁ„o natural da sua stack mantendo o Python seria:
-
-[ FRONTEND ] ????????????????? [ BACKEND ] ????????????????? [ BANCO DE DADOS ]
-React.js ou Vue.js            Python (FastAPI)              Supabase (PostgreSQL)
-(Interface Web Moderna)      (Processamento e APIs)         (Isolamento de Dados via RLS)
-
-*Transforme o Python no seu Backend (usando FastAPI): Toda a inteligÍncia do seu sistema (a leitura do PDF com pdfplumber, as validaÁıes de preÁo, o c·lculo de comissıes e as queries do Supabase) fica concentrada em uma API em Python usando FastAPI. O FastAPI È assÌncrono, extremamente veloz e aguenta milhares de acessos por segundo gastando pouquÌssimo servidor.
-
-*Construa um Frontend independente: Para as telas que os clientes v„o usar no dia a dia, substitua o Streamlit por tecnologias de mercado focadas em interfaces web, como React.js ou Vue.js (ambos usam JavaScript/TypeScript). Eles rodam direto no navegador do usu·rio, tirando todo o peso de renderizaÁ„o de tela do seu servidor.
-
-*Mantenha o GitHub (ou Bitbucket) e o Supabase: O fluxo de versionamento e o banco de dados permanecem exatamente os mesmos.
-
-*Resumo TÈcnico
-Mudar de linguagem (ir para C#, Java, PHP ou Node.js)? N„o È necess·rio. Python com FastAPI atende perfeitamente a nÌvel global.
-
-*Mantear o Supabase? Com certeza, use o RLS dele para blindar o multi-tenant do seu SaaS.
-
-*Manter o Streamlit? Apenas para vocÍ, como painel administrativo do SaaS (onde vocÍ gerencia quem pagou, ativa novos clientes, etc.). Para as telas que os supermercados e as ind˙strias v„o acessar, o Streamlit deve ser substituÌdo por um frontend em React ou Vue focado em consumo de APIs.
-
-
----
-*Documento mantido como referÍncia viva. Revis„o recomendada a cada trimestre ou apÛs conclus„o de fase.*
-
+## P1 ¬ó Produtividade Operacional
+> **Meta:** Reduzir cliques, erros e tempo de treinamento. Esses projetos afetam praticamente todos os usu√°rios todos os dias.
+
+---
+
+### ??? 1. Central de Trabalho *(NOVO)*
+
+* **Objetivo:** Transformar o ERP em um sistema orientado a tarefas, eliminando a necessidade do usu√°rio "ca√ßar" o que precisa fazer.
+* **Escopo:**
+  * Painel unificado de pend√™ncias por perfil de acesso, exibindo automaticamente o que requer a√ß√£o do usu√°rio.
+  * Exemplos de cards por √°rea:
+    * Notas fiscais aguardando lan√ßamento
+    * Boletos aguardando pagamento
+    * Dep√≥sitos aguardando concilia√ß√£o
+    * Pedidos aguardando faturamento
+    * Rotas aguardando fechamento
+  * Cada card √© clic√°vel e leva diretamente ao registro correspondente.
+* **Impacto:** Alt√≠ssimo ¬ó reduz navega√ß√£o, erros por esquecimento e tempo de treinamento de novos usu√°rios.
+* **Complexidade:** M√©dia
+* **P√∫blico-alvo:** Todos os perfis.
+
+---
+
+### ?? 2. Cadastro Inteligente
+
+* **Objetivo:** Eliminar digita√ß√£o manual e erros de cadastro via automa√ß√£o por API p√∫blica.
+* **Escopo:**
+  * Preenchimento autom√°tico de cadastro de **clientes** por CNPJ (Receita Federal).
+  * Preenchimento autom√°tico de cadastro de **fornecedores** por CNPJ.
+  * Preenchimento autom√°tico de **endere√ßos** por CEP (ViaCEP).
+  * Valida√ß√£o de CNPJ/CPF em tempo real na interface.
+* **Impacto:** Muito Alto
+* **Complexidade:** Baixa
+* **P√∫blico-alvo:** Todos os perfis com acesso a cadastros.
+
+---
+
+### ?? 3. Lan√ßamento Inteligente de NF
+
+* **Objetivo:** Evoluir o recebimento fiscal de digita√ß√£o manual para confer√™ncia assistida.
+* **Escopo:**
+  * Upload de XML da NF-e diretamente na tela de recebimento.
+  * Confer√™ncia autom√°tica de itens, quantidades e valores contra o pedido de compra vinculado.
+  * Valida√ß√£o de pre√ßos: alerta quando o pre√ßo da nota diverge do custo hist√≥rico ou do pedido.
+  * Valida√ß√£o de prazo: verifica√ß√£o dos vencimentos dos t√≠tulos gerados contra o que foi negociado.
+  * Sugest√£o autom√°tica de cadastro de novos produtos ou fornecedores detectados no XML.
+* **Impacto:** Muito Alto
+* **Complexidade:** M√©dia
+* **P√∫blico-alvo:** Perfil `FINANCEIRO` e `ADMIN`.
+
+---
+
+### ?? 4. Concilia√ß√£o Banc√°ria Assistida
+
+* **Objetivo:** Substituir a concilia√ß√£o manual por um fluxo semi-autom√°tico onde o usu√°rio valida exce√ß√µes, n√£o executa o processo inteiro.
+* **Escopo:**
+  * Importa√ß√£o de extrato banc√°rio (OFX/CSV).
+  * Motor de sugest√£o autom√°tica: o ERP associa cada lan√ßamento do extrato ao registro interno mais prov√°vel (boleto, pagamento, transfer√™ncia).
+  * O usu√°rio revisa apenas os lan√ßamentos n√£o associados automaticamente.
+  * Gera√ß√£o de relat√≥rio de concilia√ß√£o com aprova√ß√£o por usu√°rio respons√°vel.
+* **Impacto:** Muito Alto ¬ó base de qualidade para qualquer BI financeiro futuro.
+* **Complexidade:** M√©dia
+* **P√∫blico-alvo:** Perfil `FINANCEIRO`.
+
+---
+
+### ?? 5. Painel Operacional do Dia *(NOVO)*
+
+* **Objetivo:** Dar ao gestor uma vis√£o consolidada do dia em menos de 10 segundos.
+* **Escopo:**
+  * Widget na tela inicial (por perfil) com os n√∫meros mais cr√≠ticos do dia corrente.
+  * Exemplos de indicadores:
+    * Pagamentos com vencimento hoje
+    * Cobran√ßas previstas para hoje
+    * Pedidos em aberto aguardando faturamento
+    * Pend√™ncias financeiras n√£o resolvidas
+  * Design minimalista, sem necessidade de navega√ß√£o para acessar.
+* **Impacto:** Alto
+* **Complexidade:** Baixa
+* **P√∫blico-alvo:** Perfis `ADMIN` e `FINANCEIRO`.
+
+### 6. Provisionamento Recorrente (Provis√≥rio vs. Efetivo)
+
+* **Objetivo:** Lan√ßar previs√µes de despesas ou receitas recorrentes de valor estimado (Ex: Luz, √Ågua, Telefone) para at√© 12 meses, permitindo uma proje√ß√£o de fluxo de caixa muito mais realista.
+* **Escopo:**
+  * Cria√ß√£o de bot√£o/op√ß√£o "Lan√ßamento Recorrente (Provis√≥rio)" nas telas de Contas a Pagar e Receber.
+  * Gera√ß√£o autom√°tica em lote de at√© 12 parcelas com data de vencimento incremental e valor fixo/estimado.
+  * Atribui√ß√£o de uma tag/flag de status: `PROVIS√ìRIO` (para estimativas) e `EFETIVO` (para quando o valor real da fatura chega).
+  * Possibilidade de editar o valor e mudar o status para `EFETIVO` de forma r√°pida ao receber a conta real.
+  * Integra√ß√£o dos provisionamentos provis√≥rios na visualiza√ß√£o e nos gr√°ficos de Proje√ß√£o de Fluxo de Caixa (com op√ß√£o de ativ√°-los/desativ√°-los no gr√°fico).
+* **Impacto:** Muito Alto - Fornece previsibilidade real para o fluxo de caixa, evitando surpresas com contas recorrentes que ainda n√£o foram faturadas.
+* **Complexidade:** Baixa-M√©dia
+* **P√∫blico-alvo:** Perfil `FINANCEIRO` e `ADMIN`.
+
+
+---
+
+## P2 ¬ó Intelig√™ncia Operacional
+> **Meta:** Fazer o ERP ajudar a decidir, n√£o apenas registrar.
+
+---
+
+### ?? 6. Painel Comercial (BI de Vendas)
+
+* **Objetivo:** Criar um ambiente completo de Business Intelligence voltado para o time comercial e representantes de vendas.
+* **Escopo:**
+  * Substituir a visualiza√ß√£o de abas gerais por um cockpit unificado de performance comercial.
+  * Gr√°ficos din√¢micos de faturamento por representante, evolu√ß√£o mensal de metas, ranking de produtos mais vendidos e clientes inativos.
+  * Indicadores de positiva√ß√£o de carteira de clientes.
+* **Depend√™ncia:** Funciona melhor ap√≥s a Central de Trabalho e o Cadastro Inteligente estabilizarem a qualidade dos dados comerciais.
+* **P√∫blico-alvo:** Perfil `VENDAS` (Comercial / Rotas).
+
+---
+
+### [CONCLUIDO] 7. Painel Financeiro (BI Financeiro Operacional)
+
+* **Objetivo:** Criar um ambiente de Business Intelligence focado na opera√ß√£o financeira di√°ria e fluxo de caixa.
+* **Escopo:**
+  * Cockpit focado na sa√∫de financeira e fluxo de caixa operacional.
+  * Indicadores visuais de contas a pagar e receber, taxa de inadimpl√™ncia de boletos e previsibilidade de saldo de caixa.
+  * **Previs√£o de Fluxo de Caixa** em 30, 60 e 90 dias com base em t√≠tulos em aberto e hist√≥rico de recebimentos.
+* **Depend√™ncia:** Requer Concilia√ß√£o Banc√°ria Assistida (P1.4) em opera√ß√£o. BI financeiro sobre dados n√£o conciliados gera relat√≥rios n√£o confi√°veis.
+* **P√∫blico-alvo:** Perfil `FINANCEIRO` (Tesouraria).
+
+---
+
+### 8. Reforma do Painel Executivo (CEO Cockpit)
+
+* **Objetivo:** Transformar o atual Dashboard em uma central de intelig√™ncia estrat√©gica para o gestor geral / CEO.
+* **Escopo:**
+  * Agrega√ß√£o de dados consolidados de todas as √°reas: DRE, Rentabilidade Geral, EBITDA, Margem de Contribui√ß√£o, Evolu√ß√£o de Estoque Ativo, Lucratividade L√≠quida e Comiss√µes a Pagar.
+  * Exclusividade de acesso: apenas perfil `ADMIN`.
+  * **An√°lise por Regi√£o (Geogr√°fica):** Integra√ß√£o do campo **Regi√£o** no cadastro de clientes, contemplando as 10 macro-regi√µes de atendimento (*Centro/Sul, Norte, Oeste, Sudoeste, Baixada, Niter√≥i/S. Gon√ßalo, Lagos, N. Fluminense, S. Fluminense e Costa Verde*), permitindo agrupamento de faturamento, positiva√ß√£o e rentabilidade geogr√°fica.
+  * **Rentabilidade Geogr√°fica:** Receita, margem, positiva√ß√£o e ticket m√©dio por regi√£o.
+* **Depend√™ncia:** Requer Pain√©is Comercial (P2.6) e Financeiro (P2.7) como base de dados.
+* **Conceito Visual Desenvolvido:**
+  ![Conceitos do BI Painel Executivo](PAINEL%20EXECUTIVO.png)
+* **P√∫blico-alvo:** Perfil `ADMIN` (Diretoria / Gest√£o Geral).
+
+---
+
+### ?? 9. CNAB 240 / PIX em Lote *(reposicionado do P4)*
+
+* **Objetivo:** Automatizar pagamentos em lote de fornecedores, sal√°rios e benef√≠cios via integra√ß√£o banc√°ria.
+* **Escopo:**
+  * Gera√ß√£o de arquivos de remessa banc√°ria no padr√£o FEBRABAN (CNAB 240) para pagamentos em lote.
+  * Suporte a lotes de pagamento PIX via JSON API.
+  * Concilia√ß√£o autom√°tica dos pagamentos confirmados pelo banco.
+* **Nota:** Projeto financeiro, n√£o de RH ¬ó o benef√≠cio se estende a pagamentos de fornecedores e qualquer sa√≠da em lote, n√£o apenas folha.
+* **P√∫blico-alvo:** Perfil `FINANCEIRO` e `ADMIN`.
+
+---
+
+### ?? 10. Sistema de Alertas Inteligentes *(NOVO)*
+
+* **Objetivo:** Fazer o ERP notificar proativamente, sem que o usu√°rio precise consultar relat√≥rios.
+* **Escopo:**
+  * Motor de regras configur√°vel pelo administrador.
+  * Exemplos de alertas:
+    * Cliente X dias sem realizar compra
+    * Estoque abaixo do ponto de reposi√ß√£o
+    * F√©rias vencendo nos pr√≥ximos Y dias
+    * Conta banc√°ria sem concilia√ß√£o h√° Z dias
+    * Boleto vencido sem baixa
+  * Entrega via interface do ERP (notifica√ß√£o interna) e, futuramente, via Telegram/WhatsApp.
+* **P√∫blico-alvo:** Todos os perfis (alertas segmentados por perfil).
+
+---
+
+## P3 ¬ó Automa√ß√£o e IA
+> **Meta:** Fazer o ERP executar tarefas, n√£o apenas informar.
+
+---
+
+### ?? 11. Assistente Operacional IA *(anteriormente: Agente Cognitivo Telegram)*
+
+* **Objetivo:** Transformar o Bot do Telegram em uma interface bidirecional e ativa, capaz de receber comandos, fotos e √°udios para operar o ERP de forma autom√°tica e inteligente.
+* **Escopo:**
+  * **Input por √Åudio (Speech-to-Text/LLM):** Notas de voz de representantes e operadores. A IA transcreve, interpreta a inten√ß√£o e executa a transa√ß√£o (ex: lan√ßar pedido de venda por √°udio).
+  * **Feedback Interativo:** Confirma√ß√µes detalhadas de lan√ßamentos e alertas proativos no chat do usu√°rio.
+* **Nota sobre nomenclatura:** O nome "Assistente Operacional IA" foi adotado intencionalmente. A intelig√™ncia √© mais importante que o canal de entrega ¬ó futuramente pode operar via Telegram, WhatsApp, app pr√≥prio ou portal web.
+* **P√∫blico-alvo:** Diretoria, Equipe Administrativa, Representantes de Venda e Operadores de F√°brica.
+
+---
+
+### ?? 12. Processamento de Documentos por IA *(NOVO ¬ó separado do Assistente)*
+
+* **Objetivo:** Extrair dados estruturados de documentos f√≠sicos ou digitais enviados pelo usu√°rio, eliminando digita√ß√£o manual.
+* **Escopo:**
+  * **Input por Imagem (OCR/LLM):** Upload de fotos de notas fiscais, boletos, comprovantes de pagamento ou fichas de cadastro. O sistema extrai dados e realiza inser√ß√£o/cadastro autom√°tico no banco de dados.
+  * Entradas suportadas: Nota Fiscal (papel ou PDF), boleto banc√°rio, comprovante de pagamento/transfer√™ncia, ficha de cadastro de cliente.
+  * Sa√≠da: dados estruturados, sugest√£o de cadastro, lan√ßamentos prontos para aprova√ß√£o do usu√°rio.
+* **Nota:** Separado do Assistente Operacional por ser um projeto t√©cnico independente (pipeline OCR + LLM + valida√ß√£o), com l√≥gica e equipe distintas.
+* **P√∫blico-alvo:** Equipe Administrativa, Financeiro e Representantes de Venda.
+
+---
+
+### ??? 13. ERP Conversacional *(NOVO)*
+
+* **Objetivo:** Permitir que o usu√°rio consulte o ERP em linguagem natural, sem precisar navegar por relat√≥rios.
+* **Escopo:**
+  * Barra de busca inteligente acess√≠vel de qualquer tela.
+  * Exemplos de consultas:
+    * *"Quanto vendi para o cliente X este m√™s?"*
+    * *"Quais clientes est√£o sem comprar h√° mais de 30 dias?"*
+    * *"Qual foi minha margem de contribui√ß√£o ontem?"*
+    * *"Qual o saldo atual da conta Bradesco?"*
+  * Respostas em linguagem natural com op√ß√£o de abrir o relat√≥rio completo correspondente.
+* **Depend√™ncia:** Requer qualidade de dados garantida pelas iniciativas de P1 e P2.
+* **P√∫blico-alvo:** Perfis `ADMIN`, `FINANCEIRO` e `VENDAS`.
+
+---
+
+### ??? 14. Opera√ß√£o por Voz *(NOVO)*
+
+* **Objetivo:** Permitir o registro de pedidos e apontamentos por comando de voz, especialmente para representantes em campo.
+* **Escopo:**
+  * Representante fala: *"Pedido para Supermercado Silva: 10 caixas de produto A, 5 de produto B."*
+  * Sistema transcreve, interpreta e gera o rascunho do pedido para confirma√ß√£o.
+  * Integrado ao Assistente Operacional IA (P3.11).
+* **P√∫blico-alvo:** Representantes de Venda (Comercial / Rotas).
+
+---
+
+## P4 ¬ó Expans√£o Corporativa
+> **Meta:** Tornar o ERP mais completo para gest√£o de pessoas e compliance trabalhista.
+
+---
+
+### ?? 15. M√≥dulo de Recursos Humanos Avan√ßado (Fases 3, 4 e 5)
+
+* **Objetivo:** Expandir o m√≥dulo Pessoas para um sistema completo de gest√£o de RH.
+* **Escopo:**
+  * **Controle de F√©rias:** Rastreamento automatizado de per√≠odos aquisitivos e concessivos. Alertas visuais e jobs para notificar f√©rias vencidas ou pr√≥ximas do vencimento (evitando multas de f√©rias em dobro). Tabela de redu√ß√£o de f√©rias por faltas injustificadas.
+  * **C√°lculo Rescis√≥rio Autom√°tico:** Motor para c√°lculo de verbas rescis√≥rias conforme tipo de desligamento (sem justa causa, com justa causa, pedido de demiss√£o, acordo m√∫tuo). Gera√ß√£o do TRCT com provis√µes de 13¬∫ proporcional, f√©rias proporcionais + 1/3, aviso pr√©vio e multa do FGTS (40% ou 20%).
+  * **Tabelas Fiscais Din√¢micas:** Migra√ß√£o das faixas e al√≠quotas de INSS, IRRF e sal√°rio m√≠nimo para tabelas do banco de dados, permitindo atualiza√ß√£o anual via tela administrativa sem deploy de c√≥digo.
+* **Nota:** O m√≥dulo de CNAB/PIX em Lote foi reposicionado para P2 por ser um projeto financeiro com escopo mais amplo que RH.
+* **P√∫blico-alvo:** Perfis `ADMIN` e `FINANCEIRO` (Recursos Humanos e Diretoria).
+
+---
+
+### ? 16. M√≥dulo de Controle de Ponto Eletr√¥nico (Portaria 671/2021)
+
+* **Objetivo:** Integrar um sistema de controle de ponto eletr√¥nico digital e homologado para os colaboradores da f√°brica.
+* **Escopo:**
+  * **API de Ponto (FastAPI):** Registro de batidas com detec√ß√£o inteligente de tipo (Entrada, Sa√≠da, Intervalo), c√°lculo em tempo real de horas trabalhadas no dia e suporte a registros tempor√°rios offline.
+  * **Terminal de Batida Kiosk (Tablet):** Interface web otimizada para tablets na recep√ß√£o da f√°brica, permitindo batida de ponto via QR Code do crach√° (c√¢mera integrada com jsQR) ou PIN num√©rico individual de 4 d√≠gitos.
+  * **Relat√≥rio de Espelho de Ponto:** Gera√ß√£o autom√°tica e exporta√ß√£o do hist√≥rico mensal detalhado para assinatura do colaborador, em conformidade com as diretrizes do MTE.
+* **P√∫blico-alvo:** Todos os colaboradores (CLT e Diaristas) e equipe de RH/Diretoria.
+
+---
+
+## Projetos Adicionais Identificados
+
+> Iniciativas de alto valor estrat√©gico ainda sem fase definida. Ser√£o incorporadas ao roadmap conforme maturidade operacional das fases anteriores.
+
+---
+
+### ?? Planejamento de Compras *(NOVO)*
+
+* **Objetivo:** Substituir a compra por intui√ß√£o por sugest√µes baseadas em dados.
+* **Escopo:**
+  * Sistema de sugest√£o de compras com base em estoque atual, hist√≥rico de consumo e previs√£o de produ√ß√£o.
+  * Gera√ß√£o de rascunho de pedido de compra para aprova√ß√£o do gestor.
+
+---
+
+### ??? Rentabilidade Geogr√°fica *(NOVO)*
+
+* **Objetivo:** Mostrar onde o neg√≥cio √© mais e menos lucrativo geograficamente.
+* **Escopo:**
+  * Aproveitamento do campo Regi√£o j√° previsto no Painel Executivo (P2.8).
+  * Indicadores por regi√£o: Receita, Margem de Contribui√ß√£o, Positiva√ß√£o de Carteira e Ticket M√©dio.
+  * Identifica√ß√£o de regi√µes com queda de performance para a√ß√£o comercial direcionada.
+
+---
+
+###  ???  Para transformar seu sistema em um SaaS de mercado, voc√™ n√£o precisa abandonar o Python. Voc√™ precisa apenas separar o Frontend (a tela) do Backend (a l√≥gica e o processamento).
+
+*A evolu√ß√£o natural da sua stack mantendo o Python seria:
+
+[ FRONTEND ] ????????????????? [ BACKEND ] ????????????????? [ BANCO DE DADOS ]
+React.js ou Vue.js            Python (FastAPI)              Supabase (PostgreSQL)
+(Interface Web Moderna)      (Processamento e APIs)         (Isolamento de Dados via RLS)
+
+*Transforme o Python no seu Backend (usando FastAPI): Toda a intelig√™ncia do seu sistema (a leitura do PDF com pdfplumber, as valida√ß√µes de pre√ßo, o c√°lculo de comiss√µes e as queries do Supabase) fica concentrada em uma API em Python usando FastAPI. O FastAPI √© ass√≠ncrono, extremamente veloz e aguenta milhares de acessos por segundo gastando pouqu√≠ssimo servidor.
+
+*Construa um Frontend independente: Para as telas que os clientes v√£o usar no dia a dia, substitua o Streamlit por tecnologias de mercado focadas em interfaces web, como React.js ou Vue.js (ambos usam JavaScript/TypeScript). Eles rodam direto no navegador do usu√°rio, tirando todo o peso de renderiza√ß√£o de tela do seu servidor.
+
+*Mantenha o GitHub (ou Bitbucket) e o Supabase: O fluxo de versionamento e o banco de dados permanecem exatamente os mesmos.
+
+*Resumo T√©cnico
+Mudar de linguagem (ir para C#, Java, PHP ou Node.js)? N√£o √© necess√°rio. Python com FastAPI atende perfeitamente a n√≠vel global.
+
+*Mantear o Supabase? Com certeza, use o RLS dele para blindar o multi-tenant do seu SaaS.
+
+*Manter o Streamlit? Apenas para voc√™, como painel administrativo do SaaS (onde voc√™ gerencia quem pagou, ativa novos clientes, etc.). Para as telas que os supermercados e as ind√∫strias v√£o acessar, o Streamlit deve ser substitu√≠do por um frontend em React ou Vue focado em consumo de APIs.
+
+
+---
+*Documento mantido como refer√™ncia viva. Revis√£o recomendada a cada trimestre ou ap√≥s conclus√£o de fase.*
+
