@@ -80,10 +80,10 @@ if not df_cap.empty:
     df_cap['venc_month'] = df_cap['data_vencimento'].dt.to_period('M')
     
     # Define reference month based on whether it is a fixed expense or not
-    is_fixed = df_cap['codigo'].str.startswith(('2.3.', '3.1.'), na=False)
+    is_fixed = df_cap['codigo'].str.startswith(('2.3.', '3.1.'), na=False) & ~df_cap['codigo'].str.startswith('2.3.6', na=False)
     
     df_cap['ref_month'] = df_cap['venc_month']
-    # If it is a fixed expense (starting with 2.3. or 3.1.), the reference month is the month before the due date's month (venc_month - 1)
+    # If it is a fixed expense (starting with 2.3. or 3.1. except 2.3.6), the reference month is the month before the due date's month (venc_month - 1)
     df_cap.loc[is_fixed, 'ref_month'] = df_cap.loc[is_fixed, 'venc_month'] - 1
 else:
     df_cap = pd.DataFrame(columns=['valor', 'codigo', 'pc_cat', 'pc_nome', 'ref_month'])

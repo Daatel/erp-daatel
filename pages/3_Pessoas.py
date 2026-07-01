@@ -17,11 +17,12 @@ st.title("👥 Pessoas e Folha de Pagamento")
 
 df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%'")
 
-tab_cadastro, tab_aprovacoes, tab1, tab2, tab3, tab4 = st.tabs([
+tab_cadastro, tab_aprovacoes, tab1, tab2, tab_beneficios, tab3, tab4 = st.tabs([
     "📝 Cadastro de Colaboradores",
     "⚡ Cadastro Rápido",
     "Visão Geral (Quadro)",
     "Folha de Pagamento",
+    "🚌 Benefícios Semanais",
     "💎 Central de Comissões",
     "🖨️ Extrato Mensal do Vendedor"
 ])
@@ -974,6 +975,115 @@ with tab2:
                         use_container_width=True,
                         key="lote_csv"
                     )
+
+    # ---- TAB: BENEFÍCIOS SEMANAIS ----
+    with tab_beneficios:
+        df_ativos = fetch_all("SELECT id, nome, valor_transporte, valor_refeicao FROM funcionarios WHERE status='ATIVO'")
+        
+        if df_ativos.empty:
+            st.info("Nenhum colaborador ativo cadastrado no sistema.")
+        else:
+            from datetime import date, timedelta
+            
+            df_pc_b = fetch_all("SELECT id, codigo, nome FROM planos_de_contas WHERE categoria NOT IN ('RECEITA', 'RECEITA_NAO_OP') ORDER BY codigo")
+            op_pc_b = {}
+            default_idx_pc = 0
+            if not df_pc_b.empty:
+                for idx_pc, r in df_pc_b.iterrows():
+                    op_pc_b[f"{r['codigo']} - {r['nome']}"] = r['id']
+                    if r['codigo'] == '2.3.6':
+                        default_idx_pc = idx_pc
+                        
+            # Layout de colunas proporcional e equilibrado
+            col_b1, col_b2, col_b3, col_b4 = st.columns([2.5, 1.2, 1.2, 1.1])
+            pc_sel_b = col_b1.selectbox("Plano de Contas", list(op_pc_b.keys()), index=default_idx_pc, key="ben_pc_sel")
+            
+            # Seleção do intervalo semanal de pagamento
+            hoje = date.today()
+            default_start = hoje - timedelta(days=hoje.weekday()) if hoje.weekday() < 5 else hoje
+            default_end = default_start + timedelta(days=4)
+            
+            data_ini = col_b2.date_input("Início da Semana", value=default_start, format="DD/MM/YYYY", key="ben_data_ini")
+            data_fim = col_b3.date_input("Fim da Semana", value=default_end, format="DD/MM/YYYY", key="ben_data_fim")
+            venc_b = col_b4.date_input("Vencimento", value=data_fim, format="DD/MM/YYYY", key="ben_venc_sel")
+            
+            # Descrição dinâmica baseada nas datas
+            data_ini_str = data_ini.strftime("%d/%m")
+            data_fim_str = data_fim.strftime("%d/%m")
+            default_desc = f"Pgto passagem e refeição - Período: {data_ini_str} a {data_fim_str}"
+            
+            desc_modelo_b = st.text_input("Descrição / Histórico do Lançamento", value=default_desc, key="ben_desc_modelo")
+            
+            # Monta DataFrame inicial para o data_editor
+            rows_b = []
+            for _, r in df_ativos.iterrows():
+                vt_diario = float(r['valor_transporte'] or 0.0)
+                vr_diario = float(r['valor_refeicao'] or 0.0)
+                
+                vt_semanal = round(vt_diario * 5.0, 2)
+                vr_semanal = round(vr_diario * 5.0, 2)
+                
+                rows_b.append({
+                    "Gerar?": True,
+                    "Funcionario ID": int(r['id']),
+                    "Colaborador": str(r['nome']),
+                    "Passagem R$": vt_semanal,
+                    "Alimentação R$": vr_semanal
+                })
+                
+            df_editor_b = pd.DataFrame(rows_b)
+            
+            st.markdown("**Ajuste os valores para cada colaborador conforme necessário (desmarque os que não devem receber esta semana):**")
+            edited_df_b = st.data_editor(
+                df_editor_b,
+                hide_index=True,
+                column_config={
+                    "Gerar?": st.column_config.CheckboxColumn("Gerar?", default=True),
+                    "Funcionario ID": st.column_config.NumberColumn("ID", disabled=True, width="small"),
+                    "Colaborador": st.column_config.TextColumn("Colaborador", disabled=True),
+                    "Passagem R$": st.column_config.NumberColumn("Passagem R$", format="%.2f", min_value=0.0),
+                    "Alimentação R$": st.column_config.NumberColumn("Alimentação R$", format="%.2f", min_value=0.0)
+                },
+                use_container_width=True,
+                key="editor_beneficios_semanais"
+            )
+            
+            if st.button("💾 Gerar Lançamentos de Benefícios", type="primary", use_container_width=True, key="btn_gerar_beneficios"):
+                pc_id_b = op_pc_b[pc_sel_b]
+                venc_str_b = venc_b.strftime("%Y-%m-%d")
+                
+                gerados_vt = 0
+                gerados_vr = 0
+                
+                with st.spinner("Registrando lançamentos no Contas a Pagar..."):
+                    for _, r in edited_df_b.iterrows():
+                        if not r["Gerar?"]:
+                            continue
+                            
+                        nome_c = r["Colaborador"]
+                        val_vt = float(r["Passagem R$"])
+                        val_vr = float(r["Alimentação R$"])
+                        
+                        # Lança Passagem se > 0
+                        if val_vt > 0.0:
+                            desc_vt = f"{desc_modelo_b} - VT - {nome_c}"
+                            run_query(
+                                "INSERT INTO contas_a_pagar (plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, 'PENDENTE')",
+                                (pc_id_b, desc_vt, val_vt, venc_str_b)
+                            )
+                            gerados_vt += 1
+                            
+                        # Lança Alimentação se > 0
+                        if val_vr > 0.0:
+                            desc_vr = f"{desc_modelo_b} - VR - {nome_c}"
+                            run_query(
+                                "INSERT INTO contas_a_pagar (plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, 'PENDENTE')",
+                                (pc_id_b, desc_vr, val_vr, venc_str_b)
+                            )
+                            gerados_vr += 1
+                            
+                st.success(f"✅ Lançamentos concluídos: {gerados_vt} de passagem e {gerados_vr} de alimentação gerados com sucesso!")
+                import time; time.sleep(1.5); st.rerun()
 
 
 # ======= 3. COMISSÕES =======
