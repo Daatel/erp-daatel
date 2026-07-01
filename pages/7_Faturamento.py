@@ -340,11 +340,30 @@ with tab1:
                             lote_impresso = row.get('Lote Impresso (NF/DAV)', '')
                             validade_impressa = row.get('Validade (NF/DAV)', '')
                             
-                            # Se for Nota Fiscal, transmite para o SEFAZ antes de baixar no banco
+                            # Se for Nota Fiscal, transmite para o Bling e salva o ID retornado
+                            bling_id = None
                             if "Nota Fiscal" in tipo_doc:
-                                simular_emissao_sefaz_with_retry(pid, cli_nome, v_total)
+                                from utils_bling import enviar_faturamento_ao_bling
+                                # Precisamos buscar a forma de pagamento selecionada no grid para repassar
+                                row_grid = pedidos_selecionados[pedidos_selecionados['pedido_id'] == pid].iloc[0]
+                                fp_sel_nome = row_grid['Forma de Pagamento']
+                                
+                                insts_pedido = [p for p in st.session_state['parcelas_faturamento'] if p['Pedido ID'] == pid]
+                                
+                                # Envia para o Bling
+                                bling_id = enviar_faturamento_ao_bling(
+                                    venda_id=pid,
+                                    cliente_id=int(vd['cliente_id']),
+                                    produto_id=int(vd['p_id']),
+                                    quantidade=float(vd['quantidade']),
+                                    valor_unitario=float(vd['valor_total']) / float(vd['quantidade']),
+                                    valor_total=float(vd['valor_total']),
+                                    lote=lote_impresso,
+                                    validade=validade_impressa,
+                                    parcelas=insts_pedido
+                                )
                             
-                            # 1. Muda Status da Venda e Numeração (DAV)
+                            # 1. Muda Status da Venda e Numeração (DAV ou Bling ID)
                             if "DAV" in tipo_doc:
                                 df_dav_max = fetch_all_tx(cursor, "SELECT MAX(CAST(numero_documento AS INTEGER)) as max_dav FROM vendas WHERE tipo_documento LIKE '%DAV%'")
                                 max_dav = df_dav_max.iloc[0]['max_dav'] if not df_dav_max.empty and pd.notna(df_dav_max.iloc[0]['max_dav']) else 0
@@ -352,7 +371,8 @@ with tab1:
                                 dav_str = f"{novo_dav:010d}"
                                 run_query_tx(cursor, "UPDATE vendas SET status='FATURADO', tipo_documento=?, numero_documento=?, lote_impresso=?, validade_impressa=? WHERE id=?", (tipo_doc, dav_str, lote_impresso, validade_impressa, pid))
                             else:
-                                run_query_tx(cursor, "UPDATE vendas SET status='FATURADO', tipo_documento=?, lote_impresso=?, validade_impressa=? WHERE id=?", (tipo_doc, lote_impresso, validade_impressa, pid))
+                                doc_num = f"Bling #{bling_id}" if bling_id else ""
+                                run_query_tx(cursor, "UPDATE vendas SET status='FATURADO', tipo_documento=?, numero_documento=?, lote_impresso=?, validade_impressa=? WHERE id=?", (tipo_doc, doc_num, lote_impresso, validade_impressa, pid))
                             
                             # 2. Baixa de Estoque via FIFO na transação
                             custo_cmv_real, is_estimado, cmv_metodo, custo_ausente = consumir_estoque_fifo_tx(
@@ -590,6 +610,62 @@ with tab2:
                 mime="text/csv",
                 type="primary"
             )
+
+    # ======= CONEXÃO / SINCRONIZAÇÃO AUTOMÁTICA BLING =======
+    st.markdown("---")
+    st.subheader("🔄 Sincronização de Retorno Automática com o Bling")
+    st.markdown("Consulte automaticamente o Bling para obter os números oficiais das Notas Fiscais autorizadas pela SEFAZ.")
+    
+    # Busca vendas faturadas com Bling ID mas sem número oficial de nota
+    df_sync_pendentes = fetch_all('''
+        SELECT id, numero_documento
+        FROM vendas
+        WHERE status = 'FATURADO'
+          AND tipo_documento = 'Nota Fiscal (NF)'
+          AND numero_documento LIKE 'Bling #%'
+    ''')
+    
+    if df_sync_pendentes.empty:
+        st.info("ℹ️ Não há Notas Fiscais pendentes de sincronização automática com o Bling.")
+    else:
+        st.warning(f"🔔 Existem {len(df_sync_pendentes)} Notas Fiscais faturadas aguardando retorno do Bling.")
+        if st.button("🔄 Sincronizar Notas Fiscais com o Bling", type="primary", use_container_width=True):
+            from utils_bling import sincronizar_nfe_do_bling
+            success_sync = 0
+            fail_sync = 0
+            
+            progress_bar = st.progress(0)
+            status_txt = st.empty()
+            
+            for idx, r in df_sync_pendentes.iterrows():
+                v_id = int(r['id'])
+                doc_doc = str(r['numero_documento'])
+                bling_id = doc_doc.replace("Bling #", "").strip()
+                
+                status_txt.markdown(f"Consultando Bling para a Venda #{v_id} (Bling ID: {bling_id})...")
+                
+                try:
+                    num_nfe = sincronizar_nfe_do_bling(bling_id)
+                    if num_nfe:
+                        run_query("UPDATE vendas SET numero_documento = ? WHERE id = ?", (num_nfe, v_id))
+                        success_sync += 1
+                    else:
+                        fail_sync += 1
+                except Exception as ex:
+                    st.error(f"Erro na Venda #{v_id} (Bling ID: {bling_id}): {ex}")
+                    fail_sync += 1
+                
+                progress_bar.progress((idx + 1) / len(df_sync_pendentes))
+                
+            status_txt.empty()
+            progress_bar.empty()
+            
+            if success_sync > 0:
+                st.success(f"✅ {success_sync} Notas Fiscais foram sincronizadas e atualizadas com sucesso!")
+            if fail_sync > 0:
+                st.info(f"ℹ️ {fail_sync} Notas Fiscais ainda estão em processamento ou sem número gerado no Bling.")
+                
+            import time; time.sleep(1.5); st.rerun()
 
     st.markdown("---")
     st.subheader("✍️ Atualizar Números de Notas Fiscais Autorizadas (Retorno SEFAZ)")

@@ -23,3 +23,7 @@ tmp_crop.py
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Credentials & Scratch folders (Security & Cleanliness)
+bling_credentials.json
+scratch/
