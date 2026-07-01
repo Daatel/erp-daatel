@@ -756,6 +756,105 @@ try:
                             st.success("✅ Duplicata a Pagar lançada com sucesso!")
                         import time; time.sleep(1); st.rerun()
 
+        # --- LANÇADOR SEMANAL DE BENEFÍCIOS ---
+        with st.expander("➕ Gerar Lançamentos Semanais de Benefícios (Passagem / Alimentação)"):
+            st.markdown("Gere lançamentos em lote no Contas a Pagar de VT (Passagem) e VR (Alimentação) para todos os colaboradores ativos.")
+            
+            df_ativos = fetch_all("SELECT id, nome, valor_transporte, valor_refeicao FROM funcionarios WHERE status='ATIVO'")
+            
+            if df_ativos.empty:
+                st.info("Nenhum colaborador ativo cadastrado no sistema.")
+            else:
+                from datetime import date, timedelta
+                
+                df_pc_b = fetch_all("SELECT id, codigo, nome FROM planos_de_contas WHERE categoria NOT IN ('RECEITA', 'RECEITA_NAO_OP') ORDER BY codigo")
+                op_pc_b = {}
+                default_idx_pc = 0
+                if not df_pc_b.empty:
+                    for idx_pc, r in df_pc_b.iterrows():
+                        op_pc_b[f"{r['codigo']} - {r['nome']}"] = r['id']
+                        if r['codigo'] == '2.3.6':
+                            default_idx_pc = idx_pc
+                            
+                col_b1, col_b2 = st.columns(2)
+                pc_sel_b = col_b1.selectbox("Plano de Contas", list(op_pc_b.keys()), index=default_idx_pc, key="ben_pc_sel")
+                venc_b = col_b2.date_input("Vencimento dos Lançamentos", date.today() + timedelta(days=3), key="ben_venc_sel")
+                
+                desc_modelo_b = st.text_input("Descrição Base / Referência (Ex: Ref. Semana de 01 a 05 de Junho)", key="ben_desc_modelo")
+                
+                # Monta DataFrame inicial para o data_editor (ambos são diários e multiplicados por 5 dias)
+                rows_b = []
+                for _, r in df_ativos.iterrows():
+                    vt_diario = float(r['valor_transporte'] or 0.0)
+                    vr_diario = float(r['valor_refeicao'] or 0.0)
+                    
+                    vt_semanal = round(vt_diario * 5.0, 2)
+                    vr_semanal = round(vr_diario * 5.0, 2)
+                    
+                    rows_b.append({
+                        "Gerar?": True,
+                        "Funcionario ID": int(r['id']),
+                        "Colaborador": str(r['nome']),
+                        "Passagem (Semanal) R$": vt_semanal,
+                        "Alimentação (Semanal) R$": vr_semanal
+                    })
+                    
+                df_editor_b = pd.DataFrame(rows_b)
+                
+                st.markdown("**Ajuste os valores para cada colaborador conforme necessário (desmarque os que não devem receber esta semana):**")
+                edited_df_b = st.data_editor(
+                    df_editor_b,
+                    hide_index=True,
+                    column_config={
+                        "Gerar?": st.column_config.CheckboxColumn("Gerar?", default=True),
+                        "Funcionario ID": st.column_config.NumberColumn("ID", disabled=True, width="small"),
+                        "Colaborador": st.column_config.TextColumn("Colaborador", disabled=True),
+                        "Passagem (Semanal) R$": st.column_config.NumberColumn("Passagem R$", format="%.2f", min_value=0.0),
+                        "Alimentação (Semanal) R$": st.column_config.NumberColumn("Alimentação R$", format="%.2f", min_value=0.0)
+                    },
+                    use_container_width=True,
+                    key="editor_beneficios_semanais"
+                )
+                
+                if st.button("💾 Gerar Lançamentos de Benefícios", type="primary", use_container_width=True, key="btn_gerar_beneficios"):
+                    pc_id_b = op_pc_b[pc_sel_b]
+                    venc_str_b = venc_b.strftime("%Y-%m-%d")
+                    
+                    gerados_vt = 0
+                    gerados_vr = 0
+                    
+                    with st.spinner("Registrando lançamentos no Contas a Pagar..."):
+                        for _, r in edited_df_b.iterrows():
+                            if not r["Gerar?"]:
+                                continue
+                                
+                            nome_c = r["Colaborador"]
+                            val_vt = float(r["Passagem (Semanal) R$"])
+                            val_vr = float(r["Alimentação (Semanal) R$"])
+                            
+                            ref_desc = f" ({desc_modelo_b})" if desc_modelo_b else ""
+                            
+                            # Lança Passagem se > 0
+                            if val_vt > 0.0:
+                                desc_vt = f"Passagem Semanal - {nome_c}{ref_desc}"
+                                run_query(
+                                    "INSERT INTO contas_a_pagar (plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, 'PENDENTE')",
+                                    (pc_id_b, desc_vt, val_vt, venc_str_b)
+                                )
+                                gerados_vt += 1
+                                
+                            # Lança Alimentação se > 0
+                            if val_vr > 0.0:
+                                desc_vr = f"Alimentação Semanal - {nome_c}{ref_desc}"
+                                run_query(
+                                    "INSERT INTO contas_a_pagar (plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, 'PENDENTE')",
+                                    (pc_id_b, desc_vr, val_vr, venc_str_b)
+                                )
+                                gerados_vr += 1
+                                
+                    st.success(f"✅ Lançamentos concluídos: {gerados_vt} de passagem e {gerados_vr} de alimentação gerados com sucesso!")
+                    import time; time.sleep(1.5); st.rerun()
+
         df_all_contas = fetch_all("""
             SELECT c.id, f.nome_fantasia as 'Fornecedor', p.nome as 'Planta de Custo', 
                    c.descricao as 'Descrição/Fatura', c.data_vencimento as 'Vencimento', 

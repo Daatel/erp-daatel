@@ -138,7 +138,7 @@ with tab_cadastro:
                 adiantamento = col7.text_input("Política de Adiantamento (Vale)", key="reg_valem")
                 st.markdown("🚌 **Benefícios e Custos de Transporte / Refeição**")
                 col8, col9 = st.columns(2)
-                val_transp = col8.number_input("Vale Transporte / Auxílio Combustível Mensal (R$)", min_value=0.0, step=10.0, key="reg_vt")
+                val_transp = col8.number_input("Vale Transporte / Passagem Diária (R$)", min_value=0.0, step=1.0, key="reg_vt")
                 vt_desc = col9.selectbox("Desconto Vale Transporte", ["Sem desconto", "Com desconto"], key="reg_vtdesc")
                 col10, col11 = st.columns(2)
                 val_refei = col10.number_input("Vale Alimentação / Refeição Diário (R$)", min_value=0.0, step=1.0, key="reg_vr")
@@ -303,7 +303,7 @@ with tab_cadastro:
                         
                         st.markdown("🚌 **Benefícios e Custos de Transporte / Refeição**")
                         col8, col9 = st.columns(2)
-                        ef_val_transp = col8.number_input("Vale Transporte / Auxílio Combustível Mensal (R$)", value=float(f_data.get('valor_transporte', 0.0) or 0.0), step=10.0)
+                        ef_val_transp = col8.number_input("Vale Transporte / Passagem Diária (R$)", value=float(f_data.get('valor_transporte', 0.0) or 0.0), step=1.0)
                         
                         vtd_opts = ["Sem desconto", "Com desconto"]
                         db_vtd = f_data.get('vt_desconto', 'Sem desconto')
@@ -492,7 +492,7 @@ with tab_aprovacoes:
                 c_adiantamento = col39.text_input("Política de Adiantamento", key="aprov_valem")
                 
                 col40, col41 = st.columns(2)
-                c_val_transp = col40.number_input("Vale Transporte / Combustível Mensal (R$)", min_value=0.0, step=10.0, key="aprov_vt")
+                c_val_transp = col40.number_input("Vale Transporte / Passagem Diária (R$)", min_value=0.0, step=1.0, key="aprov_vt")
                 c_vt_desc = col41.selectbox("Desconto Vale Transporte", ["Sem desconto", "Com desconto"], key="aprov_vtdesc")
                 
                 col42, col43 = st.columns(2)
@@ -667,7 +667,7 @@ with tab2:
             base_vr_d  = float(refeicao_dict.get(nome_pgto, 0.0) or 0.0)
             db_vt_desc = vt_desc_dict.get(nome_pgto, 'Sem desconto')
             db_vr_desc = vr_desc_dict.get(nome_pgto, 'Sem desconto')
-            _f = _calc_folha(base_sal, base_ajuda, base_outros, base_vt, db_vt_desc, base_vr_d, db_vr_desc, 22, emp_regime)
+            _f = _calc_folha(base_sal, base_ajuda, base_outros, base_vt * 22, db_vt_desc, base_vr_d, db_vr_desc, 22, emp_regime)
 
             with st.form("form_pagamento", clear_on_submit=True):
                 col1, col2, col3 = st.columns(3)
@@ -682,7 +682,7 @@ with tab2:
                 faltas = col_faltas.number_input("Faltas (Dias)", min_value=0, max_value=31, value=0, step=1)
                 
                 # Recalcula com valores provisórios/editados da tela (adiantamento inicial = 0.0)
-                _f_calc = _calc_folha(sal_base, ajuda, outros, base_vt, db_vt_desc, base_vr_d, db_vr_desc, dias_trab, emp_regime, faltas, 0.0)
+                _f_calc = _calc_folha(sal_base, ajuda, outros, base_vt * max(0, dias_trab - faltas), db_vt_desc, base_vr_d, db_vr_desc, dias_trab, emp_regime, faltas, 0.0)
                 
                 col_vt, col_vr, col_adiant, col_enc = st.columns(4)
                 vt_pago    = col_vt.number_input("Vale Transporte (R$)", min_value=0.0, value=_f_calc['vt_liq'], step=10.0)
@@ -814,7 +814,7 @@ with tab2:
                     politica = r.get('politica_adiantamento', '') or ''
                     adiant_padrao = _get_default_adiantamento(sal, politica)
                     # Faltas padrão inicial = 0
-                    f   = _calc_folha(sal, ajd, out, vtb, vtf, vrd, vrf, _dias, reg, 0, adiant_padrao)
+                    f   = _calc_folha(sal, ajd, out, vtb * _dias, vtf, vrd, vrf, _dias, reg, 0, adiant_padrao)
                     rows.append({
                         '_id':          int(r['id']),
                         'Nome':         str(r['nome']),
