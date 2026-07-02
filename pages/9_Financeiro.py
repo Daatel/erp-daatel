@@ -1747,7 +1747,7 @@ try:
             
         with col_f2:
             busca_txt = st.text_input(
-                "Pesquisa por nome ou histórico", 
+                "Pesquisa - Nome/Histórico", 
                 placeholder="Buscar lançamento...", 
                 key="cx_search_filter"
             )
