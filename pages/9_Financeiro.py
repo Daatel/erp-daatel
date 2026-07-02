@@ -73,6 +73,140 @@ def gerar_pdf_financeiro(df_pdf, dt_ini, dt_fim, t_ent, t_sai, s_liq, banco_filt
     
     return bytes(pdf.output())
 
+@st.dialog("Lançamento Direto Bloqueado 🔒")
+def mostrar_mensagem_bloqueio(username):
+    st.markdown(f"""
+    ### Olá, **{username}**!
+    
+    Pedimos desculpas pelo inconveniente, mas não é possível realizar um lançamento direto por aqui.
+    
+    Para manter a consistência e a exatidão do seu **DRE** (Demonstrativo do Resultado do Exercício), todos os lançamentos operacionais de entrada ou saída devem ser registrados obrigatoriamente através dos módulos de **Contas a Receber** e **Contas a Pagar**.
+    
+    Agradecemos imensamente a sua compreensão!
+    """)
+    if st.button("Entendido", use_container_width=True):
+        st.rerun()
+
+@st.dialog("Ajuste de saldo")
+def mostrar_ajuste_saldo_modal(opcoes_bancos):
+    st.write("Selecione a conta em que será realizado o ajuste:")
+    
+    # 1. Seleção de Conta
+    conta_sel = st.selectbox("Conta *", list(opcoes_bancos.keys()), key="ajuste_conta_sel")
+    
+    st.write("Informe o valor desejado de saldo e a data correspondente a esse ajuste:")
+    
+    # 2. Entrada de Saldo Desejado e Data
+    col1, col2 = st.columns(2)
+    saldo_desejado = col1.number_input("Saldo desejado", min_value=0.00, value=0.00, step=100.0, format="%.2f", key="ajuste_saldo_desejado")
+    data_ajuste = col2.date_input("Data de ajuste", date.today(), key="ajuste_data")
+    
+    # 3. Calcular o saldo atual da conta selecionada até a data informada
+    b_id = opcoes_bancos[conta_sel]
+    
+    # Recupera o saldo inicial da conta
+    df_b = fetch_all("SELECT saldo_inicial FROM contas_bancarias WHERE id=?", (b_id,))
+    saldo_inicial = float(df_b.iloc[0]['saldo_inicial']) if not df_b.empty else 0.0
+    
+    # Soma todas as transações até a data selecionada
+    df_f = fetch_all("SELECT tipo, valor FROM fluxo_caixa WHERE conta_bancaria_id = ? AND data <= ?", (b_id, data_ajuste.strftime("%Y-%m-%d")))
+    saldo_atual_na_data = saldo_inicial
+    for _, f in df_f.iterrows():
+        val = float(f['valor'])
+        if f['tipo'] == 'Entrada':
+            saldo_atual_na_data += val
+        else:
+            saldo_atual_na_data -= val
+            
+    diferenca = saldo_desejado - saldo_atual_na_data
+    
+    col1.caption(f"Diferença do saldo atual: **R$ {diferenca:,.2f}**".replace(",", "X").replace(".", ",").replace("X", "."))
+    
+    st.info("ℹ️ O ajuste será realizado por meio de um lançamento no dia selecionado para 'Data de ajuste'.")
+    
+    # 4. Gravação do Ajuste
+    col_btn1, col_btn2 = st.columns(2)
+    cancelar = col_btn1.button("Cancelar", use_container_width=True, key="ajuste_cancel_btn")
+    salvar = col_btn2.button("Salvar Ajuste", type="primary", use_container_width=True, key="ajuste_save_btn")
+    
+    if cancelar:
+        st.rerun()
+        
+    if salvar:
+        if abs(diferenca) < 0.01:
+            st.warning("O saldo desejado já é igual ao saldo atual nesta data. Nenhum ajuste necessário.")
+        else:
+            tipo_ajuste = "Entrada" if diferenca > 0 else "Saída"
+            valor_ajuste = abs(diferenca)
+            desc_ajuste = f"Ajuste de saldo (Saldo desejado: R$ {saldo_desejado:,.2f})".replace(",", "X").replace(".", ",").replace("X", ".")
+            
+            run_query(
+                "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, conta_bancaria_id, conciliado) VALUES (?, ?, 'Ajuste de saldo', ?, ?, ?, TRUE)",
+                (data_ajuste.strftime("%Y-%m-%d"), tipo_ajuste, desc_ajuste, valor_ajuste, b_id)
+            )
+            st.success("✔️ Ajuste de saldo registrado com sucesso!")
+            import time; time.sleep(1); st.rerun()
+
+@st.dialog("Transferência entre contas")
+def mostrar_transferencia_modal(opcoes_bancos, df_bancos):
+    st.write("Utilize este formulário para registrar a transferência de fundos entre suas contas bancárias:")
+    
+    col_t1, col_t2 = st.columns(2)
+    
+    # 1. Conta Origem
+    opcoes_origem = {f"{r['nome']}": r['id'] for _, r in df_bancos.iterrows()}
+    conta_origem_lbl = col_t1.selectbox("Conta de Origem (De onde sai o dinheiro) *", list(opcoes_origem.keys()), key="transf_origem_sel")
+    
+    # 2. Conta Destino
+    opcoes_destino = {f"{r['nome']}": r['id'] for _, r in df_bancos.iterrows() if f"{r['nome']}" != conta_origem_lbl}
+    if opcoes_destino:
+        conta_destino_lbl = col_t2.selectbox("Conta de Destino (Para onde vai o dinheiro) *", list(opcoes_destino.keys()), key="transf_destino_sel")
+    else:
+        conta_destino_lbl = col_t2.selectbox("Conta de Destino (Para onde vai o dinheiro) *", ["Cadastre outra conta ativa para realizar transferências"], key="transf_destino_sel")
+        
+    col_t3, col_t4 = st.columns([1, 2])
+    valor_transf = col_t3.number_input("Valor (R$) *", min_value=0.00, value=0.00, step=50.0, format="%.2f", key="transf_valor")
+    data_transf = col_t4.date_input("Data da Transferência *", date.today(), key="transf_data")
+    
+    obs_transf = st.text_input("Observação / Histórico", value="Transferência Interna de Recursos", key="transf_obs")
+    
+    # 3. Gravação da Transferência
+    col_btn1, col_btn2 = st.columns(2)
+    cancelar = col_btn1.button("Cancelar", use_container_width=True, key="transf_cancel_btn")
+    salvar = col_btn2.button("Confirmar Transferência", type="primary", use_container_width=True, key="transf_save_btn")
+    
+    if cancelar:
+        st.rerun()
+        
+    if salvar:
+        if not opcoes_destino or conta_destino_lbl == "Cadastre outra conta ativa para realizar transferências":
+            st.error("Erro: Você precisa de pelo menos duas contas ativas para realizar uma transferência.")
+        elif conta_origem_lbl == conta_destino_lbl:
+            st.error("Erro: A conta de origem e destino devem ser diferentes.")
+        elif valor_transf <= 0.0:
+            st.error("Erro: O valor da transferência deve ser maior que zero (R$ 0,00).")
+        else:
+            id_origem = opcoes_origem[conta_origem_lbl]
+            id_destino = opcoes_destino[conta_destino_lbl]
+            
+            with st.spinner("Registrando transferência..."):
+                # 1. Registrar Saída na Conta de Origem
+                desc_saida = f"Transf. p/ {conta_destino_lbl} | {obs_transf}"
+                run_query(
+                    "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, conta_bancaria_id, conciliado) VALUES (?, 'Saída', 'Transferência', ?, ?, ?, TRUE)",
+                    (data_transf.strftime("%Y-%m-%d"), desc_saida, valor_transf, id_origem)
+                )
+                
+                # 2. Registrar Entrada na Conta de Destino
+                desc_entrada = f"Transf. de {conta_origem_lbl} | {obs_transf}"
+                run_query(
+                    "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Transferência', ?, ?, ?, TRUE)",
+                    (data_transf.strftime("%Y-%m-%d"), desc_entrada, valor_transf, id_destino)
+                )
+                
+            st.success(f"✔️ Transferência de R$ {valor_transf:,.2f} realizada com sucesso!")
+            import time; time.sleep(1); st.rerun()
+
 st.set_page_config(page_title="Tesouraria Oficial", page_icon="💸", layout="wide")
 carregar_estilo()
 
@@ -114,12 +248,11 @@ try:
     saldo_total_empresa = sum(saldo_por_banco.values())
 
     # ================== GUIAS ==================
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Painel Executivo", 
         "🔻 Contas a Pagar (Saída)", 
         "🟢 Contas a Receber (Entrada)", 
-        "🏦 Conciliação Bancária",
-        "🔄 Transferência entre Contas",
+        "🏦 Caixas e Bancos",
         "🚚 Auditoria Logística"
     ])
     
@@ -1566,85 +1699,98 @@ try:
                                      st.success("Recebível cancelado com sucesso!")
                                      import time; time.sleep(1); st.rerun()
 
-    # ------------------ ABA 4: CONCILIAÇÃO BANCÁRIA ------------------
+    # ------------------ ABA 4: CAIXAS E BANCOS ------------------
     with tab4:
-        st.subheader("Auditoria e Conciliação Financeira c/ Inteligência de Dados")
-        # Filtros de Conta
-        conta_con = st.selectbox("Filtrar para verificar:", ["TODAS AS CONTAS"] + list(opcoes_bancos.keys()))
+        st.subheader("🏦 Controle de Caixas e Bancos")
         
-        # ----------------- IMPORTADOR UPLOADER CSV -----------------
-        with st.expander("📂 Robô de Conciliação em Lote (Importar CSV do Banco)"):
-            st.info('''
-            **Regra de Ouro do Arquivo CSV:** Seu CSV precisa ter exatamente 3 colunas (Data, Historico, Valor). 
-            Se a saída foi paga, o valor no CSV deve estar com um sinal negativo (Ex: -500.00).
-            ''')
-            b_alvo = st.selectbox("O CSV pertence a qual Banco/Conta?", list(opcoes_bancos.keys()), key="csv_banco")
+        # Estilos CSS específicos para Caixas e Bancos
+        st.markdown("""
+        <style>
+        /* Estilização para o botão desabilitado de Inserir Lançamento */
+        div.st-key-btn_incluir_lanc_disabled button {
+            background-color: #f1f5f9 !important;
+            color: #94a3b8 !important;
+            border: 1px solid #cbd5e1 !important;
+            cursor: not-allowed !important;
+            border-radius: 6px !important;
+            width: 100% !important;
+            height: 42px !important;
+            font-weight: bold !important;
+        }
+        div.st-key-btn_incluir_lanc_disabled button:hover {
+            background-color: #e2e8f0 !important;
+            color: #64748b !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Divisão da Tela em duas colunas (Extrato à esquerda, Sidebar de Ações à direita)
+        col_main, col_sidebar = st.columns([3.2, 1.0])
+        
+        with col_main:
+            st.markdown("### 📝 Extrato da Conta")
             
-            uploaded_file = st.file_uploader("Suba a planilha extrato.csv padrão aqui:", type=["csv"])
-            if uploaded_file is not None:
-                try:
-                    df_csv = pd.read_csv(uploaded_file, sep=None, engine='python')
-                    st.write("Visão Raio-X do seu arquivo no sistema:")
-                    st.dataframe(df_csv.head(5), width="stretch")
-                    
-                    if st.button("💥 Iniciar Mapeamento Mágico de Lotes"):
-                        # Heurística Mágica: Vamos achar no ERP o que bate cravado com o Valor ABSOLUTO do CSV
-                        df_b_alvo = fetch_all(f"SELECT id, valor, conciliado FROM fluxo_caixa WHERE conta_bancaria_id={opcoes_bancos[b_alvo]} AND conciliado=FALSE")
-                        
-                        if df_b_alvo.empty:
-                            st.warning("Não há nenhuma fatura pendente de conciliação no ERP para este banco. Tudo perfeitamente limpo!")
-                        else:
-                            # A mágica: Array de valores do ERP para comparar
-                            sucessos = 0
-                            lote_ids_para_conciliar = []
-                            
-                            # Simulação Mágica Progressiva: (Itera sobre o CSV, e tenta achar matching de valor exato não pareado ainda)
-                            if 'Valor' in df_csv.columns or 'valor' in df_csv.columns:
-                                col_v = 'Valor' if 'Valor' in df_csv.columns else 'valor'
-                                for _, row_csv in df_csv.iterrows():
-                                    val_csv = abs(float(row_csv[col_v]))
-                                    
-                                    # Procura no dataframe do banco alvo o match perfeito que não pegamos ainda
-                                    match_idx = df_b_alvo.index[(df_b_alvo['valor'] == val_csv) & (~df_b_alvo['id'].isin(lote_ids_para_conciliar))].tolist()
-                                    if match_idx:
-                                        lote_ids_para_conciliar.append(int(df_b_alvo.loc[match_idx[0], 'id']))
-                                        sucessos += 1
-                                        
-                            st.success(f"🤖 O Robô localizou exatamente **{sucessos}** operações fiduciárias (valores perfeitos) que constam no seu ERP e não estavam conciliados.")
-                            
-                            if sucessos > 0:
-                                if st.button(f"Acato. Conciliar os {sucessos} itens agora!", type="primary"):
-                                    for lid in lote_ids_para_conciliar:
-                                        run_query("UPDATE fluxo_caixa SET conciliado=TRUE WHERE id=?", (lid,))
-                                    st.success("Milagre Financeiro Efetuado. Extrato rebatido!")
-                                    import time; time.sleep(1); st.rerun()
-                except Exception as e:
-                    st.error(f"Seu arquivo CSV parece corrompido ou fora dos padrões do Pandas: {e}")
-                    
-        st.markdown("---")
-
-        query_con = """
-            SELECT fc.id, fc.data as 'Data', fc.tipo as 'Movimentação', 
-                   fc.descricao as 'Histórico', fc.valor as 'Valor', 
-                   cb.nome as 'Banco', fc.conciliado as 'Revisado'
-            FROM fluxo_caixa fc
-            LEFT JOIN contas_bancarias cb ON fc.conta_bancaria_id = cb.id
-            ORDER BY fc.data ASC, fc.id ASC
-        """
-        
-        df_ext = fetch_all(query_con)
-        if df_ext.empty:
-            st.info("O livro de extratos está impecavelmente vazio.")
-        else:
-            if conta_con != "TODAS AS CONTAS":
+            # Filtros superiores (Estilo Bling!)
+            col_f1, col_f2, col_f3 = st.columns([1, 1.3, 1.2])
+            
+            conta_con = col_f1.selectbox(
+                "Conta", 
+                ["Todas as contas"] + list(opcoes_bancos.keys()), 
+                key="cx_conta_filter"
+            )
+            
+            busca_txt = col_f2.text_input(
+                "Pesquisa por nome ou histórico", 
+                placeholder="Buscar lançamento...", 
+                key="cx_search_filter"
+            )
+            
+            periodo_sel = col_f3.selectbox(
+                "Período", 
+                ["Este mês", "Hoje", "Últimos 7 dias", "Últimos 30 dias", "Personalizado"], 
+                key="cx_periodo_filter"
+            )
+            
+            # Cálculo de datas baseados no filtro de Período
+            dt_ini, dt_fi = date.today(), date.today()
+            if periodo_sel == "Este mês":
+                import calendar
+                dt_ini = date(hoje.year, hoje.month, 1)
+                dt_fi = date(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
+            elif periodo_sel == "Hoje":
+                dt_ini = hoje
+                dt_fi = hoje
+            elif periodo_sel == "Últimos 7 dias":
+                dt_ini = hoje - timedelta(days=7)
+                dt_fi = hoje
+            elif periodo_sel == "Últimos 30 dias":
+                dt_ini = hoje - timedelta(days=30)
+                dt_fi = hoje
+            elif periodo_sel == "Personalizado":
+                col_d1, col_d2 = st.columns(2)
+                dt_ini = col_d1.date_input("De", hoje - timedelta(days=30), key="cx_dt_ini")
+                dt_fi = col_d2.date_input("Até", hoje, key="cx_dt_fi")
+            
+            # 1. Carregar todo o extrato em ordem cronológica (para cálculo de saldo correto)
+            query_con = """
+                SELECT fc.id, fc.data as 'Data', fc.tipo as 'Movimentação', 
+                       fc.descricao as 'Histórico', fc.valor as 'Valor', 
+                       cb.nome as 'Banco', fc.conciliado as 'Revisado',
+                       fc.categoria as 'Categoria'
+                FROM fluxo_caixa fc
+                LEFT JOIN contas_bancarias cb ON fc.conta_bancaria_id = cb.id
+                ORDER BY fc.data ASC, fc.id ASC
+            """
+            df_ext = fetch_all(query_con)
+            
+            # 2. Filtrar por Conta antes do cálculo de saldo progressivo
+            if conta_con != "Todas as contas":
                 df_ext = df_ext[df_ext['Banco'] == conta_con]
                 
-            if df_ext.empty:
-                st.warning(f"O banco {conta_con} está limpo sem histórico!")
-            else:
-                # ----------------- SALDO PROGRESSIVO -----------------
-                saldo_inicial_conta = 0.0
-                if conta_con != "TODAS AS CONTAS":
+            # 3. Calcular saldo progressivo (acumulado histórico)
+            saldo_inicial_conta = 0.0
+            if not df_ext.empty:
+                if conta_con != "Todas as contas":
                     saldo_inicial_conta = float(df_bancos[df_bancos['nome'] == conta_con]['saldo_inicial'].iloc[0])
                 else:
                     saldo_inicial_conta = sum([float(s) for s in df_bancos['saldo_inicial']])
@@ -1658,103 +1804,112 @@ try:
                     else:
                         acc -= val
                     saldos_acumulados.append(acc)
-                    
                 df_ext['Saldo Após Linha'] = saldos_acumulados
+            else:
+                df_ext['Saldo Após Linha'] = []
                 
-                # Exibir Resumo no Topo do Grid
-                st.info(f"Saldo Inicial Configurado: R$ {saldo_inicial_conta:,.2f} |  **Saldo Acumulado Atual (Fim da Linha): R$ {acc:,.2f}**")
+            # 4. Filtrar por período de data para visualização
+            if not df_ext.empty:
+                df_ext['data_parsed'] = pd.to_datetime(df_ext['Data']).dt.date
+                df_ext = df_ext[(df_ext['data_parsed'] >= dt_ini) & (df_ext['data_parsed'] <= dt_fi)]
                 
-                # Prepara para exibir de cima para baixo reverso (mais novo prrimeiro)
-                df_ext = df_ext.sort_values(by=['Data', 'id'], ascending=[False, False])
-                df_ext['Data'] = pd.to_datetime(df_ext['Data']).dt.strftime('%d/%m/%Y')
+            # 5. Filtrar por busca textual
+            if not df_ext.empty and busca_txt:
+                busca_txt_lower = busca_txt.lower()
+                df_ext = df_ext[
+                    df_ext['Histórico'].str.lower().str.contains(busca_txt_lower, na=False) |
+                    df_ext['Categoria'].str.lower().str.contains(busca_txt_lower, na=False)
+                ]
                 
-                # Formatação
-                df_edt = df_ext.copy()
-                df_edt['Revisado'] = df_edt['Revisado'].astype(bool)
-                df_edt['Valor Físico'] = df_edt['Valor'].apply(lambda x: f"R$ {float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                df_edt['Saldo Bancário Acumulado'] = df_edt['Saldo Após Linha'].apply(lambda x: f"R$ {float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                    
-                st.markdown("**Grid Auditável Diário** (Marque como CONCILIADO as linhas conferidas)")
+            # 6. Alinhar em duas colunas separadas (Entrada e Saída)
+            if not df_ext.empty:
+                df_ext['Entrada'] = df_ext.apply(lambda r: float(r['Valor']) if r['Movimentação'] == 'Entrada' else None, axis=1)
+                df_ext['Saída'] = df_ext.apply(lambda r: float(r['Valor']) if r['Movimentação'] == 'Saída' else None, axis=1)
+            else:
+                df_ext['Entrada'] = []
+                df_ext['Saída'] = []
+                
+            # Renderização da Tabela/Grid principal
+            if df_ext.empty:
+                st.info("Nenhuma movimentação encontrada para os filtros selecionados.")
+                total_entradas_periodo = 0.0
+                total_saidas_periodo = 0.0
+            else:
+                total_entradas_periodo = float(df_ext[df_ext['Movimentação'] == 'Entrada']['Valor'].sum())
+                total_saidas_periodo = float(df_ext[df_ext['Movimentação'] == 'Saída']['Valor'].sum())
+                
+                # Exibir mais novos primeiro para visualização confortável
+                df_display = df_ext.sort_values(by=['data_parsed', 'id'], ascending=[False, False]).copy()
+                df_display['Data'] = pd.to_datetime(df_display['Data']).dt.strftime('%d/%m/%Y')
+                df_display['Revisado'] = df_display['Revisado'].astype(bool)
                 
                 edited_df = st.data_editor(
-                    df_edt[['id', 'Data', 'Banco', 'Movimentação', 'Histórico', 'Valor Físico', 'Saldo Bancário Acumulado', 'Revisado']],
+                    df_display[['id', 'Data', 'Banco', 'Histórico', 'Categoria', 'Entrada', 'Saída', 'Saldo Após Linha', 'Revisado']],
                     hide_index=True,
-                    disabled=["id", "Data", "Banco", "Movimentação", "Histórico", "Valor Físico", "Saldo Bancário Acumulado"],
+                    disabled=["id", "Data", "Banco", "Histórico", "Categoria", "Entrada", "Saída", "Saldo Após Linha"],
                     width="stretch",
                     column_config={
-                        "Revisado": st.column_config.CheckboxColumn("Tique se Bateu ✅", help="Marque se confirmou na conta do banco.", default=False)
+                        "id": None, # Oculta a coluna ID
+                        "Entrada": st.column_config.NumberColumn("Entrada (R$)", format="R$ %.2f"),
+                        "Saída": st.column_config.NumberColumn("Saída (R$)", format="R$ %.2f"),
+                        "Saldo Após Linha": st.column_config.NumberColumn("Saldo Acumulado (R$)", format="R$ %.2f"),
+                        "Revisado": st.column_config.CheckboxColumn("Revisado ✅", help="Marque se confirmou na conta do banco.", default=False)
                     }
                 )
                 
-                if st.button("Salvar Modificações de Conciliação"):
+                # Botão de salvar alterações da conciliação
+                if st.button("Salvar Modificações de Conciliação", type="primary", use_container_width=True):
                     for _, row in edited_df.iterrows():
-                        n_c = True if row['Revisado'] else False
+                        n_c = bool(row['Revisado'])
                         db_c = bool(df_ext[df_ext['id'] == row['id']].iloc[0]['Revisado'])
                         if n_c != db_c:
                             run_query("UPDATE fluxo_caixa SET conciliado=? WHERE id=?", (n_c, row['id']))
                     st.success("Extrato Oficializado pela Gerência!")
                     import time; time.sleep(1); st.rerun()
+            
+        with col_sidebar:
+            st.markdown("### ⚙️ Painel Operacional")
+            
+            # Botão de lançamento desabilitado
+            if st.button("+ Incluir lançamento", key="btn_incluir_lanc_disabled", use_container_width=True):
+                username = st.session_state.get('logged_user', 'Usuário')
+                mostrar_mensagem_bloqueio(username)
+            
+            st.markdown("---")
+            st.markdown("**Ações Rápidas**")
+            # Botões das outras operações (links/placeholders)
+            if st.button("🔄 Transferência entre contas", key="btn_placeholder_transf", use_container_width=True):
+                mostrar_transferencia_modal(opcoes_bancos, df_bancos)
+            if st.button("🔧 Ajustar saldos", key="btn_placeholder_ajuste", use_container_width=True):
+                mostrar_ajuste_saldo_modal(opcoes_bancos)
+            
+            st.markdown("---")
+            
+            # Métricas do Caixa
+            qtd_regs = len(df_ext) if not df_ext.empty else 0
+            if conta_con == "Todas as contas":
+                saldo_atual_conta = saldo_total_empresa
+            else:
+                saldo_atual_conta = saldo_por_banco.get(opcoes_bancos[conta_con], 0.0)
+                
+            st.metric("Quantidade de registros", f"{qtd_regs}")
+            st.metric("Saldo atual da conta", f"R$ {saldo_atual_conta:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            
+            # Collapsible Informações (Entradas/Saídas do período)
+            with st.expander("📊 Informações do Período", expanded=True):
+                st.write(f"**Entradas:** <span style='color:green'>R$ {total_entradas_periodo:,.2f}</span>".replace(",", "X").replace(".", ",").replace("X", "."), unsafe_allow_html=True)
+                st.write(f"**Saídas:** <span style='color:red'>R$ {total_saidas_periodo:,.2f}</span>".replace(",", "X").replace(".", ",").replace("X", "."), unsafe_allow_html=True)
+                st.write(f"**Resultado:** R$ {total_entradas_periodo - total_saidas_periodo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
-    # ------------------ ABA 5: TRANSFERÊNCIA ENTRE CONTAS ------------------
+            st.markdown("---")
+            # Resumos e saldos individuais
+            with st.expander("💳 Saldos das Contas", expanded=False):
+                for b_nome, b_id in opcoes_bancos.items():
+                    s_val = saldo_por_banco.get(b_id, 0.0)
+                    st.write(f"**{b_nome}:** R$ {s_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+    # ------------------ Guia 5: AUDITORIA LOGÍSTICA ------------------
     with tab5:
-        st.subheader("🔄 Transferência de Recursos entre Contas e Tesouraria")
-        st.markdown("""
-        Utilize este formulário para registrar a transferência de fundos entre suas contas bancárias e o caixa físico (Tesouraria).
-        Isso registrará automaticamente um lançamento de saída na conta de origem e um lançamento de entrada na conta de destino.
-        """)
-        
-        with st.form("form_transferencia_contas", clear_on_submit=True):
-            col_t1, col_t2 = st.columns(2)
-            
-            # Conta Origem
-            opcoes_origem = {f"{r['nome']}": r['id'] for _, r in df_bancos.iterrows()}
-            conta_origem_lbl = col_t1.selectbox("Conta de Origem (De onde sai o dinheiro)", list(opcoes_origem.keys()))
-            
-            # Conta Destino
-            opcoes_destino = {f"{r['nome']}": r['id'] for _, r in df_bancos.iterrows() if f"{r['nome']}" != conta_origem_lbl}
-            if opcoes_destino:
-                conta_destino_lbl = col_t2.selectbox("Conta de Destino (Para onde vai o dinheiro)", list(opcoes_destino.keys()))
-            else:
-                conta_destino_lbl = col_t2.selectbox("Conta de Destino (Para onde vai o dinheiro)", ["Cadastre outra conta ativa para realizar transferências"])
-                
-            col_t3, col_t4 = st.columns([1, 2])
-            valor_transf = col_t3.number_input("Valor da Transferência (R$)", min_value=0.00, value=0.00, step=50.0, format="%.2f")
-            data_transf = col_t4.date_input("Data da Transferência", date.today())
-            
-            obs_transf = st.text_input("Observação / Histórico", value="Transferência Interna de Recursos")
-            
-            btn_transf = st.form_submit_button("🔄 Confirmar Transferência", type="primary", use_container_width=True)
-            
-        if btn_transf:
-            if not opcoes_destino or conta_destino_lbl == "Cadastre outra conta ativa para realizar transferências":
-                st.error("Erro: Você precisa de pelo menos duas contas ativas para realizar uma transferência.")
-            elif conta_origem_lbl == conta_destino_lbl:
-                st.error("Erro: A conta de origem e destino devem ser diferentes.")
-            elif valor_transf <= 0.0:
-                st.error("Erro: O valor da transferência deve ser maior que zero (R$ 0,00).")
-            else:
-                id_origem = opcoes_origem[conta_origem_lbl]
-                id_destino = opcoes_destino[conta_destino_lbl]
-                
-                # 1. Registrar Saída na Conta de Origem
-                desc_saida = f"Transf. p/ {conta_destino_lbl} | {obs_transf}"
-                run_query(
-                    "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, conta_bancaria_id, conciliado) VALUES (?, 'Saída', 'Transferência', ?, ?, ?, TRUE)",
-                    (data_transf.strftime("%Y-%m-%d"), desc_saida, valor_transf, id_origem)
-                )
-                
-                # 2. Registrar Entrada na Conta de Destino
-                desc_entrada = f"Transf. de {conta_origem_lbl} | {obs_transf}"
-                run_query(
-                    "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Transferência', ?, ?, ?, TRUE)",
-                    (data_transf.strftime("%Y-%m-%d"), desc_entrada, valor_transf, id_destino)
-                )
-                
-                st.success(f"✔️ Transferência de R$ {valor_transf:,.2f} realizada com sucesso de '{conta_origem_lbl}' para '{conta_destino_lbl}'!")
-                import time; time.sleep(1.5); st.rerun()
-
-    # ------------------ Guia 6: AUDITORIA LOGÍSTICA ------------------
-    with tab6:
         st.subheader("🚚 Auditoria de Comprovantes Logísticos")
         st.markdown("""
         Utilize esta área para auditar os comprovantes de entrega (Canhotos de Viagem) e de descarga (Taxa de CD) 
