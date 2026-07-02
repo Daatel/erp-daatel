@@ -73,7 +73,7 @@ def gerar_pdf_financeiro(df_pdf, dt_ini, dt_fim, t_ent, t_sai, s_liq, banco_filt
     
     return bytes(pdf.output())
 
-@st.dialog("Lançamento Direto Bloqueado 🔒")
+@st.dialog("Lançamento Direto Bloqueado")
 def mostrar_mensagem_bloqueio(username):
     st.markdown(f"""
     ### Olá, **{username}**!
@@ -144,7 +144,7 @@ def mostrar_ajuste_saldo_modal(opcoes_bancos):
                 "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, conta_bancaria_id, conciliado) VALUES (?, ?, 'Ajuste de saldo', ?, ?, ?, TRUE)",
                 (data_ajuste.strftime("%Y-%m-%d"), tipo_ajuste, desc_ajuste, valor_ajuste, b_id)
             )
-            st.success("✔️ Ajuste de saldo registrado com sucesso!")
+            st.success("Ajuste de saldo registrado com sucesso!")
             import time; time.sleep(1); st.rerun()
 
 @st.dialog("Transferência entre contas")
@@ -204,14 +204,21 @@ def mostrar_transferencia_modal(opcoes_bancos, df_bancos):
                     (data_transf.strftime("%Y-%m-%d"), desc_entrada, valor_transf, id_destino)
                 )
                 
-            st.success(f"✔️ Transferência de R$ {valor_transf:,.2f} realizada com sucesso!")
+            st.success(f"Transferência de R$ {valor_transf:,.2f} realizada com sucesso!")
             import time; time.sleep(1); st.rerun()
 
-st.set_page_config(page_title="Tesouraria Oficial", page_icon="💸", layout="wide")
+st.set_page_config(page_title="Financeiro e Tesouraria", layout="wide")
 carregar_estilo()
 
 st.markdown("""
-<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -55px; margin-bottom: 20px; color: #1e293b;'>
+<style>
+/* Remove padding do topo da página do Streamlit para subir tudo de forma limpa e sem cortar o texto */
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
 Financeiro e Tesouraria
 </h1>
 """, unsafe_allow_html=True)
@@ -252,11 +259,11 @@ try:
 
     # ================== GUIAS ==================
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📊 Painel Executivo", 
-        "🔻 Contas a Pagar (Saída)", 
-        "🟢 Contas a Receber (Entrada)", 
-        "🏦 Caixas e Bancos",
-        "🚚 Auditoria Logística"
+        "Painel Executivo", 
+        "Contas a Pagar (Saída)", 
+        "Contas a Receber (Entrada)", 
+        "Caixas e Bancos",
+        "Auditoria Logística"
     ])
     
     # ------------------ ABA 1: DASHBOARD E PROJEÇÃO 30D ------------------
@@ -298,9 +305,9 @@ try:
         def to_brl(v):
             return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             
-        c_kpi1.metric("💰 Entra hoje", to_brl(entra_hoje_val))
-        c_kpi2.metric("💸 Sai hoje", to_brl(sai_hoje_val))
-        c_kpi3.metric("💎 Resultado do dia", to_brl(resultado_dia_val), 
+        c_kpi1.metric("Entra hoje", to_brl(entra_hoje_val))
+        c_kpi2.metric("Sai hoje", to_brl(sai_hoje_val))
+        c_kpi3.metric("Resultado do dia", to_brl(resultado_dia_val), 
                      delta=to_brl(resultado_dia_val) if resultado_dia_val != 0 else None,
                      delta_color="normal" if resultado_dia_val >= 0 else "inverse")
         
@@ -841,7 +848,7 @@ try:
             
             if st.button("Salvar Duplicata a Pagar", type="primary", use_container_width=False):
                 if st.session_state.get("cap_clique_bloqueado", False):
-                    st.warning("⚠️ Gravação já em andamento. Aguarde...")
+                    st.warning("Gravação já em andamento. Aguarde...")
                 elif forn_sel == "-- SELECIONE O FORNECEDOR --":
                     st.error("Por favor, selecione um Fornecedor.")
                 elif pc_sel == "-- SELECIONE O PLANO DE CONTAS --":
@@ -855,7 +862,7 @@ try:
                     
                     # Validação de Cliente Obrigatório para 2.2.1, 2.2.2, 2.2.4
                     if pc_codigo in ('2.2.1', '2.2.2', '2.2.4') and cli_id is None:
-                        st.error(f"⚠️ A conta selecionada ({pc_sel}) exige a vinculação obrigatória de um Cliente (CNPJ) para cálculo de rentabilidade. Por favor, marque a caixa e selecione o cliente correspondente.")
+                        st.error(f"A conta selecionada ({pc_sel}) exige a vinculação obrigatória de um Cliente (CNPJ) para cálculo de rentabilidade. Por favor, marque a caixa e selecione o cliente correspondente.")
                     else:
                         st.session_state["cap_clique_bloqueado"] = True
                         
@@ -1607,7 +1614,7 @@ try:
                          venda_id = rec_data['venda_id']
 
                          if pd.notna(venda_id):
-                             st.warning(f"⚠️ **Atenção:** Este recebível está vinculado à **Venda #{int(venda_id)}**.")
+                             st.warning(f"**Atenção:** Este recebível está vinculado à **Venda #{int(venda_id)}**.")
 
                          acao_rec = st.radio("O que deseja fazer?", ["Alterar Vencimento/Valor", "Aplicar Juros / Desconto", "Reparcelar", "Excluir/Cancelar"], horizontal=True, key="acao_rec")
 
@@ -1631,7 +1638,7 @@ try:
 
                          elif acao_rec == "Aplicar Juros / Desconto":
                              if pd.notna(venda_id):
-                                 st.warning("⚠️ Esta duplicata está vinculada a uma Venda. Para aplicar descontos ou juros em títulos de vendas comerciais de forma que conste no DRE, digite o valor final pago diretamente na tabela de recebimento (Lote) ao confirmar o pagamento.")
+                                 st.warning("Esta duplicata está vinculada a uma Venda. Para aplicar descontos ou juros em títulos de vendas comerciais de forma que conste no DRE, digite o valor final pago diretamente na tabela de recebimento (Lote) ao confirmar o pagamento.")
                              else:
                                  st.markdown(f"**Valor original:** R$ {valor_original:,.2f}")
                                  jd1, jd2, jd3 = st.columns(3)
@@ -1693,9 +1700,9 @@ try:
 
                          elif acao_rec == "Excluir/Cancelar":
                              if pd.notna(venda_id):
-                                 st.error("❌ Não é permitido cancelar/excluir recebíveis de vendas faturadas por aqui. Para excluir, você deve desfazer o faturamento do pedido correspondente na tela de Faturamento.")
+                                 st.error("Não é permitido cancelar/excluir recebíveis de vendas faturadas por aqui. Para excluir, você deve desfazer o faturamento do pedido correspondente na tela de Faturamento.")
                              else:
-                                 st.markdown("⚠️ **Tem certeza que deseja cancelar/excluir este recebível?**")
+                                 st.markdown("**Tem certeza que deseja cancelar/excluir este recebível?**")
                                  st.markdown("Esta ação mudará o status do recebível para `'CANCELADO'` e ele não aparecerá mais nos recebimentos pendentes.")
                                  if st.button("Confirmar Cancelamento/Exclusão", type="primary", key="btn_rec_del"):
                                      run_query("UPDATE contas_a_receber SET status='CANCELADO', descricao = descricao || ' [CANCELADO]' WHERE id=?", (rec_id,))
@@ -1725,45 +1732,49 @@ try:
         </style>
         """, unsafe_allow_html=True)
         
-        # 1. Painel Operacional em Linha Horizontal no Topo
-        col_btn1, col_btn2, col_btn3, _ = st.columns([1, 1, 1, 2.5])
+        # Reservar espaço para a barra de métricas discreta no topo (logo abaixo das abas)
+        container_metricas = st.container()
         
-        with col_btn1:
-            if st.button("+ Incluir lançamento", key="btn_incluir_lanc_disabled", use_container_width=True):
+        # Linha Única de Filtros e Botões (Colunas de proporções compactas)
+        col_f1, col_f2, col_f3, col_b1, col_b2, col_b3 = st.columns([1.0, 1.4, 1.0, 1.2, 1.0, 1.2])
+        
+        with col_f1:
+            conta_con = st.selectbox(
+                "Conta", 
+                ["Todas as contas"] + list(opcoes_bancos.keys()), 
+                key="cx_conta_filter"
+            )
+            
+        with col_f2:
+            busca_txt = st.text_input(
+                "Pesquisa por nome ou histórico", 
+                placeholder="Buscar lançamento...", 
+                key="cx_search_filter"
+            )
+            
+        with col_f3:
+            periodo_sel = st.selectbox(
+                "Período", 
+                ["Este mês", "Hoje", "Últimos 7 dias", "Últimos 30 dias", "Personalizado"], 
+                key="cx_periodo_filter"
+            )
+            
+        with col_b1:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            if st.button("Transferência", key="btn_placeholder_transf", use_container_width=True):
+                mostrar_transferencia_modal(opcoes_bancos, df_bancos)
+                
+        with col_b2:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            if st.button("Ajustar saldo", key="btn_placeholder_ajuste", use_container_width=True):
+                mostrar_ajuste_saldo_modal(opcoes_bancos)
+                
+        with col_b3:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            if st.button("+ Lançamento", key="btn_incluir_lanc_disabled", use_container_width=True):
                 username = st.session_state.get('logged_user', 'Usuário')
                 mostrar_mensagem_bloqueio(username)
                 
-        with col_btn2:
-            if st.button("🔄 Transferência entre contas", key="btn_placeholder_transf", use_container_width=True):
-                mostrar_transferencia_modal(opcoes_bancos, df_bancos)
-                
-        with col_btn3:
-            if st.button("🔧 Ajustar saldos", key="btn_placeholder_ajuste", use_container_width=True):
-                mostrar_ajuste_saldo_modal(opcoes_bancos)
-                
-        st.markdown("---")
-        
-        # 2. Filtros superiores
-        col_f1, col_f2, col_f3 = st.columns([1, 1.3, 1.2])
-        
-        conta_con = col_f1.selectbox(
-            "Conta", 
-            ["Todas as contas"] + list(opcoes_bancos.keys()), 
-            key="cx_conta_filter"
-        )
-        
-        busca_txt = col_f2.text_input(
-            "Pesquisa por nome ou histórico", 
-            placeholder="Buscar lançamento...", 
-            key="cx_search_filter"
-        )
-        
-        periodo_sel = col_f3.selectbox(
-            "Período", 
-            ["Este mês", "Hoje", "Últimos 7 dias", "Últimos 30 dias", "Personalizado"], 
-            key="cx_periodo_filter"
-        )
-        
         # Cálculo de datas baseados no filtro de Período
         dt_ini, dt_fi = date.today(), date.today()
         if periodo_sel == "Este mês":
@@ -1855,17 +1866,25 @@ try:
         else:
             saldo_atual_conta = saldo_por_banco.get(opcoes_bancos[conta_con], 0.0)
 
-        # Barra Discreta de Métricas Financeiras no Topo da Tabela
-        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-        col_m1.metric("Saldo Atual da Conta", f"R$ {saldo_atual_conta:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        col_m1.caption(f"Conta: {conta_con}")
-        col_m2.metric("Entradas (Período)", f"R$ {total_entradas_periodo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        col_m3.metric("Saídas (Período)", f"R$ {total_saidas_periodo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        
+        # 8. Barra Discreta de Métricas Financeiras no Topo (Renderizada no Container reservado)
         resultado_periodo = total_entradas_periodo - total_saidas_periodo
-        col_m4.metric("Resultado (Período)", f"R$ {resultado_periodo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        color_res = "#16a34a" if resultado_periodo >= 0 else "#dc2626"
         
-        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        def formatar_moeda(val):
+            return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            
+        with container_metricas:
+            st.markdown(f"""
+            <div style="display: flex; gap: 20px; font-size: 0.95rem; color: #475569; margin-top: 5px; margin-bottom: 15px; background-color: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div>Saldo Atual: <strong style="color: #1e293b;">{formatar_moeda(saldo_atual_conta)}</strong></div>
+                <div style="color: #cbd5e1;">|</div>
+                <div>Entradas (Período): <strong style="color: #16a34a;">{formatar_moeda(total_entradas_periodo)}</strong></div>
+                <div style="color: #cbd5e1;">|</div>
+                <div>Saídas (Período): <strong style="color: #dc2626;">{formatar_moeda(total_saidas_periodo)}</strong></div>
+                <div style="color: #cbd5e1;">|</div>
+                <div>Resultado: <strong style="color: {color_res};">{formatar_moeda(resultado_periodo)}</strong></div>
+            </div>
+            """, unsafe_allow_html=True)
             
         # Renderização da Tabela/Grid principal
         if df_ext.empty:
@@ -1886,7 +1905,7 @@ try:
                     "Entrada": st.column_config.NumberColumn("Entrada (R$)", format="R$ %.2f"),
                     "Saída": st.column_config.NumberColumn("Saída (R$)", format="R$ %.2f"),
                     "Saldo Após Linha": st.column_config.NumberColumn("Saldo Acumulado (R$)", format="R$ %.2f"),
-                    "Revisado": st.column_config.CheckboxColumn("Revisado ✅", help="Marque se confirmou na conta do banco.", default=False)
+                    "Revisado": st.column_config.CheckboxColumn("Revisado", help="Marque se confirmou na conta do banco.", default=False)
                 }
             )
             
@@ -1902,7 +1921,7 @@ try:
 
     # ------------------ Guia 5: AUDITORIA LOGÍSTICA ------------------
     with tab5:
-        st.subheader("🚚 Auditoria de Comprovantes Logísticos")
+        st.subheader("Auditoria de Comprovantes Logísticos")
         st.markdown("""
         Utilize esta área para auditar os comprovantes de entrega (Canhotos de Viagem) e de descarga (Taxa de CD) 
         antes de efetuar o pagamento correspondente de fretes e tarifas.
@@ -1921,7 +1940,7 @@ try:
         """)
         
         # --- VISUALIZADOR DE CANHOTOS ---
-        with st.expander("🔍 Auditar Canhotos de Viagens (Transportadoras)", expanded=True):
+        with st.expander("Auditar Canhotos de Viagens (Transportadoras)", expanded=True):
             st.markdown("Verifique os comprovantes anexados pela expedição antes de autorizar o pagamento.")
             contas_man = df_all_contas[df_all_contas['Descrição/Fatura'].str.contains("Acerto Rota/Manifesto #", na=False)]
             if not contas_man.empty:
