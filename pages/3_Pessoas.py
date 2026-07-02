@@ -13,18 +13,29 @@ st.set_page_config(page_title="Pessoas", page_icon="👥", layout="wide")
 from estilo import carregar_estilo
 carregar_estilo()
 
-st.title("👥 Pessoas e Folha de Pagamento")
+st.markdown("""
+<style>
+/* Remove padding do topo da página do Streamlit para subir tudo de forma limpa e sem cortar o texto */
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+Pessoas e Folha de Pagamento
+</h1>
+""", unsafe_allow_html=True)
 
 df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%'")
 
 tab_cadastro, tab_aprovacoes, tab1, tab2, tab_beneficios, tab3, tab4 = st.tabs([
-    "📝 Cadastro de Colaboradores",
-    "⚡ Cadastro Rápido",
+    "Cadastro de Colaboradores",
+    "Cadastro Rápido",
     "Visão Geral (Quadro)",
     "Folha de Pagamento",
-    "🚌 Benefícios Semanais",
-    "💎 Central de Comissões",
-    "🖨️ Extrato Mensal do Vendedor"
+    "Benefícios Semanais",
+    "Central de Comissões",
+    "Extrato Mensal do Vendedor"
 ])
 
 # ======= CADASTRO DE COLABORADORES =======
@@ -633,7 +644,7 @@ def _calc_folha(sal_base, ajuda, outros, vt_bruto, vt_desc_flag, vr_diario, vr_d
 # ======= PAGAMENTO =======
 with tab2:
     st.subheader("Folha de Pagamento")
-    subtab_ind, subtab_lote = st.tabs(["📋 Individual", "📊 Fechamento em Lote"])
+    subtab_ind, subtab_lote = st.tabs(["Individual", "Fechamento em Lote"])
 
     df_func2 = fetch_all("""
         SELECT id, nome, salario_base, ajuda_custo, outros_valor,
@@ -980,8 +991,15 @@ with tab2:
     with tab_beneficios:
         df_ativos = fetch_all("SELECT id, nome, valor_transporte, valor_refeicao FROM funcionarios WHERE status='ATIVO'")
         
+        # Filtro: só mostrar funcionários que têm benefícios cadastrados (> 0)
+        if not df_ativos.empty:
+            df_ativos = df_ativos[
+                (df_ativos['valor_transporte'].fillna(0.0) > 0.0) | 
+                (df_ativos['valor_refeicao'].fillna(0.0) > 0.0)
+            ]
+            
         if df_ativos.empty:
-            st.info("Nenhum colaborador ativo cadastrado no sistema.")
+            st.info("Nenhum colaborador ativo com benefícios diários (VR/VT) cadastrados no sistema.")
         else:
             from datetime import date, timedelta
             
@@ -1014,8 +1032,25 @@ with tab2:
             
             desc_modelo_b = st.text_input("Descrição / Histórico do Lançamento", value=default_desc, key="ben_desc_modelo")
             
+            # Alerta informativo (st.info) explicando sobre o cadastro
+            st.info("Caso algum colaborador não seja listado abaixo, verifique no cadastro de colaboradores se os valores diários de VR e VT estão preenchidos corretamente.")
+            
+            # Inicializa controle de seleção em lote se não existir
+            if "ben_check_all" not in st.session_state:
+                st.session_state["ben_check_all"] = True
+                
+            # Botões de Seleção em Lote (Marcar / Desmarcar todos)
+            col_lote1, col_lote2, _ = st.columns([1.5, 1.5, 5])
+            if col_lote1.button("Selecionar Todos", key="btn_ben_sel_todos"):
+                st.session_state["ben_check_all"] = True
+                st.rerun()
+            if col_lote2.button("Limpar Seleção", key="btn_ben_limp_sel"):
+                st.session_state["ben_check_all"] = False
+                st.rerun()
+                
             # Monta DataFrame inicial para o data_editor
             rows_b = []
+            default_check = st.session_state["ben_check_all"]
             for _, r in df_ativos.iterrows():
                 vt_diario = float(r['valor_transporte'] or 0.0)
                 vr_diario = float(r['valor_refeicao'] or 0.0)
@@ -1024,16 +1059,15 @@ with tab2:
                 vr_semanal = round(vr_diario * 5.0, 2)
                 
                 rows_b.append({
-                    "Gerar?": True,
+                    "Gerar?": default_check,
                     "Funcionario ID": int(r['id']),
                     "Colaborador": str(r['nome']),
                     "Passagem R$": vt_semanal,
                     "Alimentação R$": vr_semanal
                 })
                 
-            df_editor_b = pd.DataFrame(rows_b)
+            df_editor_b = pd.DataFrame(rows_b)[['Gerar?', 'Funcionario ID', 'Colaborador', 'Passagem R$', 'Alimentação R$']]
             
-            st.markdown("**Ajuste os valores para cada colaborador conforme necessário (desmarque os que não devem receber esta semana):**")
             edited_df_b = st.data_editor(
                 df_editor_b,
                 hide_index=True,
@@ -1048,7 +1082,7 @@ with tab2:
                 key="editor_beneficios_semanais"
             )
             
-            if st.button("💾 Gerar Lançamentos de Benefícios", type="primary", use_container_width=True, key="btn_gerar_beneficios"):
+            if st.button("Gerar Lançamentos de Benefícios", type="primary", use_container_width=True, key="btn_gerar_beneficios"):
                 pc_id_b = op_pc_b[pc_sel_b]
                 venc_str_b = venc_b.strftime("%Y-%m-%d")
                 
@@ -1082,7 +1116,7 @@ with tab2:
                             )
                             gerados_vr += 1
                             
-                st.success(f"✅ Lançamentos concluídos: {gerados_vt} de passagem e {gerados_vr} de alimentação gerados com sucesso!")
+                st.success(f"Lançamentos concluídos: {gerados_vt} de passagem e {gerados_vr} de alimentação gerados com sucesso!")
                 import time; time.sleep(1.5); st.rerun()
 
 
