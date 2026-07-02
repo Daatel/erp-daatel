@@ -210,8 +210,11 @@ def mostrar_transferencia_modal(opcoes_bancos, df_bancos):
 st.set_page_config(page_title="Tesouraria Oficial", page_icon="💸", layout="wide")
 carregar_estilo()
 
-st.title("💸 Tesouraria e Inteligência Financeira")
-st.markdown("O Centro de Comando com previsão de 30 dias, Múltiplas Contas Bancárias e Inadimplência.")
+st.markdown("""
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -55px; margin-bottom: 20px; color: #1e293b;'>
+Financeiro e Tesouraria
+</h1>
+""", unsafe_allow_html=True)
 
 try:
     hoje = date.today()
@@ -1701,8 +1704,6 @@ try:
 
     # ------------------ ABA 4: CAIXAS E BANCOS ------------------
     with tab4:
-        st.subheader("🏦 Controle de Caixas e Bancos")
-        
         # Estilos CSS específicos para Caixas e Bancos
         st.markdown("""
         <style>
@@ -1724,189 +1725,180 @@ try:
         </style>
         """, unsafe_allow_html=True)
         
-        # Divisão da Tela em duas colunas (Extrato à esquerda, Sidebar de Ações à direita)
-        col_main, col_sidebar = st.columns([3.2, 1.0])
+        # 1. Painel Operacional em Linha Horizontal no Topo
+        col_btn1, col_btn2, col_btn3, _ = st.columns([1, 1, 1, 2.5])
         
-        with col_main:
-            st.markdown("### 📝 Extrato da Conta")
-            
-            # Filtros superiores (Estilo Bling!)
-            col_f1, col_f2, col_f3 = st.columns([1, 1.3, 1.2])
-            
-            conta_con = col_f1.selectbox(
-                "Conta", 
-                ["Todas as contas"] + list(opcoes_bancos.keys()), 
-                key="cx_conta_filter"
-            )
-            
-            busca_txt = col_f2.text_input(
-                "Pesquisa por nome ou histórico", 
-                placeholder="Buscar lançamento...", 
-                key="cx_search_filter"
-            )
-            
-            periodo_sel = col_f3.selectbox(
-                "Período", 
-                ["Este mês", "Hoje", "Últimos 7 dias", "Últimos 30 dias", "Personalizado"], 
-                key="cx_periodo_filter"
-            )
-            
-            # Cálculo de datas baseados no filtro de Período
-            dt_ini, dt_fi = date.today(), date.today()
-            if periodo_sel == "Este mês":
-                import calendar
-                dt_ini = date(hoje.year, hoje.month, 1)
-                dt_fi = date(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
-            elif periodo_sel == "Hoje":
-                dt_ini = hoje
-                dt_fi = hoje
-            elif periodo_sel == "Últimos 7 dias":
-                dt_ini = hoje - timedelta(days=7)
-                dt_fi = hoje
-            elif periodo_sel == "Últimos 30 dias":
-                dt_ini = hoje - timedelta(days=30)
-                dt_fi = hoje
-            elif periodo_sel == "Personalizado":
-                col_d1, col_d2 = st.columns(2)
-                dt_ini = col_d1.date_input("De", hoje - timedelta(days=30), key="cx_dt_ini")
-                dt_fi = col_d2.date_input("Até", hoje, key="cx_dt_fi")
-            
-            # 1. Carregar todo o extrato em ordem cronológica (para cálculo de saldo correto)
-            query_con = """
-                SELECT fc.id, fc.data as 'Data', fc.tipo as 'Movimentação', 
-                       fc.descricao as 'Histórico', fc.valor as 'Valor', 
-                       cb.nome as 'Banco', fc.conciliado as 'Revisado',
-                       fc.categoria as 'Categoria'
-                FROM fluxo_caixa fc
-                LEFT JOIN contas_bancarias cb ON fc.conta_bancaria_id = cb.id
-                ORDER BY fc.data ASC, fc.id ASC
-            """
-            df_ext = fetch_all(query_con)
-            
-            # 2. Filtrar por Conta antes do cálculo de saldo progressivo
-            if conta_con != "Todas as contas":
-                df_ext = df_ext[df_ext['Banco'] == conta_con]
-                
-            # 3. Calcular saldo progressivo (acumulado histórico)
-            saldo_inicial_conta = 0.0
-            if not df_ext.empty:
-                if conta_con != "Todas as contas":
-                    saldo_inicial_conta = float(df_bancos[df_bancos['nome'] == conta_con]['saldo_inicial'].iloc[0])
-                else:
-                    saldo_inicial_conta = sum([float(s) for s in df_bancos['saldo_inicial']])
-                    
-                saldos_acumulados = []
-                acc = saldo_inicial_conta
-                for _, r in df_ext.iterrows():
-                    val = float(r['Valor'])
-                    if r['Movimentação'] == 'Entrada':
-                        acc += val
-                    else:
-                        acc -= val
-                    saldos_acumulados.append(acc)
-                df_ext['Saldo Após Linha'] = saldos_acumulados
-            else:
-                df_ext['Saldo Após Linha'] = []
-                
-            # 4. Filtrar por período de data para visualização
-            if not df_ext.empty:
-                df_ext['data_parsed'] = pd.to_datetime(df_ext['Data']).dt.date
-                df_ext = df_ext[(df_ext['data_parsed'] >= dt_ini) & (df_ext['data_parsed'] <= dt_fi)]
-                
-            # 5. Filtrar por busca textual
-            if not df_ext.empty and busca_txt:
-                busca_txt_lower = busca_txt.lower()
-                df_ext = df_ext[
-                    df_ext['Histórico'].str.lower().str.contains(busca_txt_lower, na=False) |
-                    df_ext['Categoria'].str.lower().str.contains(busca_txt_lower, na=False)
-                ]
-                
-            # 6. Alinhar em duas colunas separadas (Entrada e Saída)
-            if not df_ext.empty:
-                df_ext['Entrada'] = df_ext.apply(lambda r: float(r['Valor']) if r['Movimentação'] == 'Entrada' else None, axis=1)
-                df_ext['Saída'] = df_ext.apply(lambda r: float(r['Valor']) if r['Movimentação'] == 'Saída' else None, axis=1)
-            else:
-                df_ext['Entrada'] = []
-                df_ext['Saída'] = []
-                
-            # Renderização da Tabela/Grid principal
-            if df_ext.empty:
-                st.info("Nenhuma movimentação encontrada para os filtros selecionados.")
-                total_entradas_periodo = 0.0
-                total_saidas_periodo = 0.0
-            else:
-                total_entradas_periodo = float(df_ext[df_ext['Movimentação'] == 'Entrada']['Valor'].sum())
-                total_saidas_periodo = float(df_ext[df_ext['Movimentação'] == 'Saída']['Valor'].sum())
-                
-                # Exibir mais novos primeiro para visualização confortável
-                df_display = df_ext.sort_values(by=['data_parsed', 'id'], ascending=[False, False]).copy()
-                df_display['Data'] = pd.to_datetime(df_display['Data']).dt.strftime('%d/%m/%Y')
-                df_display['Revisado'] = df_display['Revisado'].astype(bool)
-                
-                edited_df = st.data_editor(
-                    df_display[['id', 'Data', 'Banco', 'Histórico', 'Categoria', 'Entrada', 'Saída', 'Saldo Após Linha', 'Revisado']],
-                    hide_index=True,
-                    disabled=["id", "Data", "Banco", "Histórico", "Categoria", "Entrada", "Saída", "Saldo Após Linha"],
-                    width="stretch",
-                    column_config={
-                        "id": None, # Oculta a coluna ID
-                        "Entrada": st.column_config.NumberColumn("Entrada (R$)", format="R$ %.2f"),
-                        "Saída": st.column_config.NumberColumn("Saída (R$)", format="R$ %.2f"),
-                        "Saldo Após Linha": st.column_config.NumberColumn("Saldo Acumulado (R$)", format="R$ %.2f"),
-                        "Revisado": st.column_config.CheckboxColumn("Revisado ✅", help="Marque se confirmou na conta do banco.", default=False)
-                    }
-                )
-                
-                # Botão de salvar alterações da conciliação
-                if st.button("Salvar Modificações de Conciliação", type="primary", use_container_width=True):
-                    for _, row in edited_df.iterrows():
-                        n_c = bool(row['Revisado'])
-                        db_c = bool(df_ext[df_ext['id'] == row['id']].iloc[0]['Revisado'])
-                        if n_c != db_c:
-                            run_query("UPDATE fluxo_caixa SET conciliado=? WHERE id=?", (n_c, row['id']))
-                    st.success("Extrato Oficializado pela Gerência!")
-                    import time; time.sleep(1); st.rerun()
-            
-        with col_sidebar:
-            st.markdown("### ⚙️ Painel Operacional")
-            
-            # Botão de lançamento desabilitado
+        with col_btn1:
             if st.button("+ Incluir lançamento", key="btn_incluir_lanc_disabled", use_container_width=True):
                 username = st.session_state.get('logged_user', 'Usuário')
                 mostrar_mensagem_bloqueio(username)
-            
-            st.markdown("---")
-            st.markdown("**Ações Rápidas**")
-            # Botões das outras operações (links/placeholders)
+                
+        with col_btn2:
             if st.button("🔄 Transferência entre contas", key="btn_placeholder_transf", use_container_width=True):
                 mostrar_transferencia_modal(opcoes_bancos, df_bancos)
+                
+        with col_btn3:
             if st.button("🔧 Ajustar saldos", key="btn_placeholder_ajuste", use_container_width=True):
                 mostrar_ajuste_saldo_modal(opcoes_bancos)
-            
-            st.markdown("---")
-            
-            # Métricas do Caixa
-            qtd_regs = len(df_ext) if not df_ext.empty else 0
-            if conta_con == "Todas as contas":
-                saldo_atual_conta = saldo_total_empresa
-            else:
-                saldo_atual_conta = saldo_por_banco.get(opcoes_bancos[conta_con], 0.0)
                 
-            st.metric("Quantidade de registros", f"{qtd_regs}")
-            st.metric("Saldo atual da conta", f"R$ {saldo_atual_conta:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        st.markdown("---")
+        
+        # 2. Filtros superiores
+        col_f1, col_f2, col_f3 = st.columns([1, 1.3, 1.2])
+        
+        conta_con = col_f1.selectbox(
+            "Conta", 
+            ["Todas as contas"] + list(opcoes_bancos.keys()), 
+            key="cx_conta_filter"
+        )
+        
+        busca_txt = col_f2.text_input(
+            "Pesquisa por nome ou histórico", 
+            placeholder="Buscar lançamento...", 
+            key="cx_search_filter"
+        )
+        
+        periodo_sel = col_f3.selectbox(
+            "Período", 
+            ["Este mês", "Hoje", "Últimos 7 dias", "Últimos 30 dias", "Personalizado"], 
+            key="cx_periodo_filter"
+        )
+        
+        # Cálculo de datas baseados no filtro de Período
+        dt_ini, dt_fi = date.today(), date.today()
+        if periodo_sel == "Este mês":
+            import calendar
+            dt_ini = date(hoje.year, hoje.month, 1)
+            dt_fi = date(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
+        elif periodo_sel == "Hoje":
+            dt_ini = hoje
+            dt_fi = hoje
+        elif periodo_sel == "Últimos 7 dias":
+            dt_ini = hoje - timedelta(days=7)
+            dt_fi = hoje
+        elif periodo_sel == "Últimos 30 dias":
+            dt_ini = hoje - timedelta(days=30)
+            dt_fi = hoje
+        elif periodo_sel == "Personalizado":
+            col_d1, col_d2 = st.columns(2)
+            dt_ini = col_d1.date_input("De", hoje - timedelta(days=30), key="cx_dt_ini")
+            dt_fi = col_d2.date_input("Até", hoje, key="cx_dt_fi")
+        
+        # 1. Carregar todo o extrato em ordem cronológica (para cálculo de saldo correto)
+        query_con = """
+            SELECT fc.id, fc.data as 'Data', fc.tipo as 'Movimentação', 
+                   fc.descricao as 'Histórico', fc.valor as 'Valor', 
+                   cb.nome as 'Banco', fc.conciliado as 'Revisado',
+                   fc.categoria as 'Categoria'
+            FROM fluxo_caixa fc
+            LEFT JOIN contas_bancarias cb ON fc.conta_bancaria_id = cb.id
+            ORDER BY fc.data ASC, fc.id ASC
+        """
+        df_ext = fetch_all(query_con)
+        
+        # 2. Filtrar por Conta antes do cálculo de saldo progressivo
+        if conta_con != "Todas as contas":
+            df_ext = df_ext[df_ext['Banco'] == conta_con]
             
-            # Collapsible Informações (Entradas/Saídas do período)
-            with st.expander("📊 Informações do Período", expanded=True):
-                st.write(f"**Entradas:** <span style='color:green'>R$ {total_entradas_periodo:,.2f}</span>".replace(",", "X").replace(".", ",").replace("X", "."), unsafe_allow_html=True)
-                st.write(f"**Saídas:** <span style='color:red'>R$ {total_saidas_periodo:,.2f}</span>".replace(",", "X").replace(".", ",").replace("X", "."), unsafe_allow_html=True)
-                st.write(f"**Resultado:** R$ {total_entradas_periodo - total_saidas_periodo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        # 3. Calcular saldo progressivo (acumulado histórico)
+        saldo_inicial_conta = 0.0
+        if not df_ext.empty:
+            if conta_con != "Todas as contas":
+                saldo_inicial_conta = float(df_bancos[df_bancos['nome'] == conta_con]['saldo_inicial'].iloc[0])
+            else:
+                saldo_inicial_conta = sum([float(s) for s in df_bancos['saldo_inicial']])
+                
+            saldos_acumulados = []
+            acc = saldo_inicial_conta
+            for _, r in df_ext.iterrows():
+                val = float(r['Valor'])
+                if r['Movimentação'] == 'Entrada':
+                    acc += val
+                else:
+                    acc -= val
+                saldos_acumulados.append(acc)
+            df_ext['Saldo Após Linha'] = saldos_acumulados
+        else:
+            df_ext['Saldo Após Linha'] = []
+            
+        # 4. Filtrar por período de data para visualização
+        if not df_ext.empty:
+            df_ext['data_parsed'] = pd.to_datetime(df_ext['Data']).dt.date
+            df_ext = df_ext[(df_ext['data_parsed'] >= dt_ini) & (df_ext['data_parsed'] <= dt_fi)]
+            
+        # 5. Filtrar por busca textual
+        if not df_ext.empty and busca_txt:
+            busca_txt_lower = busca_txt.lower()
+            df_ext = df_ext[
+                df_ext['Histórico'].str.lower().str.contains(busca_txt_lower, na=False) |
+                df_ext['Categoria'].str.lower().str.contains(busca_txt_lower, na=False)
+            ]
+            
+        # 6. Alinhar em duas colunas separadas (Entrada e Saída)
+        if not df_ext.empty:
+            df_ext['Entrada'] = df_ext.apply(lambda r: float(r['Valor']) if r['Movimentação'] == 'Entrada' else None, axis=1)
+            df_ext['Saída'] = df_ext.apply(lambda r: float(r['Valor']) if r['Movimentação'] == 'Saída' else None, axis=1)
+        else:
+            df_ext['Entrada'] = []
+            df_ext['Saída'] = []
+            
+        # 7. Resumos e Saldos do Período
+        if df_ext.empty:
+            total_entradas_periodo = 0.0
+            total_saidas_periodo = 0.0
+        else:
+            total_entradas_periodo = float(df_ext[df_ext['Movimentação'] == 'Entrada']['Valor'].sum())
+            total_saidas_periodo = float(df_ext[df_ext['Movimentação'] == 'Saída']['Valor'].sum())
 
-            st.markdown("---")
-            # Resumos e saldos individuais
-            with st.expander("💳 Saldos das Contas", expanded=False):
-                for b_nome, b_id in opcoes_bancos.items():
-                    s_val = saldo_por_banco.get(b_id, 0.0)
-                    st.write(f"**{b_nome}:** R$ {s_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        if conta_con == "Todas as contas":
+            saldo_atual_conta = saldo_total_empresa
+        else:
+            saldo_atual_conta = saldo_por_banco.get(opcoes_bancos[conta_con], 0.0)
+
+        # Barra Discreta de Métricas Financeiras no Topo da Tabela
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        col_m1.metric("Saldo Atual da Conta", f"R$ {saldo_atual_conta:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col_m1.caption(f"Conta: {conta_con}")
+        col_m2.metric("Entradas (Período)", f"R$ {total_entradas_periodo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col_m3.metric("Saídas (Período)", f"R$ {total_saidas_periodo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        
+        resultado_periodo = total_entradas_periodo - total_saidas_periodo
+        col_m4.metric("Resultado (Período)", f"R$ {resultado_periodo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+            
+        # Renderização da Tabela/Grid principal
+        if df_ext.empty:
+            st.info("Nenhuma movimentação encontrada para os filtros selecionados.")
+        else:
+            # Exibir mais novos primeiro para visualização confortável
+            df_display = df_ext.sort_values(by=['data_parsed', 'id'], ascending=[False, False]).copy()
+            df_display['Data'] = pd.to_datetime(df_display['Data']).dt.strftime('%d/%m/%Y')
+            df_display['Revisado'] = df_display['Revisado'].astype(bool)
+            
+            edited_df = st.data_editor(
+                df_display[['id', 'Data', 'Banco', 'Histórico', 'Categoria', 'Entrada', 'Saída', 'Saldo Após Linha', 'Revisado']],
+                hide_index=True,
+                disabled=["id", "Data", "Banco", "Histórico", "Categoria", "Entrada", "Saída", "Saldo Após Linha"],
+                width="stretch",
+                column_config={
+                    "id": None, # Oculta a coluna ID
+                    "Entrada": st.column_config.NumberColumn("Entrada (R$)", format="R$ %.2f"),
+                    "Saída": st.column_config.NumberColumn("Saída (R$)", format="R$ %.2f"),
+                    "Saldo Após Linha": st.column_config.NumberColumn("Saldo Acumulado (R$)", format="R$ %.2f"),
+                    "Revisado": st.column_config.CheckboxColumn("Revisado ✅", help="Marque se confirmou na conta do banco.", default=False)
+                }
+            )
+            
+            # Botão de salvar alterações da conciliação
+            if st.button("Salvar Modificações de Conciliação", type="primary", use_container_width=True):
+                for _, row in edited_df.iterrows():
+                    n_c = bool(row['Revisado'])
+                    db_c = bool(df_ext[df_ext['id'] == row['id']].iloc[0]['Revisado'])
+                    if n_c != db_c:
+                        run_query("UPDATE fluxo_caixa SET conciliado=? WHERE id=?", (n_c, row['id']))
+                st.success("Extrato Oficializado pela Gerência!")
+                import time; time.sleep(1); st.rerun()
 
     # ------------------ Guia 5: AUDITORIA LOGÍSTICA ------------------
     with tab5:
