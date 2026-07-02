@@ -10,10 +10,63 @@ from database import (
 )
 from estilo import carregar_estilo
 
-st.set_page_config(page_title="Faturamento & Expedição", page_icon="📦", layout="wide")
+st.set_page_config(page_title="Faturamento & Expedição", layout="wide")
 carregar_estilo()
 
-st.title("📦 Faturamento & Expedição (SEFAZ)")
+# Modais de Impressão imediata de DAV
+@st.dialog("Imprimir Documento Auxiliar de Venda (DAV)")
+def modal_perguntar_impressao(vendas_ids):
+    st.write("O faturamento foi concluído com sucesso!")
+    st.write("Deseja abrir a tela de impressão do(s) DAV(s) agora?")
+    
+    col1, col2 = st.columns(2)
+    if col1.button("Sim, Imprimir", type="primary", use_container_width=True):
+        st.session_state['disparar_impressao_davs'] = vendas_ids
+        if 'pedidos_dav_faturados' in st.session_state:
+            del st.session_state['pedidos_dav_faturados']
+        st.rerun()
+    if col2.button("Não", use_container_width=True):
+        if 'pedidos_dav_faturados' in st.session_state:
+            del st.session_state['pedidos_dav_faturados']
+        st.rerun()
+
+@st.dialog("Imprimir DAV", width="large")
+def modal_impressao_dav(vendas_ids):
+    import streamlit.components.v1 as components
+    from utils_dav import buscar_dados_venda, gerar_html_dav
+    
+    st.write("Abrindo painel de visualização e fila de impressão...")
+    for vid in vendas_ids:
+        venda_info = buscar_dados_venda(vid)
+        if venda_info:
+            html_dav = gerar_html_dav(venda_info)
+            # Injeta window.print() automática no HTML do DAV
+            html_dav = html_dav.replace("</body>", "<script>window.print();</script></body>")
+            components.html(html_dav, height=800, scrolling=True)
+            
+    if st.button("Fechar", type="primary", use_container_width=True):
+        if 'disparar_impressao_davs' in st.session_state:
+            del st.session_state['disparar_impressao_davs']
+        st.rerun()
+
+# Disparadores de Modais baseados em Session State
+if st.session_state.get('pedidos_dav_faturados'):
+    modal_perguntar_impressao(st.session_state['pedidos_dav_faturados'])
+elif st.session_state.get('disparar_impressao_davs'):
+    modal_impressao_dav(st.session_state['disparar_impressao_davs'])
+
+st.markdown("""
+<style>
+/* Remove padding do topo da página do Streamlit para subir tudo de forma limpa e sem cortar o texto */
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+Faturamento e Expedição
+</h1>
+""", unsafe_allow_html=True)
 st.markdown("Central de liberação de carga. Fature os pedidos aprovados na Venda, bata o estoque e gere arquivos de integração fiscal.")
 
 def format_brl(val):
@@ -25,10 +78,10 @@ df_clientes = get_clientes_ativos_cached()
 df_produtos = get_produtos_cached()
 
 tab1, tab2, tab3, tab4 = st.tabs([
-    "🚀 Fila de Faturamento (Em Lote)", 
-    "📂 Gerador Fiscal (SEFAZ/Emissor)", 
-    "🔄 Estornar NF / DAV",
-    "🔄 Logística Reversa (Devoluções)"
+    "Fila de Faturamento (Em Lote)", 
+    "Gerador Fiscal (SEFAZ/Emissor)", 
+    "Estornar NF / DAV",
+    "Logística Reversa (Devoluções)"
 ])
 
 # ======= 1. FILA DE FATURAMENTO =======
@@ -175,7 +228,7 @@ with tab1:
         
         if not pedidos_selecionados.empty:
             st.markdown("---")
-            st.subheader("⚙️ Ação em Lote")
+            st.subheader("Ação em Lote")
             col_f1, col_f2, col_f3 = st.columns(3)
             
             tipo_doc = col_f1.selectbox("Tipo de Documento", ["Nota Fiscal (NF)", "DAV (Documento Auxiliar de Venda)"])
@@ -457,6 +510,9 @@ with tab1:
                 
                 if sucesso:
                     st.success(f"✅ {qtd_processada} Pedido(s) Faturados com Sucesso! Estoque e Financeiro atualizados de forma consistente.")
+                    if "DAV" in tipo_doc:
+                        st.session_state['pedidos_dav_faturados'] = [int(row['pedido_id']) for _, row in pedidos_selecionados.iterrows()]
+                    
                     if alertas_custo_ausente:
                         produtos_unicos = ", ".join(sorted(set(alertas_custo_ausente)))
                         st.warning(f"⚠️ Produto(s) sem custo cadastrado (CMV registrado como zero): {produtos_unicos}. Cadastre o custo em Produtos.")
