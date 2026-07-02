@@ -1896,16 +1896,16 @@ try:
             df_display['Revisado'] = df_display['Revisado'].astype(bool)
             
             edited_df = st.data_editor(
-                df_display[['id', 'Data', 'Banco', 'Histórico', 'Categoria', 'Entrada', 'Saída', 'Saldo Após Linha', 'Revisado']],
+                df_display[['id', 'Revisado', 'Data', 'Banco', 'Histórico', 'Entrada', 'Saída', 'Saldo Após Linha', 'Categoria']],
                 hide_index=True,
-                disabled=["id", "Data", "Banco", "Histórico", "Categoria", "Entrada", "Saída", "Saldo Após Linha"],
+                disabled=["id", "Data", "Banco", "Histórico", "Entrada", "Saída", "Saldo Após Linha", "Categoria"],
                 width="stretch",
                 column_config={
                     "id": None, # Oculta a coluna ID
+                    "Revisado": st.column_config.CheckboxColumn("Ok", help="Marque se confirmou na conta do banco.", default=False),
                     "Entrada": st.column_config.NumberColumn("Entrada (R$)", format="R$ %.2f"),
                     "Saída": st.column_config.NumberColumn("Saída (R$)", format="R$ %.2f"),
-                    "Saldo Após Linha": st.column_config.NumberColumn("Saldo Acumulado (R$)", format="R$ %.2f"),
-                    "Revisado": st.column_config.CheckboxColumn("Revisado", help="Marque se confirmou na conta do banco.", default=False)
+                    "Saldo Após Linha": st.column_config.NumberColumn("Saldo Acumulado (R$)", format="R$ %.2f")
                 }
             )
             
