@@ -7,7 +7,18 @@ from datetime import date
 st.set_page_config(page_title="Cadastros Base", page_icon="📝", layout="wide")
 carregar_estilo()
 
-st.title("📝 Cadastros Inteligentes")
+st.markdown("""
+<style>
+/* Remove padding do topo da página do Streamlit para subir tudo de forma limpa e sem cortar o texto */
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+Cadastros Inteligentes
+</h1>
+""", unsafe_allow_html=True)
 
 tab_empresa, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab_fp, tab_ft = st.tabs([
     "🏢 Minha Empresa", "Produtos", "Clientes", "Fornecedores", "Regras de Comissão", 
@@ -226,667 +237,1137 @@ with tab1:
                         if st.form_submit_button("Atualizar Produto"):
                             run_query("UPDATE produtos SET nome=?, marca=?, preco_venda_base=?, unidade_medida=?, unidades_por_fardo=?, peso_volume=?, referencia=?, is_materia_prima=?, estoque_minimo=?, embalagem_master=?, cod_emb_master=?, custo_medio=? WHERE id=?", 
                                       (enome, emarca, epreco, eunidade, efator, epeso, eref, True if emateria else False, eestoque_min, eembalagem_master, ecod_master, ecusto_medio, pid))
-                            st.success("Produto atualizado!")
-                            import time; time.sleep(1); st.rerun()
-
-# ======= CLIENTES =======
+    # ======= CLIENTES =======
 with tab2:
-    st.subheader("Cadastro de Clientes")
-    
-    # --- NOVO IMPORTADOR DE CLIENTES VIA CSV ---
-    with st.expander("📥 Importação em Massa de Clientes (Planilha CSV)"):
-        st.warning(
-            "⚠️ **IMPORTANTE:** Para realizar a importação de clientes, certifique-se de que os seus **Representantes** (aba 'Colaboradores'), **Redes de Clientes** e **Grupos de Lojas** (aba 'Redes e Grupos') já estejam previamente cadastrados no sistema. A importação será bloqueada por segurança caso existam nomes na planilha não correspondentes aos registros prévios."
-        )
-        
-        modelo_csv = (
-            "Razão Social;Nome Fantasia;CNPJ/CPF;Inscrição Estadual;Endereço;Bairro;CEP;Cidade;UF;Telefone;E-mail;Observações;Status;Rede de Clientes;Grupo de Lojas;PRAZO DE PAGAMENTO;Representante\n"
-            "Empresa Exemplo Ltda;Exemplo;00.000.000/0001-00;Isento;Rua das Flores 123;Centro;74000-000;Goiânia;GO;(62) 99999-9999;compras@exemplo.com;Entrega de manhã;ATIVO;;;;\n"
-        )
-        st.download_button(
-            label="📥 Baixar Planilha CSV Modelo",
-            data=modelo_csv.encode('utf-8-sig'),
-            file_name="modelo_importacao_clientes.csv",
-            mime="text/csv",
-            help="Utilize este arquivo como modelo. Lembre-se de salvar em formato CSV (delimitado por vírgula ou ponto-e-vírgula)."
-        )
-        
-        uploaded_file = st.file_uploader("Selecione o arquivo CSV de clientes para importação", type=["csv"], key="import_clientes_uploader")
-        
-        if uploaded_file is not None:
-            try:
-                import io
-                content = uploaded_file.getvalue()
-                try:
-                    text_content = content.decode('utf-8')
-                except UnicodeDecodeError:
-                    text_content = content.decode('latin-1')
-                
-                # Detectar separador
-                primeira_linha = text_content.split('\n')[0]
-                sep = ';' if ';' in primeira_linha else ','
-                
-                df_import = pd.read_csv(io.StringIO(text_content), sep=sep)
-                df_import.columns = [str(c).strip() for c in df_import.columns]
-            except Exception as e:
-                st.error(f"Erro ao processar arquivo: {e}")
-                df_import = None
-                
-            if df_import is not None:
-                if 'Razão Social' not in df_import.columns:
-                    st.error("❌ O arquivo não possui a coluna obrigatória **'Razão Social'**. Verifique a planilha modelo.")
-                else:
-                    # Limpeza rápida
-                    def clean_val(x):
-                        if pd.isna(x): return ""
-                        v = str(x).strip()
-                        return "" if v.lower() == "nan" else v
-                        
-                    for col in df_import.columns:
-                        df_import[col] = df_import[col].apply(clean_val)
-                        
-                    st.success("📂 Arquivo de importação carregado!")
-                    st.markdown("**Prévia dos Dados (Primeiras 10 linhas):**")
-                    st.dataframe(df_import.head(10), use_container_width=True)
-                    
-                    # 1. Carregar dependências existentes no banco para validação
-                    df_reps_db = fetch_all("SELECT id, nome FROM funcionarios")
-                    existing_reps = set(df_reps_db['nome'].tolist()) if not df_reps_db.empty else set()
-                    rep_id_map = dict(zip(df_reps_db['nome'], df_reps_db['id'])) if not df_reps_db.empty else {}
-                    
-                    df_redes_db = fetch_all("SELECT nome FROM redes_clientes")
-                    existing_redes = set(df_redes_db['nome'].tolist()) if not df_redes_db.empty else set()
-                    
-                    df_grupos_db = fetch_all("SELECT nome FROM grupos_clientes")
-                    existing_grupos = set(df_grupos_db['nome'].tolist()) if not df_grupos_db.empty else set()
-                    
-                    df_existing_cnpj = fetch_all("SELECT cnpj_cpf FROM clientes")
-                    existing_cnpjs = set(df_existing_cnpj['cnpj_cpf'].tolist()) if not df_existing_cnpj.empty else set()
-                    
-                    # Listas para auditoria
-                    missing_reps = set()
-                    missing_redes = set()
-                    missing_grupos = set()
-                    duplicate_cnpjs = []
-                    cnpjs_na_planilha = {}
-                    
-                    valid_rows_count = 0
-                    
-                    for idx, row in df_import.iterrows():
-                        razao = row.get('Razão Social', '')
-                        if not razao:
-                            continue
-                            
-                        cnpj = row.get('CNPJ/CPF', '')
-                        rep = row.get('Representante', '')
-                        rede = row.get('Rede de Clientes', '')
-                        grupo = row.get('Grupo de Lojas', '')
-                        
-                        # Duplicados
-                        if cnpj:
-                            if cnpj in existing_cnpjs:
-                                duplicate_cnpjs.append(f"{razao} (CNPJ: {cnpj} - já cadastrado)")
-                            elif cnpj in cnpjs_na_planilha:
-                                duplicate_cnpjs.append(f"{razao} (CNPJ: {cnpj} - duplicado na planilha)")
-                            else:
-                                cnpjs_na_planilha[cnpj] = 1
-                                
-                        # Representantes pendentes
-                        if rep and rep not in existing_reps:
-                            missing_reps.add(rep)
-                            
-                        # Redes pendentes
-                        if rede and rede not in existing_redes:
-                            missing_redes.add(rede)
-                            
-                        # Grupos pendentes
-                        if grupo and grupo not in existing_grupos:
-                            missing_grupos.add(grupo)
-                            
-                        valid_rows_count += 1
-                        
-                    # Mostrar resultados da Validação
-                    st.markdown("#### 🔍 Relatório de Validação e Consistência:")
-                    is_blocked = False
-                    
-                    col_v1, col_v2, col_v3 = st.columns(3)
-                    with col_v1:
-                        if missing_reps:
-                            st.error(f"❌ **Representantes Ausentes ({len(missing_reps)}):**\n" + "\n".join([f"- {r}" for r in sorted(missing_reps)]))
-                            is_blocked = True
-                        else:
-                            st.success("✅ Representantes OK")
-                            
-                    with col_v2:
-                        if missing_redes:
-                            st.error(f"❌ **Redes Ausentes ({len(missing_redes)}):**\n" + "\n".join([f"- {r}" for r in sorted(missing_redes)]))
-                            is_blocked = True
-                        else:
-                            st.success("✅ Redes de Clientes OK")
-                            
-                    with col_v3:
-                        if missing_grupos:
-                            st.error(f"❌ **Grupos de Lojas Ausentes ({len(missing_grupos)}):**\n" + "\n".join([f"- {g}" for g in sorted(missing_grupos)]))
-                            is_blocked = True
-                        else:
-                            st.success("✅ Grupos de Lojas OK")
-                            
-                    if duplicate_cnpjs:
-                        st.warning(f"⚠️ **Clientes a serem ignorados por CNPJ duplicado ({len(duplicate_cnpjs)}):**\n" + "\n".join([f"- {d}" for d in duplicate_cnpjs]))
-                        
-                    if is_blocked:
-                        st.error("⚠️ **IMPORTAÇÃO BLOQUEADA:** Por segurança, realize o cadastro prévio das dependências ausentes apontadas acima nas abas correspondentes antes de prosseguir.")
-                        st.button("Confirmar Importação de Clientes", disabled=True, use_container_width=True, key="btn_import_disabled")
-                    else:
-                        st.success("🎉 Planilha validada com sucesso! Todos os relacionamentos estão em conformidade com os cadastros prévios do ERP.")
-                        limpar_banco = st.checkbox("🗑️ Excluir todos os clientes existentes atualmente no sistema antes de importar", value=False, key="import_limpar_banco")
-                        
-                        if st.button("Confirmar Importação de Clientes", use_container_width=True, type="primary", key="btn_import_active"):
-                            try:
-                                imported_count = 0
-                                ignored_count = 0
-                                
-                                if limpar_banco:
-                                    run_query("DELETE FROM clientes")
-                                    
-                                for idx, row in df_import.iterrows():
-                                    razao = row.get('Razão Social', '')
-                                    if not razao:
-                                        continue
-                                        
-                                    cnpj = row.get('CNPJ/CPF', '')
-                                    if not limpar_banco and cnpj and cnpj in existing_cnpjs:
-                                        ignored_count += 1
-                                        continue
-                                        
-                                    nome_fantasia = row.get('Nome Fantasia', '')
-                                    insc_estadual = row.get('Inscrição Estadual', '')
-                                    endereco = row.get('Endereço', '')
-                                    bairro = row.get('Bairro', '')
-                                    cep = row.get('CEP', '')
-                                    cidade = row.get('Cidade', '')
-                                    uf = row.get('UF', '')
-                                    telefone = row.get('Telefone', '')
-                                    email = row.get('E-mail', '')
-                                    observacoes = row.get('Observações', '')
-                                    status_val = row.get('Status', 'ATIVO')
-                                    if not status_val: status_val = 'ATIVO'
-                                    rede_val = row.get('Rede de Clientes', '')
-                                    grupo_val = row.get('Grupo de Lojas', '')
-                                    prazo_pag = row.get('PRAZO DE PAGAMENTO', '')
-                                    chave_pix_val = row.get('Código Pix', row.get('Chave Pix', ''))
-                                    
-                                    rep_nome = row.get('Representante', '')
-                                    rep_id = rep_id_map.get(rep_nome, None) if rep_nome else None
-                                    
-                                    # Tentar achar correspondência para prazo_pag
-                                    fp_id_val = None
-                                    if prazo_pag:
-                                        df_match = fetch_all("SELECT id FROM formas_pagamento WHERE UPPER(TRIM(nome)) = ?", (prazo_pag.strip().upper(),))
-                                        if not df_match.empty:
-                                            fp_id_val = int(df_match.iloc[0]['id'])
-
-                                    query_insert = """INSERT INTO clientes 
-                                               (nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual, 
-                                                bairro, cep, cidade, uf, email, observacoes, status, rede_clientes, 
-                                                grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix, forma_pagamento_id) 
-                                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-                                    
-                                    run_query(query_insert, (
-                                        razao, telefone, endereco, nome_fantasia, cnpj, insc_estadual,
-                                        bairro, cep, cidade, uf, email, observacoes, status_val, rede_val,
-                                        grupo_val, prazo_pag, rep_id, None, 30, 0.0, "", chave_pix_val, fp_id_val
-                                    ))
-                                    imported_count += 1
-                                    
-                                st.success(f"✅ Importação finalizada! {imported_count} novos clientes importados. {ignored_count} registros ignorados por duplicidade de CNPJ.")
-                                import time; time.sleep(2); st.rerun()
-                            except Exception as ex:
-                                st.error(f"Erro ao inserir dados no banco: {ex}")
-    # --- FIM DO NOVO IMPORTADOR ---
-    
-    df_reps = fetch_all("SELECT id, nome FROM funcionarios WHERE cargo LIKE '%Representante%' OR cargo LIKE '%Vendedor%'")
-    rep_options = ["-- SELECIONE --"] + df_reps['nome'].tolist() if not df_reps.empty else ["-- SELECIONE --"]
-    rep_dict = dict(zip(df_reps['nome'], df_reps['id'])) if not df_reps.empty else {}
-    
-    df_redes_bd = fetch_all("SELECT id, nome FROM redes_clientes ORDER BY nome")
-    redes_opts = ["(Nenhuma)"] + df_redes_bd['nome'].tolist() if not df_redes_bd.empty else ["(Nenhuma)"]
-    
-    # We fetch all groups to filter via JS/Streamlit
-    df_grupos_bd = fetch_all("SELECT g.id, g.nome, r.nome as rede_nome FROM grupos_clientes g JOIN redes_clientes r ON g.rede_id = r.id")
-    
-    st.markdown("##### Configuração de Rede do Cliente")
-    rede_dinamica = st.selectbox("1. Selecione a Rede (Isso vai filtrar as opções de Grupo abaixo)", redes_opts)
-    
-    grupos_opts = ["(Nenhum)"]
-    if rede_dinamica != "(Nenhuma)" and not df_grupos_bd.empty:
-        grupos_opts += df_grupos_bd[df_grupos_bd['rede_nome'] == rede_dinamica]['nome'].tolist()
-
-    with st.form("form_cliente", clear_on_submit=True):
-        c1, c2, c3, c_nasc = st.columns(4)
-        nome = c1.text_input("Razão Social")
-        nome_fantasia = c2.text_input("Nome Fantasia")
-        cnpj_cpf = c3.text_input("CNPJ/CPF")
-        nascimento = c_nasc.date_input("Data de Nasc/Fundação", value=None, format="DD/MM/YYYY")
-        
-        c4, c5, c6 = st.columns(3)
-        inscricao_estadual = c4.text_input("Inscrição Estadual")
-        telefone = c5.text_input("Telefone")
-        email = c6.text_input("E-mail")
-        
-        c7, c8, c9, c10 = st.columns([2, 1, 1, 1])
-        endereco = c7.text_input("Endereço")
-        bairro = c8.text_input("Bairro")
-        cidade = c9.text_input("Cidade")
-        uf = c10.text_input("UF")
-        
-        c11, c12, c13, c_pix = st.columns(4)
-        cep = c11.text_input("CEP")
-        grupo_lojas = c12.selectbox("2. Grupo (Sub-rede)", grupos_opts)
-        status = c13.selectbox("Status", ["ATIVO", "INATIVO"])
-        chave_pix = c_pix.text_input("Código Pix")
-        
-        c14, c16, c17 = st.columns(3)
-        # Buscar formas de pagamento
-        df_fp_list = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
-        fp_opts = {}
-        if not df_fp_list.empty:
-            for _, r in df_fp_list.iterrows():
-                fp_opts[r['nome']] = (r['id'], r['parcelas'])
-
-        fp_selecionada = c14.selectbox("Forma de Pagamento Padrão", ["-- SELECIONE --"] + list(fp_opts.keys()))
-        
-        if fp_selecionada and fp_selecionada != "-- SELECIONE --":
-            fp_id_val, fp_parc_val = fp_opts[fp_selecionada]
-            import re
-            first_day = 0
-            nums = re.findall(r'\d+', fp_parc_val)
-            if nums:
-                first_day = int(nums[0])
-        else:
-            fp_id_val = None
-            fp_selecionada = ""
-            first_day = 30
-            
-        rep_nome = c16.selectbox("Representante Responsável", rep_options)
-        observacoes = c17.text_input("Observações")
-        
-        st.info(f"Rede Vinculada a este client: **{rede_dinamica}**")
-        
-        st.markdown("##### Logística e Descarga")
-        c18, c19 = st.columns([1, 3])
-        taxa_descarga = c18.number_input("Taxa de Descarga (R$)", min_value=0.0, step=10.0, help="Valor cobrado pelo CD/Cliente para descarregar o caminhão.")
-        regras_descarga = c19.text_input("Regras e Horários de Descarga", help="Ex: Descarga Paletizada, Horário Noturno, Agendamento.")
-        
-        if st.form_submit_button("Cadastrar Cliente"):
-            if not nome:
-                st.error("Por favor, preencha a Razão Social.")
-            elif not fp_selecionada or fp_selecionada == "-- SELECIONE --":
-                st.error("Por favor, selecione a Forma de Pagamento Padrão.")
-            elif not rep_nome or rep_nome == "-- SELECIONE --":
-                st.error("Por favor, selecione o Representante Responsável.")
+    # 1. Funções Auxiliares
+    def buscar_cnpj_api(cnpj_val):
+        import requests
+        cnpj_clean = "".join(filter(str.isdigit, cnpj_val))
+        if len(cnpj_clean) != 14:
+            return {"error": "CNPJ inválido. Deve conter 14 dígitos."}
+        try:
+            r = requests.get(f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_clean}", timeout=8)
+            if r.status_code == 200:
+                return r.json()
+            elif r.status_code == 404:
+                return {"error": "CNPJ não encontrado."}
             else:
-                nome_limpo = nome.strip().upper()
-                # 1. Validar se o nome já existe
-                chk_nome = fetch_all("SELECT id FROM clientes WHERE UPPER(TRIM(nome)) = ?", (nome_limpo,))
+                return {"error": f"Erro na consulta (status {r.status_code})."}
+        except Exception as e:
+            return {"error": f"Erro de conexão com a API: {str(e)}"}
+
+    def gerar_pdf_clientes(df_pdf):
+        from fpdf import FPDF
+        import unicodedata
+        
+        class PDF(FPDF):
+            def header(self):
+                self.set_font("Helvetica", "B", 14)
+                self.cell(0, 10, "EMPORIO DO ALHO - RELATORIO DE CLIENTES", new_x="LMARGIN", new_y="NEXT", align="C")
+                self.ln(5)
                 
-                # 2. Validar CNPJ/CPF se preenchido
-                chk_cnpj = pd.DataFrame()
-                cnpj_val = cnpj_cpf.strip() if cnpj_cpf else ""
-                if cnpj_val:
-                    chk_cnpj = fetch_all("SELECT id FROM clientes WHERE TRIM(cnpj_cpf) = ?", (cnpj_val,))
-                
-                if not chk_nome.empty:
-                    st.error(f"⚠️ Já existe um cliente cadastrado com o nome '{nome.strip()}'. Se forem clientes diferentes, diferencie-os no nome (ex: '{nome.strip()} RJ', '{nome.strip()} - Filial').")
-                elif not chk_cnpj.empty:
-                    st.error(f"⚠️ Já existe um cliente cadastrado com o CNPJ/CPF '{cnpj_val}'.")
-                else:
-                    req_id = rep_dict.get(rep_nome, None)
-                    rede_val = rede_dinamica if rede_dinamica != "(Nenhuma)" else ""
-                    grupo_val = grupo_lojas if grupo_lojas != "(Nenhum)" else ""
-                    
-                    query = """INSERT INTO clientes 
-                               (nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual, 
-                                bairro, cep, cidade, uf, email, observacoes, status, rede_clientes, 
-                                grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix, forma_pagamento_id) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-                    
-                    run_query(query, (
-                        nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual,
-                        bairro, cep, cidade, uf, email, observacoes, status, rede_val,
-                        grupo_val, fp_selecionada, req_id, nascimento, first_day, taxa_descarga, regras_descarga, chave_pix, fp_id_val
-                    ))
-                    st.success("Cliente cadastrado com sucesso!")
-                    import time; time.sleep(1); st.rerun()
-                
-    st.markdown("---")
-    st.subheader("Clientes Cadastrados")
-    df_clientes = fetch_all("""
-        SELECT c.id, c.nome as 'Razão Social', c.cnpj_cpf as 'CNPJ/CPF', c.cidade as 'Cidade', c.uf as 'UF', 
-               c.rede_clientes as 'Rede', c.grupo_lojas as 'Grupo', COALESCE(fp.nome, c.prazo_pagamento) as 'Forma Pagto',
-               c.status as 'Status', f.nome as 'Representante',
-               c.taxa_descarga as 'Taxa Descarga (R$)', c.regras_descarga as 'Regras Descarga', c.chave_pix as 'Código Pix'
+        pdf = PDF()
+        pdf.add_page()
+        
+        pdf.set_font("Helvetica", "B", 8.5)
+        pdf.cell(10, 7, "ID", border=1, align="C")
+        pdf.cell(50, 7, "Razao Social", border=1)
+        pdf.cell(32, 7, "CNPJ/CPF", border=1)
+        pdf.cell(30, 7, "Cidade/UF", border=1)
+        pdf.cell(28, 7, "Representante", border=1)
+        pdf.cell(40, 7, "Forma Pagto", border=1, new_x="LMARGIN", new_y="NEXT")
+        
+        pdf.set_font("Helvetica", "", 7.5)
+        for _, r in df_pdf.iterrows():
+            cid_uf = f"{r.get('Cidade') or ''}/{r.get('UF') or ''}"
+            
+            # Limpeza de acentos para compatibilidade com Helvetica
+            razao = "".join(ch for ch in unicodedata.normalize('NFKD', str(r.get('Razão Social') or '')) if unicodedata.category(ch) != 'Mn')
+            cnpj = str(r.get('CNPJ/CPF') or '')
+            rep = "".join(ch for ch in unicodedata.normalize('NFKD', str(r.get('Representante') or '')) if unicodedata.category(ch) != 'Mn')
+            fp = "".join(ch for ch in unicodedata.normalize('NFKD', str(r.get('Forma Pagto') or '')) if unicodedata.category(ch) != 'Mn')
+            cid_uf_clean = "".join(ch for ch in unicodedata.normalize('NFKD', cid_uf) if unicodedata.category(ch) != 'Mn')
+            
+            pdf.cell(10, 6, str(r.get('id', '')), border=1, align="C")
+            pdf.cell(50, 6, razao[:28], border=1)
+            pdf.cell(32, 6, cnpj, border=1)
+            pdf.cell(30, 6, cid_uf_clean[:18], border=1)
+            pdf.cell(28, 6, rep[:15], border=1)
+            pdf.cell(40, 6, fp[:22], border=1, new_x="LMARGIN", new_y="NEXT")
+            
+        return bytes(pdf.output())
+
+    def carregar_dados_edicao(client_id):
+        df_cb = fetch_all("SELECT * FROM clientes WHERE id = ?", (client_id,))
+        if not df_cb.empty:
+            cb = df_cb.iloc[0]
+            st.session_state["cli_cnpj"] = cb.get("cnpj_cpf") or ""
+            st.session_state["cli_nome"] = cb.get("nome") or ""
+            st.session_state["cli_nome_fantasia"] = cb.get("nome_fantasia") or ""
+            try:
+                st.session_state["cli_data_nascimento"] = pd.to_datetime(cb["data_nascimento"]).date() if pd.notnull(cb["data_nascimento"]) else None
+            except:
+                st.session_state["cli_data_nascimento"] = None
+            st.session_state["cli_inscricao_estadual"] = cb.get("inscricao_estadual") or ""
+            st.session_state["cli_telefone"] = cb.get("telefone") or ""
+            st.session_state["cli_email"] = cb.get("email") or ""
+            st.session_state["cli_endereco"] = cb.get("endereco") or ""
+            st.session_state["cli_bairro"] = cb.get("bairro") or ""
+            st.session_state["cli_cidade"] = cb.get("cidade") or ""
+            st.session_state["cli_uf"] = cb.get("uf") or ""
+            st.session_state["cli_cep"] = cb.get("cep") or ""
+            st.session_state["cli_rede"] = cb.get("rede_clientes") or "(Nenhuma)"
+            st.session_state["cli_grupo"] = cb.get("grupo_lojas") or "(Nenhum)"
+            st.session_state["cli_chave_pix"] = cb.get("chave_pix") or ""
+            st.session_state["cli_forma_pagamento_id"] = cb.get("forma_pagamento_id")
+            st.session_state["cli_representante_id"] = cb.get("representante_id")
+            st.session_state["cli_observacoes"] = cb.get("observacoes") or ""
+            st.session_state["cli_taxa_descarga"] = float(cb.get("taxa_descarga") or 0.0)
+            st.session_state["cli_regras_descarga"] = cb.get("regras_descarga") or ""
+            st.session_state["cli_status"] = cb.get("status") or "ATIVO"
+            st.session_state["cli_limite_credito"] = float(cb.get("limite_credito") or 0.0)
+            st.session_state["cli_limite_ilimitado"] = bool(cb.get("limite_ilimitado") if cb.get("limite_ilimitado") is not None else True)
+            
+            import json
+            contatos = []
+            c_json = cb.get("contatos_json")
+            if c_json:
+                try:
+                    contatos = json.loads(c_json)
+                except:
+                    pass
+            for i in range(3):
+                cont = contatos[i] if i < len(contatos) else {}
+                st.session_state[f"cli_contato_{i}_nome"] = cont.get("nome", "")
+                st.session_state[f"cli_contato_{i}_depto"] = cont.get("depto", "")
+                st.session_state[f"cli_contato_{i}_tel1"] = cont.get("tel1", "")
+                st.session_state[f"cli_contato_{i}_wapp1"] = bool(cont.get("wapp1", False))
+                st.session_state[f"cli_contato_{i}_tel2"] = cont.get("tel2", "")
+                st.session_state[f"cli_contato_{i}_wapp2"] = bool(cont.get("wapp2", False))
+                st.session_state[f"cli_contato_{i}_email"] = cont.get("email", "")
+
+    def limpar_dados_formulario():
+        keys_to_delete = [k for k in st.session_state.keys() if k.startswith("cli_") and k not in ("cli_filtro_busca", "cli_filtro_inativos", "cli_filtro_usar_periodo")]
+        for k in keys_to_delete:
+            del st.session_state[k]
+
+    # 2. Query Principal de Clientes
+    df_clientes_raw = fetch_all("""
+        SELECT c.id, c.nome_fantasia as 'Nome Fantasia', c.grupo_lojas as 'Grupo', c.rede_clientes as 'Rede', 
+               c.cidade as 'Cidade', c.uf as 'UF', f.nome as 'Representante', c.nome as 'Razão Social', 
+               c.cnpj_cpf as 'CNPJ/CPF', COALESCE(fp.nome, c.prazo_pagamento) as 'Forma Pagto',
+               c.status as 'Status', c.telefone as 'Telefone', c.limite_credito, c.limite_ilimitado, c.contatos_json,
+               c.taxa_descarga, c.regras_descarga, c.chave_pix
         FROM clientes c
         LEFT JOIN funcionarios f ON c.representante_id = f.id
         LEFT JOIN formas_pagamento fp ON c.forma_pagamento_id = fp.id
+        ORDER BY c.id DESC
     """)
-    if not df_clientes.empty:
-        export_btn(df_clientes, 'clientes.csv')
-        st.dataframe(df_clientes, width="stretch", hide_index=True)
-        
-        with st.expander("✏️ Editar ou Inativar Cliente"):
-            opts_cli = {}
-            for _, r in df_clientes.iterrows():
-                lbl = f"ID {r['id']} | {r['Razão Social']} ({r['Status']})"
-                opts_cli[lbl] = r['id']
-                
-            c_sel = st.selectbox("Selecione o Cliente:", list(opts_cli.keys()))
-            if c_sel:
-                cid = opts_cli[c_sel]
-                c_data = fetch_all("SELECT * FROM clientes WHERE id=?", (cid,))
-                if not c_data.empty:
-                    cb = c_data.iloc[0]
-                    
-                    df_reps_edit = fetch_all("SELECT id, nome FROM funcionarios WHERE cargo LIKE '%Representante%' OR cargo LIKE '%Vendedor%'")
-                    rep_options_edit = ["(Nenhum/Direto)"] + df_reps_edit['nome'].tolist() if not df_reps_edit.empty else ["(Nenhum/Direto)"]
-                    rep_dict_edit = dict(zip(df_reps_edit['nome'], df_reps_edit['id'])) if not df_reps_edit.empty else {}
-                    rep_reverse_dict_edit = dict(zip(df_reps_edit['id'], df_reps_edit['nome'])) if not df_reps_edit.empty else {}
 
-                    with st.form("edit_cli"):
-                        ec1, ec2, ec3, ec_n = st.columns(4)
-                        enome = ec1.text_input("Razão Social", cb['nome'])
-                        enome_fantasia = ec2.text_input("Nome Fantasia", cb['nome_fantasia'] if cb['nome_fantasia'] else "")
-                        edoc = ec3.text_input("CNPJ/CPF", cb['cnpj_cpf'] if cb['cnpj_cpf'] else "")
-                        
-                        try:
-                            val_nasc = pd.to_datetime(cb['data_nascimento']).date() if pd.notnull(cb['data_nascimento']) else None
-                        except:
-                            val_nasc = None
-                        enascimento = ec_n.date_input("Data de Nasc/Fundação", value=val_nasc, format="DD/MM/YYYY")
-                        
-                        ec4, ec5, ec6 = st.columns(3)
-                        eie = ec4.text_input("Inscrição Estadual", cb['inscricao_estadual'] if cb['inscricao_estadual'] else "")
-                        etelefone = ec5.text_input("Telefone", cb['telefone'] if cb['telefone'] else "")
-                        eemail = ec6.text_input("E-mail", cb['email'] if cb['email'] else "")
-                        
-                        ec7, ec8, ec9, ec10 = st.columns([2, 1, 1, 1])
-                        eendereco = ec7.text_input("Endereço", cb['endereco'] if cb['endereco'] else "")
-                        ebairro = ec8.text_input("Bairro", cb['bairro'] if cb['bairro'] else "")
-                        ecidade = ec9.text_input("Cidade", cb['cidade'] if cb['cidade'] else "")
-                        euf = ec10.text_input("UF", cb['uf'] if cb['uf'] else "")
-                        
-                        ec11, ec12, ec13, ec_pix = st.columns(4)
-                        ecep = ec11.text_input("CEP", cb['cep'] if cb['cep'] else "")
-                        erede = ec12.text_input("Rede", cb['rede_clientes'] if cb['rede_clientes'] else "")
-                        egrupo_lojas = ec13.text_input("Grupo (Sub-rede)", cb['grupo_lojas'] if cb['grupo_lojas'] else "")
-                        echave_pix = ec_pix.text_input("Código Pix", cb['chave_pix'] if cb['chave_pix'] else "")
-                        
-                        # Buscar formas de pagamento
-                        df_fp_list_edit = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
-                        fp_opts_edit = {}
-                        if not df_fp_list_edit.empty:
-                            for _, r in df_fp_list_edit.iterrows():
-                                fp_opts_edit[r['nome']] = (r['id'], r['parcelas'])
-                        
-                        # Pegar valor atual
-                        fp_atual_nome = cb['prazo_pagamento']
-                        if cb['forma_pagamento_id']:
-                            df_cur_fp = fetch_all("SELECT nome FROM formas_pagamento WHERE id=?", (int(cb['forma_pagamento_id']),))
-                            if not df_cur_fp.empty:
-                                fp_atual_nome = df_cur_fp.iloc[0]['nome']
-                        
-                        idx_fp = 0
-                        if fp_atual_nome in fp_opts_edit:
-                            idx_fp = list(fp_opts_edit.keys()).index(fp_atual_nome)
-                        
-                        ec14, ec16, ec17 = st.columns(3)
-                        efp_selecionada = ec14.selectbox("Forma de Pagamento Padrão", list(fp_opts_edit.keys()), index=idx_fp, key=f"efp_{cid}")
-                        
-                        if efp_selecionada:
-                            efp_id_val, efp_parc_val = fp_opts_edit[efp_selecionada]
-                            import re
-                            efirst_day = 0
-                            nums = re.findall(r'\d+', efp_parc_val)
-                            if nums:
-                                efirst_day = int(nums[0])
-                        else:
-                            efp_id_val = None
-                            efp_selecionada = ""
-                            efirst_day = 30
+    # 3. Controles e Filtros Superiores (Horizontais)
+    col_f1, col_f2, col_f3 = st.columns([2.5, 1.2, 1.2])
+    with col_f1:
+        filtro_busca = st.text_input("🔍 Buscar por Razão Social, Nome Fantasia ou CNPJ", value="", key="cli_filtro_busca")
+    with col_f2:
+        filtro_inativos = st.checkbox("Exibir Clientes Inativos", value=False, key="cli_filtro_inativos")
+    with col_f3:
+        filtro_usar_periodo = st.checkbox("Filtrar por Período de Nasc./Fund.", value=False, key="cli_filtro_usar_periodo")
+
+    # Filtro de Período Opcional
+    dt_ini, dt_fim = None, None
+    if filtro_usar_periodo:
+        col_d1, col_d2 = st.columns(2)
+        dt_ini = col_d1.date_input("De", value=date.today() - timedelta(days=365*10))
+        dt_fim = col_d2.date_input("Até", value=date.today())
+
+    # 4. Aplicação dos Filtros em Memória (Pandas)
+    df_filtered = df_clientes_raw.copy()
+    if not df_filtered.empty:
+        # Filtro de Status (Inativos)
+        if not filtro_inativos:
+            df_filtered = df_filtered[df_filtered['Status'] == 'ATIVO']
+            
+        # Filtro de Busca Textual
+        if filtro_busca:
+            fb_upper = filtro_busca.upper()
+            df_filtered = df_filtered[
+                df_filtered['Razão Social'].str.upper().str.contains(fb_upper, na=False) |
+                df_filtered['Nome Fantasia'].str.upper().str.contains(fb_upper, na=False) |
+                df_filtered['CNPJ/CPF'].str.contains(filtro_busca, na=False)
+            ]
+            
+        # Filtro de Período
+        if filtro_usar_periodo and dt_ini and dt_fim:
+            df_ids_periodo = fetch_all("SELECT id FROM clientes WHERE data_nascimento BETWEEN ? AND ?", 
+                                       (dt_ini.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")))
+            if not df_ids_periodo.empty:
+                df_filtered = df_filtered[df_filtered['id'].isin(df_ids_periodo['id'])]
+            else:
+                df_filtered = pd.DataFrame(columns=df_filtered.columns)
+
+    # 5. Barra de Ações (Toolbar Horizontal)
+    col_act1, col_act2, col_act3, col_act4, col_act5, col_act6 = st.columns([1.5, 1.2, 1.2, 1.2, 1.2, 2.5])
+    
+    show_incluir = st.session_state.get("show_incluir_cliente", False)
+    edit_id = st.session_state.get("edit_cliente_id", None)
+    show_importar = st.session_state.get("show_importar_csv", False)
+    
+    # Determinar seleção no Grid
+    selected_ids = []
+    
+    # Renderizar a planilha/grid interativo
+    page_size = 10
+    total_rows = len(df_filtered)
+    total_pages = max(1, (total_rows + page_size - 1) // page_size)
+    
+    # Paginação
+    with col_act6:
+        col_pag1, col_pag2 = st.columns([2, 1])
+        page = col_pag2.number_input("Pág.", min_value=1, max_value=total_pages, value=1, step=1)
+        col_pag1.write(f"Total: **{total_rows}** clientes encontrados.")
+        
+    df_page = df_filtered.iloc[(page - 1) * page_size : page * page_size].copy() if not df_filtered.empty else pd.DataFrame(columns=df_filtered.columns)
+    
+    # Prepara dataframe de exibição com checkbox
+    df_display = df_page.copy()
+    if not df_display.empty:
+        df_display.insert(0, "Seleção", False)
+        # Selecionar apenas colunas especificadas pelo usuário
+        cols_display = ["Seleção", "id", "Nome Fantasia", "Grupo", "Rede", "Cidade", "UF", "Representante", "Razão Social", "CNPJ/CPF", "Forma Pagto"]
+        df_display_clean = df_display[cols_display]
+        
+        # Render com st.data_editor
+        edited_df = st.data_editor(
+            df_display_clean,
+            key=f"clientes_editor_{page}",
+            use_container_width=True,
+            hide_index=True,
+            disabled=[c for c in cols_display if c != "Seleção"]
+        )
+        # Extrair selecionados
+        selected_rows = edited_df[edited_df["Seleção"] == True]
+        selected_ids = selected_rows["id"].tolist()
+    else:
+        st.info("Nenhum cliente cadastrado ou correspondente aos filtros.")
+        selected_rows = pd.DataFrame()
+        
+    can_edit = len(selected_ids) == 1
+
+    # Configuração dos Botões da Toolbar
+    with col_act1:
+        if st.button("➕ Incluir Novo", use_container_width=True, type="primary" if show_incluir else "secondary"):
+            limpar_dados_formulario()
+            st.session_state["show_incluir_cliente"] = not show_incluir
+            st.session_state["edit_cliente_id"] = None
+            st.session_state["show_importar_csv"] = False
+            st.rerun()
+            
+    with col_act2:
+        if st.button("✏️ Editar", disabled=not can_edit, use_container_width=True, type="primary" if edit_id else "secondary"):
+            st.session_state["show_incluir_cliente"] = False
+            st.session_state["show_importar_csv"] = False
+            carregar_dados_edicao(selected_ids[0])
+            st.session_state["edit_cliente_id"] = selected_ids[0]
+            st.rerun()
+            
+    with col_act3:
+        # Impressão em PDF
+        pdf_data = b""
+        if not df_filtered.empty:
+            df_print = df_filtered[df_filtered["id"].isin(selected_ids)] if selected_ids else df_page
+            pdf_data = gerar_pdf_clientes(df_print)
+        st.download_button(
+            label="🖨️ Imprimir",
+            data=pdf_data,
+            file_name="relatorio_clientes.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            disabled=df_filtered.empty
+        )
+        
+    with col_act4:
+        # Exportar CSV
+        csv_data = b""
+        if not df_filtered.empty:
+            df_export = df_filtered[df_filtered["id"].isin(selected_ids)] if selected_ids else df_filtered
+            csv_data = df_export.to_csv(index=False, sep=";").encode("utf-8-sig")
+        st.download_button(
+            label="📤 Exportar",
+            data=csv_data,
+            file_name="clientes_export.csv",
+            mime="text/csv",
+            use_container_width=True,
+            disabled=df_filtered.empty
+        )
+        
+    with col_act5:
+        if st.button("📥 Importar", use_container_width=True, type="primary" if show_importar else "secondary"):
+            st.session_state["show_importar_csv"] = not show_importar
+            st.session_state["show_incluir_cliente"] = False
+            st.session_state["edit_cliente_id"] = None
+            st.rerun()
+
+    # --- SEÇÃO: IMPORTAÇÃO CSV (EXIBIDA CONDICIONALMENTE) ---
+    if show_importar:
+        st.markdown("---")
+        with st.container():
+            st.markdown("#### 📥 Importação em Massa de Clientes (Planilha CSV)")
+            st.warning(
+                "⚠️ **IMPORTANTE:** Para realizar a importação de clientes, certifique-se de que os seus **Representantes** (aba 'Colaboradores'), **Redes de Clientes** e **Grupos de Lojas** (aba 'Redes e Grupos') já estejam previamente cadastrados no sistema. A importação será bloqueada por segurança caso existam nomes na planilha não correspondentes aos registros prévios."
+            )
+            
+            modelo_csv = (
+                "Razão Social;Nome Fantasia;CNPJ/CPF;Inscrição Estadual;Endereço;Bairro;CEP;Cidade;UF;Telefone;E-mail;Observações;Status;Rede de Clientes;Grupo de Lojas;PRAZO DE PAGAMENTO;Representante\n"
+                "Empresa Exemplo Ltda;Exemplo;00.000.000/0001-00;Isento;Rua das Flores 123;Centro;74000-000;Goiânia;GO;(62) 99999-9999;compras@exemplo.com;Entrega de manhã;ATIVO;;;;\n"
+            )
+            st.download_button(
+                label="📥 Baixar Planilha CSV Modelo",
+                data=modelo_csv.encode('utf-8-sig'),
+                file_name="modelo_importacao_clientes.csv",
+                mime="text/csv",
+                help="Utilize este arquivo como modelo. Lembre-se de salvar em formato CSV (delimitado por vírgula ou ponto-e-vírgula)."
+            )
+            
+            uploaded_file = st.file_uploader("Selecione o arquivo CSV de clientes para importação", type=["csv"], key="import_clientes_uploader")
+            
+            if uploaded_file is not None:
+                try:
+                    import io
+                    content = uploaded_file.getvalue()
+                    try:
+                        text_content = content.decode('utf-8')
+                    except UnicodeDecodeError:
+                        text_content = content.decode('latin-1')
+                    
+                    # Detectar separador
+                    primeira_linha = text_content.split('\n')[0]
+                    sep = ';' if ';' in primeira_linha else ','
+                    
+                    df_import = pd.read_csv(io.StringIO(text_content), sep=sep)
+                    df_import.columns = [str(c).strip() for c in df_import.columns]
+                except Exception as e:
+                    st.error(f"Erro ao processar arquivo: {e}")
+                    df_import = None
+                    
+                if df_import is not None:
+                    if 'Razão Social' not in df_import.columns:
+                        st.error("❌ O arquivo não possui a coluna obrigatória **'Razão Social'**. Verifique a planilha modelo.")
+                    else:
+                        def clean_val(x):
+                            if pd.isna(x): return ""
+                            v = str(x).strip()
+                            return "" if v.lower() == "nan" else v
                             
-                        rep_default = rep_reverse_dict_edit.get(cb['representante_id'], "(Nenhum/Direto)")
-                        idx_rep = rep_options_edit.index(rep_default) if rep_default in rep_options_edit else 0
-                        erep_nome = ec16.selectbox("Vendedor Responsável", rep_options_edit, index=idx_rep)
-                        
-                        eobs = ec17.text_input("Observações", cb['observacoes'] if cb['observacoes'] else "")
-                        
-                        c_stts = ["ATIVO", "INATIVO"]
-                        d_stts = cb['status'] if cb['status'] in c_stts else "ATIVO"
-                        estatus = st.selectbox("Status da Conta", c_stts, index=c_stts.index(d_stts))
-                        
-                        st.markdown("##### Logística e Descarga")
-                        ec_l1, ec_l2 = st.columns([1, 3])
-                        etaxa = ec_l1.number_input("Taxa de Descarga (R$)", value=float(cb['taxa_descarga']) if pd.notnull(cb['taxa_descarga']) else 0.0, step=10.0)
-                        eregras = ec_l2.text_input("Regras/Horários de Descarga", cb['regras_descarga'] if cb['regras_descarga'] else "")
-                        
-                        if st.form_submit_button("Salvar Cliente"):
-                            enome_limpo = enome.strip().upper()
-                            # 1. Validar se o nome já existe em outro cliente
-                            chk_nome_edit = fetch_all("SELECT id FROM clientes WHERE UPPER(TRIM(nome)) = ? AND id != ?", (enome_limpo, cid))
+                        for col in df_import.columns:
+                            df_import[col] = df_import[col].apply(clean_val)
                             
-                            # 2. Validar se o CNPJ/CPF já existe em outro cliente
-                            chk_cnpj_edit = pd.DataFrame()
-                            edoc_val = edoc.strip() if edoc else ""
-                            if edoc_val:
-                                chk_cnpj_edit = fetch_all("SELECT id FROM clientes WHERE TRIM(cnpj_cpf) = ? AND id != ?", (edoc_val, cid))
+                        st.success("📂 Arquivo de importação carregado!")
+                        st.markdown("**Prévia dos Dados (Primeiras 10 linhas):**")
+                        st.dataframe(df_import.head(10), use_container_width=True)
+                        
+                        df_reps_db = fetch_all("SELECT id, nome FROM funcionarios")
+                        existing_reps = set(df_reps_db['nome'].tolist()) if not df_reps_db.empty else set()
+                        rep_id_map = dict(zip(df_reps_db['nome'], df_reps_db['id'])) if not df_reps_db.empty else {}
+                        
+                        df_redes_db = fetch_all("SELECT nome FROM redes_clientes")
+                        existing_redes = set(df_redes_db['nome'].tolist()) if not df_redes_db.empty else set()
+                        
+                        df_grupos_db = fetch_all("SELECT nome FROM grupos_clientes")
+                        existing_grupos = set(df_grupos_db['nome'].tolist()) if not df_grupos_db.empty else set()
+                        
+                        df_existing_cnpj = fetch_all("SELECT cnpj_cpf FROM clientes")
+                        existing_cnpjs = set(df_existing_cnpj['cnpj_cpf'].tolist()) if not df_existing_cnpj.empty else set()
+                        
+                        missing_reps = set()
+                        missing_redes = set()
+                        missing_grupos = set()
+                        duplicate_cnpjs = []
+                        cnpjs_na_planilha = {}
+                        
+                        for idx, row in df_import.iterrows():
+                            razao = row.get('Razão Social', '')
+                            if not razao:
+                                continue
+                            cnpj = row.get('CNPJ/CPF', '')
+                            rep = row.get('Representante', '')
+                            rede = row.get('Rede de Clientes', '')
+                            grupo = row.get('Grupo de Lojas', '')
                             
-                            if not chk_nome_edit.empty:
-                                st.error(f"⚠️ Já existe outro cliente cadastrado com o nome '{enome.strip()}'. Para salvar, diferencie-o (ex: '{enome.strip()} RJ', '{enome.strip()} - Filial').")
-                            elif not chk_cnpj_edit.empty:
-                                st.error(f"⚠️ Já existe outro cliente cadastrado com o CNPJ/CPF '{edoc_val}'.")
-                            else:
-                                nasc_str = enascimento.strftime("%Y-%m-%d") if enascimento else None
-                                rep_id_val = rep_dict_edit.get(erep_nome, None) if erep_nome != "(Nenhum/Direto)" else None
+                            if cnpj:
+                                if cnpj in existing_cnpjs:
+                                    duplicate_cnpjs.append(f"{razao} (CNPJ: {cnpj} - já cadastrado)")
+                                elif cnpj in cnpjs_na_planilha:
+                                    duplicate_cnpjs.append(f"{razao} (CNPJ: {cnpj} - duplicado na planilha)")
+                                else:
+                                    cnpjs_na_planilha[cnpj] = 1
+                                    
+                            if rep and rep not in existing_reps:
+                                missing_reps.add(rep)
+                            if rede and rede not in existing_redes:
+                                missing_redes.add(rede)
+                            if grupo and grupo not in existing_grupos:
+                                missing_grupos.add(grupo)
                                 
-                                run_query("""
-                                    UPDATE clientes 
-                                    SET nome=?, nome_fantasia=?, cnpj_cpf=?, data_nascimento=?, inscricao_estadual=?,
-                                        telefone=?, email=?, endereco=?, bairro=?, cidade=?, uf=?, cep=?, rede_clientes=?, grupo_lojas=?,
-                                        status=?, chave_pix=?, prazo_pagamento=?, prazo_pagamento_dias=?, representante_id=?,
-                                        observacoes=?, taxa_descarga=?, regras_descarga=?, forma_pagamento_id=? 
-                                    WHERE id=?
-                                """, (enome, enome_fantasia, edoc, nasc_str, eie,
-                                      etelefone, eemail, eendereco, ebairro, ecidade, euf, ecep, erede, egrupo_lojas,
-                                      estatus, echave_pix, efp_selecionada, efirst_day, rep_id_val,
-                                      eobs, etaxa, eregras, efp_id_val, cid))
-                                st.success("Cliente alterado com sucesso!")
-                                import time; time.sleep(1); st.rerun()
-                            import time; time.sleep(1); st.rerun()
+                        is_blocked = False
+                        col_v1, col_v2, col_v3 = st.columns(3)
+                        with col_v1:
+                            if missing_reps:
+                                st.error(f"❌ **Representantes Ausentes ({len(missing_reps)}):**\n" + "\n".join([f"- {r}" for r in sorted(missing_reps)]))
+                                is_blocked = True
+                            else:
+                                st.success("✅ Representantes OK")
+                                
+                        with col_v2:
+                            if missing_redes:
+                                st.error(f"❌ **Redes Ausentes ({len(missing_redes)}):**\n" + "\n".join([f"- {r}" for r in sorted(missing_redes)]))
+                                is_blocked = True
+                            else:
+                                st.success("✅ Redes de Clientes OK")
+                                
+                        with col_v3:
+                            if missing_grupos:
+                                st.error(f"❌ **Grupos de Lojas Ausentes ({len(missing_grupos)}):**\n" + "\n".join([f"- {g}" for g in sorted(missing_grupos)]))
+                                is_blocked = True
+                            else:
+                                st.success("✅ Grupos de Lojas OK")
+                                
+                        if duplicate_cnpjs:
+                            st.warning(f"⚠️ **Clientes a serem ignorados por CNPJ duplicado ({len(duplicate_cnpjs)}):**\n" + "\n".join([f"- {d}" for d in duplicate_cnpjs]))
+                            
+                        if is_blocked:
+                            st.error("⚠️ **IMPORTAÇÃO BLOQUEADA:** Por segurança, realize o cadastro prévio das dependências ausentes apontadas acima nas abas correspondentes antes de prosseguir.")
+                        else:
+                            st.success("🎉 Planilha validada com sucesso! Todos os relacionamentos estão em conformidade com os cadastros prévios do ERP.")
+                            limpar_banco = st.checkbox("Excluir todos os clientes existentes atualmente no sistema antes de importar", value=False, key="import_limpar_banco")
+                            
+                            if st.button("Confirmar Importação de Clientes", use_container_width=True, type="primary"):
+                                try:
+                                    imported_count = 0
+                                    ignored_count = 0
+                                    
+                                    if limpar_banco:
+                                        run_query("DELETE FROM clientes")
+                                        
+                                    for idx, row in df_import.iterrows():
+                                        razao = row.get('Razão Social', '')
+                                        if not razao:
+                                            continue
+                                        cnpj = row.get('CNPJ/CPF', '')
+                                        if not limpar_banco and cnpj and cnpj in existing_cnpjs:
+                                            ignored_count += 1
+                                            continue
+                                            
+                                        nome_fantasia = row.get('Nome Fantasia', '')
+                                        insc_estadual = row.get('Inscrição Estadual', '')
+                                        endereco = row.get('Endereço', '')
+                                        bairro = row.get('Bairro', '')
+                                        cep = row.get('CEP', '')
+                                        cidade = row.get('Cidade', '')
+                                        uf = row.get('UF', '')
+                                        telefone = row.get('Telefone', '')
+                                        email = row.get('E-mail', '')
+                                        observacoes = row.get('Observações', '')
+                                        status_val = row.get('Status', 'ATIVO')
+                                        if not status_val: status_val = 'ATIVO'
+                                        rede_val = row.get('Rede de Clientes', '')
+                                        grupo_val = row.get('Grupo de Lojas', '')
+                                        prazo_pag = row.get('PRAZO DE PAGAMENTO', '')
+                                        chave_pix_val = row.get('Código Pix', row.get('Chave Pix', ''))
+                                        
+                                        rep_nome = row.get('Representante', '')
+                                        rep_id = rep_id_map.get(rep_nome, None) if rep_nome else None
+                                        
+                                        fp_id_val = None
+                                        if prazo_pag:
+                                            df_match = fetch_all("SELECT id FROM formas_pagamento WHERE UPPER(TRIM(nome)) = ?", (prazo_pag.strip().upper(),))
+                                            if not df_match.empty:
+                                                fp_id_val = int(df_match.iloc[0]['id'])
+                                                
+                                        query_insert = """INSERT INTO clientes 
+                                                   (nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual, 
+                                                    bairro, cep, cidade, uf, email, observacoes, status, rede_clientes, 
+                                                    grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix, forma_pagamento_id, limite_credito, limite_ilimitado) 
+                                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 1)"""
+                                        
+                                        run_query(query_insert, (
+                                            razao, telefone, endereco, nome_fantasia, cnpj, insc_estadual,
+                                            bairro, cep, cidade, uf, email, observacoes, status_val, rede_val,
+                                            grupo_val, prazo_pag, rep_id, None, 30, 0.0, "", chave_pix_val, fp_id_val
+                                        ))
+                                        imported_count += 1
+                                        
+                                    st.success(f"✅ Importação finalizada! {imported_count} novos clientes importados. {ignored_count} registros ignorados.")
+                                    import time; time.sleep(1.5); st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Erro ao inserir dados no banco: {ex}")
+
+    # --- SEÇÃO: FORMULÁRIO DE INCLUSÃO OU EDIÇÃO ---
+    if show_incluir or edit_id is not None:
+        st.markdown("---")
+        label_form = "✏️ Editar Informações do Cliente" if edit_id else "➕ Incluir Novo Cliente"
+        st.markdown(f"### {label_form}")
+        
+        # 1. Campo de Busca de CNPJ
+        col_c_cnpj, col_c_btn = st.columns([3, 1])
+        cnpj_val = col_c_cnpj.text_input("CNPJ / CPF", key="cli_cnpj")
+        
+        if col_c_btn.button("🔍 Buscar CNPJ na Internet", use_container_width=True):
+            if cnpj_val:
+                with st.spinner("Consultando na Receita Federal (BrasilAPI)..."):
+                    res = buscar_cnpj_api(cnpj_val)
+                    if "error" in res:
+                        st.error(res["error"])
+                    else:
+                        st.session_state["cli_nome"] = res.get("razao_social", "")
+                        st.session_state["cli_nome_fantasia"] = res.get("nome_fantasia", "")
+                        st.session_state["cli_cep"] = res.get("cep", "")
+                        
+                        logradouro = res.get("logradouro", "")
+                        numero = res.get("numero", "")
+                        complemento = res.get("complemento", "")
+                        end_str = f"{logradouro}, {numero}"
+                        if complemento:
+                            end_str += f" - {complemento}"
+                        st.session_state["cli_endereco"] = end_str
+                        
+                        st.session_state["cli_bairro"] = res.get("bairro", "")
+                        st.session_state["cli_cidade"] = res.get("cidade", "")
+                        st.session_state["cli_uf"] = res.get("uf", "")
+                        st.success("Dados cadastrais pré-preenchidos! Revise e edite os campos abaixo se necessário.")
+                        import time; time.sleep(1)
+                        st.rerun()
+            else:
+                st.warning("Preencha o campo CNPJ primeiro.")
+
+        # 2. Dados Gerais do Formulário
+        c1, c2, c3 = st.columns([2, 1, 1])
+        nome_val = c1.text_input("Razão Social *", key="cli_nome")
+        nome_fantasia_val = c2.text_input("Nome Fantasia", key="cli_nome_fantasia")
+        nascimento_val = c3.date_input("Data de Nasc/Fundação", key="cli_data_nascimento", value=None, format="DD/MM/YYYY")
+        
+        c4, c5, c6 = st.columns(3)
+        inscricao_estadual_val = c4.text_input("Inscrição Estadual", key="cli_inscricao_estadual")
+        telefone_val = c5.text_input("Telefone Geral", key="cli_telefone")
+        email_val = c6.text_input("E-mail Geral", key="cli_email")
+        
+        c7, c8, c9, c10 = st.columns([2, 1, 1, 1])
+        endereco_val = c7.text_input("Endereço", key="cli_endereco")
+        bairro_val = c8.text_input("Bairro", key="cli_bairro")
+        cidade_val = c9.text_input("Cidade", key="cli_cidade")
+        uf_val = c10.text_input("UF", key="cli_uf")
+        
+        c11, c12, c13 = st.columns(3)
+        cep_val = c11.text_input("CEP", key="cli_cep")
+        status_val = c12.selectbox("Status do Cliente", ["ATIVO", "INATIVO"], key="cli_status")
+        chave_pix_val = c13.text_input("Chave Pix", key="cli_chave_pix")
+
+        # 3. Rede e Grupo Relacionados (Dinamismo Interno)
+        df_redes_bd = fetch_all("SELECT id, nome FROM redes_clientes ORDER BY nome")
+        redes_opts = ["(Nenhuma)"] + df_redes_bd['nome'].tolist() if not df_redes_bd.empty else ["(Nenhuma)"]
+        
+        # Obter valor de rede do session_state
+        rede_atual = st.session_state.get("cli_rede", "(Nenhuma)")
+        if rede_atual not in redes_opts:
+            redes_opts.append(rede_atual)
+        idx_rede = redes_opts.index(rede_atual)
+        
+        st.markdown("##### Configuração de Rede do Cliente")
+        col_r1, col_r2 = st.columns(2)
+        rede_selecionada = col_r1.selectbox("Rede Vinculada", redes_opts, index=idx_rede, key="cli_rede")
+        
+        # Filtrar grupos de acordo com a rede selecionada
+        df_grupos_bd = fetch_all("SELECT g.id, g.nome, r.nome as rede_nome FROM grupos_clientes g JOIN redes_clientes r ON g.rede_id = r.id")
+        grupos_opts = ["(Nenhum)"]
+        if rede_selecionada != "(Nenhuma)" and not df_grupos_bd.empty:
+            grupos_opts += df_grupos_bd[df_grupos_bd['rede_nome'] == rede_selecionada]['nome'].tolist()
+            
+        grupo_atual = st.session_state.get("cli_grupo", "(Nenhum)")
+        if grupo_atual not in grupos_opts:
+            grupos_opts.append(grupo_atual)
+        idx_grupo = grupos_opts.index(grupo_atual)
+        grupo_selecionado = col_r2.selectbox("Grupo de Lojas (Sub-rede)", grupos_opts, index=idx_grupo, key="cli_grupo")
+
+        # 4. Crédito e Forma de Pagamento
+        st.markdown("##### 💳 Limite de Crédito e Forma de Pagamento")
+        col_cr1, col_cr2, col_cr3 = st.columns(3)
+        with col_cr1:
+            st.checkbox("Limite Ilimitado", value=True, disabled=True, key="cli_limite_ilimitado", 
+                        help="Neste primeiro momento, o limite é ilimitado até o desenvolvimento da API de análise de crédito.")
+        with col_cr2:
+            st.number_input("Limite de Crédito (R$)", value=0.0, disabled=True, key="cli_limite_credito")
+        with col_cr3:
+            # Buscar formas de pagamento do banco
+            df_fp_list = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
+            fp_opts = {}
+            if not df_fp_list.empty:
+                for _, r in df_fp_list.iterrows():
+                    fp_opts[r['nome']] = (r['id'], r['parcelas'])
+            
+            fp_keys = ["-- SELECIONE --"] + list(fp_opts.keys())
+            curr_fp_id = st.session_state.get("cli_forma_pagamento_id")
+            curr_index = 0
+            if curr_fp_id:
+                for idx, k in enumerate(fp_keys):
+                    if k != "-- SELECIONE --" and fp_opts[k][0] == curr_fp_id:
+                        curr_index = idx
+                        break
+            fp_selecionada = st.selectbox("Forma de Pagamento Padrão *", fp_keys, index=curr_index)
+
+        # 5. Representante Responsável e Observações
+        col_rp1, col_rp2 = st.columns([1, 2])
+        with col_rp1:
+            df_reps = fetch_all("SELECT id, nome FROM funcionarios WHERE cargo LIKE '%Representante%' OR cargo LIKE '%Vendedor%'")
+            rep_dict = dict(zip(df_reps['nome'], df_reps['id'])) if not df_reps.empty else {}
+            rep_keys = ["-- SELECIONE --"] + df_reps['nome'].tolist() if not df_reps.empty else ["-- SELECIONE --"]
+            
+            curr_rep_id = st.session_state.get("cli_representante_id")
+            curr_rep_index = 0
+            if curr_rep_id:
+                for idx, k in enumerate(rep_keys):
+                    if k != "-- SELECIONE --" and rep_dict.get(k) == curr_rep_id:
+                        curr_rep_index = idx
+                        break
+            rep_selecionado = st.selectbox("Representante Responsável *", rep_keys, index=curr_rep_index)
+            
+        with col_rp2:
+            observacoes_val = st.text_input("Observações Gerais do Cliente", key="cli_observacoes")
+
+        # 6. Logística e Descarga
+        st.markdown("##### 🚚 Logística e Descarga")
+        col_l1, col_l2 = st.columns([1, 3])
+        taxa_descarga_val = col_l1.number_input("Taxa de Descarga (R$)", min_value=0.0, step=10.0, key="cli_taxa_descarga",
+                                                help="Valor cobrado para descarregar mercadoria no cliente.")
+        regras_descarga_val = col_l2.text_input("Regras e Horários de Descarga (Ex: Apenas agendado, Paletizado)", key="cli_regras_descarga")
+
+        # 7. Contatos Destacados (Mínimo 3)
+        st.markdown("##### 👥 Contatos de Atendimento (Mínimo 3)")
+        col_ct1, col_ct2, col_ct3 = st.columns(3)
+        
+        for i, col_c in enumerate([col_ct1, col_ct2, col_ct3]):
+            with col_c:
+                st.markdown(f"**Contato {i+1}**")
+                st.text_input("Nome", key=f"cli_contato_{i}_nome")
+                st.text_input("Departamento / Setor", key=f"cli_contato_{i}_depto")
+                
+                col_t1_w1, col_t1_w2 = st.columns([3, 1])
+                col_t1_w1.text_input("Telefone 1", key=f"cli_contato_{i}_tel1")
+                col_t1_w2.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
+                col_t1_w2.checkbox("Wapp?", key=f"cli_contato_{i}_wapp1")
+                
+                col_t2_w1, col_t2_w2 = st.columns([3, 1])
+                col_t2_w1.text_input("Telefone 2", key=f"cli_contato_{i}_tel2")
+                col_t2_w2.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
+                col_t2_w2.checkbox("Wapp?", key=f"cli_contato_{i}_wapp2")
+                
+                st.text_input("E-mail", key=f"cli_contato_{i}_email")
+
+        # 8. Ações do Formulário (Salvar e Cancelar)
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_btn_salvar, col_btn_cancelar = st.columns(2)
+        
+        if col_btn_cancelar.button("Cancelar", use_container_width=True):
+            limpar_dados_formulario()
+            st.session_state["show_incluir_cliente"] = False
+            st.session_state["edit_cliente_id"] = None
+            st.rerun()
+            
+        if col_btn_salvar.button("Salvar Cadastro", use_container_width=True, type="primary"):
+            if not nome_val:
+                st.error("Por favor, preencha o campo Razão Social.")
+            elif fp_selecionada == "-- SELECIONE --":
+                st.error("Por favor, selecione a Forma de Pagamento Padrão.")
+            elif rep_selecionado == "-- SELECIONE --":
+                st.error("Por favor, selecione o Representante Responsável.")
+            else:
+                # Validar duplicados
+                if edit_id:
+                    chk_nome = fetch_all("SELECT id FROM clientes WHERE UPPER(TRIM(nome)) = ? AND id != ?", (nome_val.upper(), edit_id))
+                else:
+                    chk_nome = fetch_all("SELECT id FROM clientes WHERE UPPER(TRIM(nome)) = ?", (nome_val.upper(),))
+                    
+                chk_cnpj = pd.DataFrame()
+                if cnpj_val:
+                    if edit_id:
+                        chk_cnpj = fetch_all("SELECT id FROM clientes WHERE TRIM(cnpj_cpf) = ? AND id != ?", (cnpj_val, edit_id))
+                    else:
+                        chk_cnpj = fetch_all("SELECT id FROM clientes WHERE TRIM(cnpj_cpf) = ?", (cnpj_val,))
+                        
+                if not chk_nome.empty:
+                    st.error(f"⚠️ Já existe um cliente cadastrado com a Razão Social '{nome_val}'. Se forem clientes diferentes, diferencie-os (ex: '{nome_val} RJ').")
+                elif not chk_cnpj.empty:
+                    st.error(f"⚠️ Já existe um cliente cadastrado com o CNPJ/CPF '{cnpj_val}'.")
+                else:
+                    # Preparação final dos valores
+                    rep_id_val = rep_dict.get(rep_selecionado)
+                    fp_id_val, fp_parc_val = fp_opts[fp_selecionada]
+                    
+                    import re
+                    first_day = 30
+                    nums = re.findall(r'\d+', fp_parc_val)
+                    if nums:
+                        first_day = int(nums[0])
+                        
+                    nasc_str = nascimento_val.strftime("%Y-%m-%d") if nascimento_val else None
+                    r_val = rede_selecionada if rede_selecionada != "(Nenhuma)" else ""
+                    g_val = grupo_selecionado if grupo_selecionado != "(Nenhum)" else ""
+                    
+                    import json
+                    contatos_list = []
+                    for i in range(3):
+                        contatos_list.append({
+                            "nome": st.session_state.get(f"cli_contato_{i}_nome", ""),
+                            "depto": st.session_state.get(f"cli_contato_{i}_depto", ""),
+                            "tel1": st.session_state.get(f"cli_contato_{i}_tel1", ""),
+                            "wapp1": bool(st.session_state.get(f"cli_contato_{i}_wapp1", False)),
+                            "tel2": st.session_state.get(f"cli_contato_{i}_tel2", ""),
+                            "wapp2": bool(st.session_state.get(f"cli_contato_{i}_wapp2", False)),
+                            "email": st.session_state.get(f"cli_contato_{i}_email", "")
+                        })
+                    contatos_json_val = json.dumps(contatos_list, ensure_ascii=False)
+                    
+                    limit_cred = 0.0
+                    limit_ilimit = 1
+                    
+                    if edit_id:
+                        # UPDATE
+                        run_query("""
+                            UPDATE clientes
+                            SET nome=?, nome_fantasia=?, cnpj_cpf=?, data_nascimento=?, inscricao_estadual=?,
+                                telefone=?, email=?, endereco=?, bairro=?, cidade=?, uf=?, cep=?, rede_clientes=?, grupo_lojas=?,
+                                status=?, chave_pix=?, prazo_pagamento=?, prazo_pagamento_dias=?, representante_id=?,
+                                observacoes=?, taxa_descarga=?, regras_descarga=?, forma_pagamento_id=?,
+                                limite_credito=?, limite_ilimitado=?, contatos_json=?
+                            WHERE id=?
+                        """, (nome_val, nome_fantasia_val, cnpj_val, nasc_str, inscricao_estadual_val,
+                              telefone_val, email_val, endereco_val, bairro_val, cidade_val, uf_val, cep_val, r_val, g_val,
+                              status_val, chave_pix_val, fp_selecionada, first_day, rep_id_val,
+                              observacoes_val, taxa_descarga_val, regras_descarga_val, fp_id_val,
+                              limit_cred, limit_ilimit, contatos_json_val, edit_id))
+                        st.success("Cadastro do cliente atualizado com sucesso!")
+                    else:
+                        # INSERT
+                        run_query("""
+                            INSERT INTO clientes 
+                            (nome, nome_fantasia, cnpj_cpf, data_nascimento, inscricao_estadual,
+                             telefone, email, endereco, bairro, cidade, uf, cep, rede_clientes, grupo_lojas,
+                             status, chave_pix, prazo_pagamento, prazo_pagamento_dias, representante_id,
+                             observacoes, taxa_descarga, regras_descarga, forma_pagamento_id,
+                             limite_credito, limite_ilimitado, contatos_json) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (nome_val, nome_fantasia_val, cnpj_val, nasc_str, inscricao_estadual_val,
+                              telefone_val, email_val, endereco_val, bairro_val, cidade_val, uf_val, cep_val, r_val, g_val,
+                              status_val, chave_pix_val, fp_selecionada, first_day, rep_id_val,
+                              observacoes_val, taxa_descarga_val, regras_descarga_val, fp_id_val,
+                              limit_cred, limit_ilimit, contatos_json_val))
+                        st.success("Cliente cadastrado com sucesso!")
+                        
+                    limpar_dados_formulario()
+                    st.session_state["show_incluir_cliente"] = False
+                    st.session_state["edit_cliente_id"] = None
+                    import time; time.sleep(1.5)
+                    st.rerun()
 
 # ======= FORNECEDORES =======
 with tab3:
-    st.subheader("Cadastro de Fornecedores")
-    
+
+    # ─────── Funções Auxiliares Fornecedores ───────
+    def buscar_cnpj_api_forn(cnpj_val):
+        import requests
+        cnpj_clean = "".join(filter(str.isdigit, cnpj_val))
+        if len(cnpj_clean) != 14:
+            return {"error": "CNPJ inválido. Deve conter 14 dígitos."}
+        try:
+            r = requests.get(f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_clean}", timeout=8)
+            if r.status_code == 200:
+                return r.json()
+            elif r.status_code == 404:
+                return {"error": "CNPJ não encontrado na Receita Federal."}
+            else:
+                return {"error": f"Erro na consulta (status {r.status_code})."}
+        except Exception as e:
+            return {"error": f"Erro de conexão com a API: {str(e)}"}
+
+    def limpar_form_forn():
+        keys_forn = [
+            "forn_cnpj", "forn_nome", "forn_fantasia", "forn_ie", "forn_telefone", "forn_email",
+            "forn_cep", "forn_endereco", "forn_bairro", "forn_cidade", "forn_uf",
+            "forn_chave_pix", "forn_observacoes", "forn_status",
+            "forn_c0_nome","forn_c0_depto","forn_c0_tel1","forn_c0_wapp1","forn_c0_tel2","forn_c0_wapp2","forn_c0_email",
+            "forn_c1_nome","forn_c1_depto","forn_c1_tel1","forn_c1_wapp1","forn_c1_tel2","forn_c1_wapp2","forn_c1_email",
+            "forn_c2_nome","forn_c2_depto","forn_c2_tel1","forn_c2_wapp1","forn_c2_tel2","forn_c2_wapp2","forn_c2_email",
+        ]
+        for k in keys_forn:
+            if k in st.session_state:
+                del st.session_state[k]
+
+    # ─────── Inicialização de estados ───────
+    if "show_form_forn" not in st.session_state:
+        st.session_state["show_form_forn"] = False
+    if "edit_forn_id" not in st.session_state:
+        st.session_state["edit_forn_id"] = None
+
+    # ─────── Carrega Dados Base ───────
     df_planos = fetch_all("SELECT id, nome FROM planos_de_contas ORDER BY nome")
     planos_options = df_planos['nome'].tolist() if not df_planos.empty else []
     planos_dict = dict(zip(df_planos['nome'], df_planos['id'])) if not df_planos.empty else {}
     planos_reverse_dict = dict(zip(df_planos['id'], df_planos['nome'])) if not df_planos.empty else {}
-    
-    with st.form("form_fornecedor", clear_on_submit=True):
-        c1, c2, c3 = st.columns(3)
-        nome = c1.text_input("Razão Social / Nome")
-        nome_fantasia = c2.text_input("Nome Fantasia")
-        cnpj_cpf = c3.text_input("CNPJ/CPF")
-        
-        c4, c5, c6 = st.columns(3)
-        inscricao_estadual = c4.text_input("Inscrição Estadual")
-        telefone = c5.text_input("Telefone")
-        email = c6.text_input("E-mail")
-        
-        c7, c8, c9, c10 = st.columns([2, 1, 1, 1])
-        endereco = c7.text_input("Endereço")
-        bairro = c8.text_input("Bairro")
-        cidade = c9.text_input("Cidade")
-        uf = c10.text_input("UF")
-        
-        c11, c12, c13 = st.columns(3)
-        cep = c11.text_input("CEP")
-        status = c12.selectbox("Status", ["ATIVO", "INATIVO"])
-        
-        if planos_options:
-            plano_de_contas = c13.selectbox("Plano de Contas", ["(Nenhum/Outro)"] + planos_options)
-            plano_id_val = planos_dict.get(plano_de_contas, None) if plano_de_contas != "(Nenhum/Outro)" else None
-        else:
-            plano_de_contas = c13.text_input("Plano de Contas")
-            plano_id_val = None
-            
-        df_fp_list = fetch_all("SELECT id, nome FROM formas_pagamento ORDER BY id ASC")
-        fp_opts = {}
-        if not df_fp_list.empty:
-            for _, r in df_fp_list.iterrows():
-                fp_opts[r['nome']] = r['id']
-                
-        col_prazo, col_pix = st.columns(2)
-        fp_selecionada = col_prazo.selectbox("Condição/Prazo Pagamento Padrão", list(fp_opts.keys()), key="forn_fp_sel")
-        fp_id_val = fp_opts.get(fp_selecionada, None)
-        chave_pix = col_pix.text_input("Código Pix")
-            
-        if st.form_submit_button("Cadastrar Fornecedor"):
-            if plano_de_contas == "(Nenhum/Outro)":
-                plano_de_contas = ""
-                
-            if nome and nome_fantasia:
-                nome_limpo = nome.strip().upper()
-                chk_nome = fetch_all("SELECT id FROM fornecedores WHERE UPPER(TRIM(nome)) = ?", (nome_limpo,))
-                
-                chk_cnpj = pd.DataFrame()
-                cnpj_val = cnpj_cpf.strip() if cnpj_cpf else ""
-                if cnpj_val:
-                    chk_cnpj = fetch_all("SELECT id FROM fornecedores WHERE TRIM(cnpj_cpf) = ?", (cnpj_val,))
-                
-                if not chk_nome.empty:
-                    st.error(f"⚠️ Já existe um fornecedor cadastrado com a Razão Social/Nome '{nome.strip()}'. Se forem fornecedores diferentes, diferencie-os no nome (ex: '{nome.strip()} RJ', '{nome.strip()} - Filial').")
-                elif not chk_cnpj.empty:
-                    st.error(f"⚠️ Já existe um fornecedor cadastrado com o CNPJ/CPF '{cnpj_val}'.")
-                else:
-                    query = """INSERT INTO fornecedores 
-                               (nome, telefone, cnpj_cpf, nome_fantasia, inscricao_estadual,
-                                endereco, bairro, cep, cidade, uf, email, plano_de_contas, status, prazo_pagamento, chave_pix, plano_conta_id, forma_pagamento_id) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-                    
-                    run_query(query, (
-                        nome, telefone, cnpj_cpf, nome_fantasia, inscricao_estadual,
-                        endereco, bairro, cep, cidade, uf, email, plano_de_contas, status, fp_selecionada, chave_pix, plano_id_val, fp_id_val
-                    ))
-                    st.success("Fornecedor cadastrado com sucesso!")
-                    import time; time.sleep(1); st.rerun()
+
+    df_fp_list_forn = fetch_all("SELECT id, nome FROM formas_pagamento ORDER BY id ASC")
+    fp_opts_forn = {}
+    if not df_fp_list_forn.empty:
+        for _, _r in df_fp_list_forn.iterrows():
+            fp_opts_forn[_r['nome']] = _r['id']
+
+    # ─────── Query e Filtros ───────
+    st.markdown("### Fornecedores Cadastrados")
+    f_col1, f_col2, f_col3, f_col4 = st.columns([3, 2, 1, 2])
+    forn_busca = f_col1.text_input("🔍 Busca por nome, CNPJ ou cidade", key="forn_busca_txt", label_visibility="collapsed", placeholder="🔍 Buscar por nome, CNPJ ou cidade...")
+    forn_exibir_inativos = f_col2.checkbox("Exibir Fornecedores Inativos", key="forn_exibir_inativos", value=False)
+    forn_filtro_periodo = f_col3.checkbox("Filtrar por período", key="forn_filtro_periodo", value=False)
+    if forn_filtro_periodo:
+        forn_data_ini = f_col4.date_input("Data inicial", key="forn_data_ini", format="DD/MM/YYYY", value=None)
+        forn_data_fim = f_col4.date_input("Data final", key="forn_data_fim", format="DD/MM/YYYY", value=None)
+    else:
+        forn_data_ini = None
+        forn_data_fim = None
+
+    # ─── Toolbar: Ferramentas e Ações ───
+    tb_a, tb_b, tb_c, tb_d, tb_e, tb_f = st.columns([2, 2, 1.5, 1.5, 1.5, 1.5])
+    if tb_a.button("➕ Incluir Novo Fornecedor", use_container_width=True):
+        limpar_form_forn()
+        st.session_state["show_form_forn"] = True
+        st.session_state["edit_forn_id"] = None
+        st.rerun()
+
+    df_forn_raw = fetch_all("""
+        SELECT f.id, f.nome as "Razão Social", f.nome_fantasia as "Nome Fantasia",
+               f.cnpj_cpf as "CNPJ/CPF", f.cidade as "Cidade", f.uf as "UF",
+               f.telefone as "Telefone", f.email as "E-mail",
+               f.status as "Status", f.prazo_pagamento as "Prazo Padrão",
+               f.chave_pix as "Chave Pix", f.plano_conta_id, f.forma_pagamento_id,
+               f.observacoes, f.cep, f.endereco, f.bairro, f.inscricao_estadual,
+               f.contatos_json
+        FROM fornecedores f
+        ORDER BY f.id DESC
+    """)
+
+    if df_forn_raw.empty:
+        df_forn_raw = pd.DataFrame()
+
+    df_forn_filtered = df_forn_raw.copy() if not df_forn_raw.empty else pd.DataFrame()
+
+    if not df_forn_filtered.empty:
+        if not forn_exibir_inativos:
+            df_forn_filtered = df_forn_filtered[df_forn_filtered["Status"].str.upper() != "INATIVO"]
+        if forn_busca:
+            mask = (
+                df_forn_filtered["Razão Social"].str.contains(forn_busca, case=False, na=False) |
+                df_forn_filtered["Nome Fantasia"].str.contains(forn_busca, case=False, na=False) |
+                df_forn_filtered["CNPJ/CPF"].str.contains(forn_busca, case=False, na=False) |
+                df_forn_filtered["Cidade"].str.contains(forn_busca, case=False, na=False)
+            )
+            df_forn_filtered = df_forn_filtered[mask]
+
+    # Botões de utilidade (export/import)
+    if not df_forn_filtered.empty:
+        csv_forn = df_forn_filtered[["id","Razão Social","Nome Fantasia","CNPJ/CPF","Cidade","UF","Telefone","E-mail","Status","Prazo Padrão","Chave Pix"]].to_csv(index=False, sep=';').encode('utf-8-sig')
+        tb_c.download_button("📤 Exportar CSV", data=csv_forn, file_name="fornecedores.csv", mime="text/csv", use_container_width=True)
+
+    show_import_forn = tb_d.button("📥 Importar CSV", use_container_width=True, key="forn_import_btn")
+
+    # Paginação
+    FORN_PAGE_SIZE = 10
+    if "forn_page" not in st.session_state:
+        st.session_state["forn_page"] = 0
+    total_forn = len(df_forn_filtered) if not df_forn_filtered.empty else 0
+    total_pages_forn = max(1, (total_forn + FORN_PAGE_SIZE - 1) // FORN_PAGE_SIZE)
+    if st.session_state["forn_page"] >= total_pages_forn:
+        st.session_state["forn_page"] = 0
+
+    pag_a, pag_b, pag_c = st.columns([1, 3, 1])
+    if pag_a.button("◀ Anterior", key="forn_prev", disabled=st.session_state["forn_page"] == 0):
+        st.session_state["forn_page"] -= 1; st.rerun()
+    pag_b.markdown(f"<div style='text-align:center; padding-top:6px'>Pág. {st.session_state['forn_page']+1} de {total_pages_forn} — {total_forn} fornecedor(es)</div>", unsafe_allow_html=True)
+    if pag_c.button("Próximo ▶", key="forn_next", disabled=st.session_state["forn_page"] >= total_pages_forn - 1):
+        st.session_state["forn_page"] += 1; st.rerun()
+
+    # Grid
+    FORN_GRID_COLS = ["Razão Social", "Nome Fantasia", "CNPJ/CPF", "Cidade", "UF", "Telefone", "E-mail", "Status", "Prazo Padrão"]
+    if not df_forn_filtered.empty:
+        forn_start = st.session_state["forn_page"] * FORN_PAGE_SIZE
+        df_forn_page = df_forn_filtered.iloc[forn_start: forn_start + FORN_PAGE_SIZE].reset_index(drop=True)
+        df_forn_page.insert(0, "✓", False)
+
+        edited_forn = st.data_editor(
+            df_forn_page[["✓"] + FORN_GRID_COLS],
+            column_config={"✓": st.column_config.CheckboxColumn("✓", default=False, width="small")},
+            hide_index=True,
+            use_container_width=True,
+            key="forn_grid_editor"
+        )
+
+        selecionados_forn = df_forn_page[edited_forn["✓"].values == True]
+
+        if tb_b.button("✏️ Editar Selecionado", use_container_width=True, disabled=len(selecionados_forn) != 1):
+            fid_edit = selecionados_forn.iloc[0]["id"] if "id" in selecionados_forn.columns else df_forn_page[edited_forn["✓"].values == True].iloc[0]["id"]
+            forn_row = df_forn_raw[df_forn_raw["id"] == fid_edit].iloc[0]
+            limpar_form_forn()
+            st.session_state["edit_forn_id"] = int(fid_edit)
+            st.session_state["show_form_forn"] = True
+            st.session_state["forn_cnpj"] = forn_row.get("CNPJ/CPF", "") or ""
+            st.session_state["forn_nome"] = forn_row.get("Razão Social", "") or ""
+            st.session_state["forn_fantasia"] = forn_row.get("Nome Fantasia", "") or ""
+            st.session_state["forn_ie"] = forn_row.get("inscricao_estadual", "") or ""
+            st.session_state["forn_telefone"] = forn_row.get("Telefone", "") or ""
+            st.session_state["forn_email"] = forn_row.get("E-mail", "") or ""
+            st.session_state["forn_cep"] = forn_row.get("cep", "") or ""
+            st.session_state["forn_endereco"] = forn_row.get("endereco", "") or ""
+            st.session_state["forn_bairro"] = forn_row.get("bairro", "") or ""
+            st.session_state["forn_cidade"] = forn_row.get("Cidade", "") or ""
+            st.session_state["forn_uf"] = forn_row.get("UF", "") or ""
+            st.session_state["forn_chave_pix"] = forn_row.get("Chave Pix", "") or ""
+            st.session_state["forn_observacoes"] = forn_row.get("observacoes", "") or ""
+            st.session_state["forn_status"] = forn_row.get("Status", "ATIVO") or "ATIVO"
+            import json as _json
+            try:
+                contatos_salvos = _json.loads(forn_row.get("contatos_json") or "[]")
+            except Exception:
+                contatos_salvos = []
+            for ci in range(3):
+                c_data = contatos_salvos[ci] if ci < len(contatos_salvos) else {}
+                st.session_state[f"forn_c{ci}_nome"] = c_data.get("nome", "")
+                st.session_state[f"forn_c{ci}_depto"] = c_data.get("depto", "")
+                st.session_state[f"forn_c{ci}_tel1"] = c_data.get("tel1", "")
+                st.session_state[f"forn_c{ci}_wapp1"] = c_data.get("wapp1", False)
+                st.session_state[f"forn_c{ci}_tel2"] = c_data.get("tel2", "")
+                st.session_state[f"forn_c{ci}_wapp2"] = c_data.get("wapp2", False)
+                st.session_state[f"forn_c{ci}_email"] = c_data.get("email", "")
+            st.rerun()
+    else:
+        st.info("Nenhum fornecedor encontrado com os filtros aplicados.")
+        selecionados_forn = pd.DataFrame()
+        if not df_forn_filtered.empty or df_forn_raw.empty:
+            tb_b.button("✏️ Editar Selecionado", use_container_width=True, disabled=True)
+
+    # Importação por CSV
+    if show_import_forn:
+        with st.expander("📥 Importar Fornecedores via Planilha CSV", expanded=True):
+            st.caption("O arquivo deve conter as colunas: nome, nome_fantasia, cnpj_cpf, telefone, email, endereco, bairro, cidade, uf, cep, status")
+            csv_import_forn = st.file_uploader("Selecione o arquivo CSV", type=["csv"], key="forn_import_upload")
+            if csv_import_forn:
+                try:
+                    df_imp = pd.read_csv(csv_import_forn, sep=';', dtype=str)
+                    st.dataframe(df_imp.head(5))
+                    if st.button("✅ Confirmar Importação", key="forn_confirm_import"):
+                        imported = 0
+                        for _, imp_row in df_imp.iterrows():
+                            n = str(imp_row.get("nome", "")).strip()
+                            if not n: continue
+                            chk = fetch_all("SELECT id FROM fornecedores WHERE UPPER(TRIM(nome))=?", (n.upper(),))
+                            if not chk.empty: continue
+                            run_query("""INSERT INTO fornecedores (nome, nome_fantasia, cnpj_cpf, telefone, email, endereco, bairro, cidade, uf, cep, status)
+                                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                      (n, str(imp_row.get("nome_fantasia","")).strip(), str(imp_row.get("cnpj_cpf","")).strip(),
+                                       str(imp_row.get("telefone","")).strip(), str(imp_row.get("email","")).strip(),
+                                       str(imp_row.get("endereco","")).strip(), str(imp_row.get("bairro","")).strip(),
+                                       str(imp_row.get("cidade","")).strip(), str(imp_row.get("uf","")).strip(),
+                                       str(imp_row.get("cep","")).strip(), str(imp_row.get("status","ATIVO")).strip()))
+                            imported += 1
+                        st.success(f"{imported} fornecedor(es) importados com sucesso!")
+                        import time; time.sleep(1.5); st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao processar o arquivo: {e}")
+
+    # ─────── Formulário de Inclusão / Edição ───────
+    if st.session_state.get("show_form_forn"):
+        is_editing_forn = st.session_state.get("edit_forn_id") is not None
+        forn_form_title = f"✏️ Editando Fornecedor (ID {st.session_state['edit_forn_id']})" if is_editing_forn else "➕ Novo Fornecedor"
+        st.markdown(f"---\n### {forn_form_title}")
+
+        # 1. Campo de CNPJ com busca
+        fcol_cnpj, fcol_btn = st.columns([3, 1])
+        forn_cnpj_val = fcol_cnpj.text_input("CNPJ / CPF *", key="forn_cnpj")
+
+        if fcol_btn.button("🔍 Buscar CNPJ", use_container_width=True):
+            if forn_cnpj_val:
+                with st.spinner("Consultando Receita Federal (BrasilAPI)..."):
+                    res = buscar_cnpj_api_forn(forn_cnpj_val)
+                    if "error" in res:
+                        st.error(res["error"])
+                    else:
+                        st.session_state["forn_nome"] = res.get("razao_social", "")
+                        st.session_state["forn_fantasia"] = res.get("nome_fantasia", "")
+                        st.session_state["forn_cep"] = res.get("cep", "")
+                        logr = res.get("logradouro", "")
+                        num = res.get("numero", "")
+                        comp = res.get("complemento", "")
+                        end_str = f"{logr}, {num}"
+                        if comp:
+                            end_str += f" - {comp}"
+                        st.session_state["forn_endereco"] = end_str
+                        st.session_state["forn_bairro"] = res.get("bairro", "")
+                        st.session_state["forn_cidade"] = res.get("municipio", "")
+                        st.session_state["forn_uf"] = res.get("uf", "")
+                        st.success("Dados pré-preenchidos! Revise e edite se necessário.")
+                        import time; time.sleep(1); st.rerun()
             else:
-                st.error("Atenção: Razão Social e Nome Fantasia são obrigatórios.")
-                
-    st.markdown("---")
-    st.subheader("Fornecedores Cadastrados")
-    df_fornecedores = fetch_all("SELECT id, nome as 'Razão Social', nome_fantasia as 'Nome Fantasia', cnpj_cpf as 'CNPJ', prazo_pagamento as 'Prazo Padrão', status as 'Status', chave_pix as 'Código Pix', plano_conta_id FROM fornecedores")
-    if not df_fornecedores.empty:
-        export_btn(df_fornecedores.drop(columns=['plano_conta_id']), 'fornecedores.csv')
-        st.dataframe(df_fornecedores.drop(columns=['plano_conta_id']), width="stretch", hide_index=True)
-        
-        with st.expander("✏️ Editar ou Inativar Fornecedor"):
-            opts_forn = {}
-            for _, r in df_fornecedores.iterrows():
-                lbl = f"ID {r['id']} | {r['Nome Fantasia']} ({r['Status']})"
-                opts_forn[lbl] = r['id']
-                
-            f_sel = st.selectbox("Selecione o Fornecedor:", list(opts_forn.keys()))
-            if f_sel:
-                fid = opts_forn[f_sel]
-                f_data = fetch_all("SELECT * FROM fornecedores WHERE id=?", (fid,))
-                if not f_data.empty:
-                    fb = f_data.iloc[0]
-                    with st.form("edit_forn"):
-                        ef1, ef2, ef3 = st.columns(3)
-                        enome = ef1.text_input("Razão Social / Nome", fb['nome'])
-                        efantasia = ef2.text_input("Nome Fantasia", fb['nome_fantasia'])
-                        edoc = ef3.text_input("CNPJ/CPF", fb['cnpj_cpf'] if fb['cnpj_cpf'] else "")
-                        
-                        ef4, ef5, ef6 = st.columns(3)
-                        eie = ef4.text_input("Inscrição Estadual", fb.get('inscricao_estadual', '') if fb.get('inscricao_estadual') else "")
-                        etelefone = ef5.text_input("Telefone", fb.get('telefone', '') if fb.get('telefone') else "")
-                        eemail = ef6.text_input("E-mail", fb.get('email', '') if fb.get('email') else "")
-                        
-                        ef7, ef8, ef9, ef10 = st.columns([2, 1, 1, 1])
-                        eendereco = ef7.text_input("Endereço", fb.get('endereco', '') if fb.get('endereco') else "")
-                        ebairro = ef8.text_input("Bairro", fb.get('bairro', '') if fb.get('bairro') else "")
-                        ecidade = ef9.text_input("Cidade", fb.get('cidade', '') if fb.get('cidade') else "")
-                        euf = ef10.text_input("UF", fb.get('uf', '') if fb.get('uf') else "")
-                        
-                        ef11, ef12, ef13 = st.columns(3)
-                        ecep = ef11.text_input("CEP", fb.get('cep', '') if fb.get('cep') else "")
-                        
-                        f_stts = ["ATIVO", "INATIVO"]
-                        d_stts = fb['status'] if fb['status'] in f_stts else "ATIVO"
-                        estatus = ef12.selectbox("Status", f_stts, index=f_stts.index(d_stts))
-                        
-                        if planos_options:
-                            d_plano_id = fb.get('plano_conta_id') if 'plano_conta_id' in fb else None
-                            d_plano = planos_reverse_dict.get(d_plano_id, fb.get('plano_de_contas', '')) if d_plano_id is not None else fb.get('plano_de_contas', '')
-                            idx_plano = planos_options.index(d_plano) + 1 if d_plano in planos_options else 0
-                            eplano_de_contas = ef13.selectbox("Plano de Contas", ["(Nenhum/Outro)"] + planos_options, index=idx_plano)
-                            eplano_id_val = planos_dict.get(eplano_de_contas, None) if eplano_de_contas != "(Nenhum/Outro)" else None
-                        else:
-                            eplano_de_contas = ef13.text_input("Plano de Contas", fb.get('plano_de_contas', '') if fb.get('plano_de_contas') else "")
-                            eplano_id_val = None
-                            
-                        df_fp_list_edit = fetch_all("SELECT id, nome FROM formas_pagamento ORDER BY id ASC")
-                        fp_opts_edit = {}
-                        if not df_fp_list_edit.empty:
-                            for _, r in df_fp_list_edit.iterrows():
-                                fp_opts_edit[r['nome']] = r['id']
-                        
-                        col_eprazo, col_epix = st.columns(2)
-                        
-                        d_fp_id = fb.get('forma_pagamento_id') if 'forma_pagamento_id' in fb else None
-                        d_fp_nome = ""
-                        if d_fp_id is not None and pd.notna(d_fp_id):
-                            df_cur_fp = fetch_all("SELECT nome FROM formas_pagamento WHERE id=?", (int(d_fp_id),))
-                            if not df_cur_fp.empty:
-                                d_fp_nome = df_cur_fp.iloc[0]['nome']
-                        
-                        if not d_fp_nome:
-                            d_fp_nome = fb.get('prazo_pagamento', '')
-                            
-                        idx_fp = list(fp_opts_edit.keys()).index(d_fp_nome) if d_fp_nome in fp_opts_edit else 0
-                        efp_selecionada = col_eprazo.selectbox("Condição/Prazo Pagamento Padrão", list(fp_opts_edit.keys()), index=idx_fp, key="forn_efp_sel")
-                        efp_id_val = fp_opts_edit.get(efp_selecionada, None)
-                        echave_pix = col_epix.text_input("Código Pix", fb.get('chave_pix', '') if fb.get('chave_pix') else "")
-                        
-                        if st.form_submit_button("Salvar Fornecedor"):
-                            if eplano_de_contas == "(Nenhum/Outro)":
-                                eplano_de_contas = ""
-                                
-                            if enome and efantasia:
-                                enome_limpo = enome.strip().upper()
-                                chk_nome = fetch_all("SELECT id FROM fornecedores WHERE UPPER(TRIM(nome)) = ? AND id != ?", (enome_limpo, fid))
-                                
-                                chk_cnpj = pd.DataFrame()
-                                ecnpj_val = edoc.strip() if edoc else ""
-                                if ecnpj_val:
-                                    chk_cnpj = fetch_all("SELECT id FROM fornecedores WHERE TRIM(cnpj_cpf) = ? AND id != ?", (ecnpj_val, fid))
-                                
-                                if not chk_nome.empty:
-                                    st.error(f"⚠️ Já existe outro fornecedor cadastrado com a Razão Social/Nome '{enome.strip()}'. Se forem fornecedores diferentes, diferencie-os no nome.")
-                                elif not chk_cnpj.empty:
-                                    st.error(f"⚠️ Já existe outro fornecedor cadastrado com o CNPJ/CPF '{ecnpj_val}'.")
-                                else:
-                                    run_query("""
-                                        UPDATE fornecedores 
-                                        SET nome=?, nome_fantasia=?, cnpj_cpf=?, inscricao_estadual=?, telefone=?, email=?,
-                                            endereco=?, bairro=?, cidade=?, uf=?, cep=?, status=?, plano_de_contas=?, prazo_pagamento=?, chave_pix=?, plano_conta_id=?, forma_pagamento_id=? 
-                                        WHERE id=?
-                                    """, (enome, efantasia, edoc, eie, etelefone, eemail, eendereco, ebairro, ecidade, euf, ecep, estatus, eplano_de_contas, efp_selecionada, echave_pix, eplano_id_val, efp_id_val, fid))
-                                    st.success("Fornecedor cadastrado com sucesso!")
-                                    import time; time.sleep(1); st.rerun()
-                            else:
-                                st.error("Atenção: Razão Social e Nome Fantasia são obrigatórios.")
+                st.warning("Preencha o campo CNPJ antes de buscar.")
+
+        # 2. Dados Gerais
+        fg1, fg2 = st.columns([2, 1])
+        forn_nome_val = fg1.text_input("Razão Social *", key="forn_nome")
+        forn_fantasia_val = fg2.text_input("Nome Fantasia", key="forn_fantasia")
+
+        fg3, fg4, fg5 = st.columns(3)
+        forn_ie_val = fg3.text_input("Inscrição Estadual", key="forn_ie")
+        forn_tel_val = fg4.text_input("Telefone Geral", key="forn_telefone")
+        forn_email_val = fg5.text_input("E-mail Geral", key="forn_email")
+
+        fg6, fg7, fg8, fg9, fg10 = st.columns([3, 1, 2, 1, 1])
+        forn_end_val = fg6.text_input("Endereço (Rua, Número, Complemento)", key="forn_endereco")
+        forn_cep_val = fg7.text_input("CEP", key="forn_cep")
+        forn_bairro_val = fg8.text_input("Bairro", key="forn_bairro")
+        forn_cidade_val = fg9.text_input("Cidade", key="forn_cidade")
+        forn_uf_val = fg10.text_input("UF", key="forn_uf", max_chars=2)
+
+        fg11, fg12, fg13, fg14 = st.columns(4)
+        forn_pix_val = fg11.text_input("Chave Pix", key="forn_chave_pix")
+
+        _forn_fp_keys = list(fp_opts_forn.keys())
+        _forn_fp_default_idx = 0
+        if is_editing_forn:
+            _eid_forn = st.session_state["edit_forn_id"]
+            _ef_row = df_forn_raw[df_forn_raw["id"] == _eid_forn]
+            if not _ef_row.empty:
+                _fp_id_cur = _ef_row.iloc[0].get("forma_pagamento_id")
+                if _fp_id_cur and pd.notna(_fp_id_cur):
+                    _df_fp_cur = fetch_all("SELECT nome FROM formas_pagamento WHERE id=?", (int(_fp_id_cur),))
+                    if not _df_fp_cur.empty:
+                        _fp_nome_cur = _df_fp_cur.iloc[0]['nome']
+                        if _fp_nome_cur in _forn_fp_keys:
+                            _forn_fp_default_idx = _forn_fp_keys.index(_fp_nome_cur)
+
+        forn_fp_sel = fg12.selectbox("Forma / Prazo Pagto.", _forn_fp_keys if _forn_fp_keys else ["(nenhuma)"], index=_forn_fp_default_idx, key="forn_fp_sel")
+        forn_fp_id_val = fp_opts_forn.get(forn_fp_sel, None) if _forn_fp_keys else None
+
+        _plano_default_idx = 0
+        if is_editing_forn and planos_options:
+            _eid_forn = st.session_state["edit_forn_id"]
+            _ef_row2 = df_forn_raw[df_forn_raw["id"] == _eid_forn]
+            if not _ef_row2.empty:
+                _plano_id_cur = _ef_row2.iloc[0].get("plano_conta_id")
+                _plano_nome_cur = planos_reverse_dict.get(_plano_id_cur, "")
+                if _plano_nome_cur in planos_options:
+                    _plano_default_idx = planos_options.index(_plano_nome_cur) + 1
+
+        forn_plano_sel = fg13.selectbox("Plano de Contas", ["(Nenhum/Outro)"] + planos_options, index=_plano_default_idx, key="forn_plano_sel")
+        forn_plano_id_val = planos_dict.get(forn_plano_sel, None) if forn_plano_sel != "(Nenhum/Outro)" else None
+
+        _forn_status_opts = ["ATIVO", "INATIVO"]
+        _forn_status_default = 0
+        if is_editing_forn:
+            _cur_status = st.session_state.get("forn_status", "ATIVO")
+            if _cur_status in _forn_status_opts:
+                _forn_status_default = _forn_status_opts.index(_cur_status)
+        forn_status_val = fg14.selectbox("Status", _forn_status_opts, index=_forn_status_default, key="forn_status_sel")
+
+        forn_obs_val = st.text_area("Observações", key="forn_observacoes", height=70)
+
+        # 3. Seção de Contatos
+        st.markdown("---")
+        st.markdown("#### 👥 Contatos do Fornecedor")
+        import json as _json_forn
+        forn_contatos_coletados = []
+        for ci in range(3):
+            st.markdown(f"**Contato {ci+1}**")
+            cc1, cc2, cc3, cc4, cc5, cc6, cc7 = st.columns([2, 1.5, 1.5, 0.6, 1.5, 0.6, 2])
+            c_nome = cc1.text_input("Nome", key=f"forn_c{ci}_nome")
+            c_depto = cc2.text_input("Departamento", key=f"forn_c{ci}_depto")
+            c_tel1 = cc3.text_input("Telefone 1", key=f"forn_c{ci}_tel1")
+            c_wapp1 = cc4.checkbox("WhatsApp", key=f"forn_c{ci}_wapp1")
+            c_tel2 = cc5.text_input("Telefone 2", key=f"forn_c{ci}_tel2")
+            c_wapp2 = cc6.checkbox("WhatsApp", key=f"forn_c{ci}_wapp2")
+            c_email = cc7.text_input("E-mail", key=f"forn_c{ci}_email")
+            forn_contatos_coletados.append({
+                "nome": c_nome, "depto": c_depto,
+                "tel1": c_tel1, "wapp1": c_wapp1,
+                "tel2": c_tel2, "wapp2": c_wapp2,
+                "email": c_email
+            })
+
+        # 4. Botões de Ação
+        st.markdown("")
+        fbn_salvar, fbn_cancelar, _ = st.columns([2, 2, 6])
+        forn_contatos_json_val = _json_forn.dumps(forn_contatos_coletados, ensure_ascii=False)
+
+        if fbn_salvar.button("💾 Salvar Fornecedor", use_container_width=True, type="primary"):
+            if not forn_nome_val.strip():
+                st.error("A Razão Social é obrigatória.")
+            else:
+                nome_limpo = forn_nome_val.strip().upper()
+                cnpj_limpo = forn_cnpj_val.strip() if forn_cnpj_val else ""
+
+                if is_editing_forn:
+                    fid_upd = st.session_state["edit_forn_id"]
+                    chk_nome_upd = fetch_all("SELECT id FROM fornecedores WHERE UPPER(TRIM(nome))=? AND id != ?", (nome_limpo, fid_upd))
+                    chk_cnpj_upd = fetch_all("SELECT id FROM fornecedores WHERE TRIM(cnpj_cpf)=? AND id != ?", (cnpj_limpo, fid_upd)) if cnpj_limpo else pd.DataFrame()
+
+                    if not chk_nome_upd.empty:
+                        st.error(f"Já existe outro fornecedor com a Razão Social '{forn_nome_val.strip()}'.")
+                    elif not chk_cnpj_upd.empty:
+                        st.error(f"Já existe outro fornecedor com o CNPJ '{cnpj_limpo}'.")
+                    else:
+                        run_query("""
+                            UPDATE fornecedores
+                            SET nome=?, nome_fantasia=?, cnpj_cpf=?, inscricao_estadual=?,
+                                telefone=?, email=?, endereco=?, bairro=?, cidade=?, uf=?, cep=?,
+                                chave_pix=?, prazo_pagamento=?, plano_de_contas=?, status=?,
+                                plano_conta_id=?, forma_pagamento_id=?, observacoes=?, contatos_json=?
+                            WHERE id=?
+                        """, (forn_nome_val, forn_fantasia_val, forn_cnpj_val, forn_ie_val,
+                              forn_tel_val, forn_email_val, forn_end_val, forn_bairro_val,
+                              forn_cidade_val, forn_uf_val, forn_cep_val,
+                              forn_pix_val, forn_fp_sel, forn_plano_sel, forn_status_val,
+                              forn_plano_id_val, forn_fp_id_val, forn_obs_val,
+                              forn_contatos_json_val, fid_upd))
+                        st.success("Fornecedor atualizado com sucesso!")
+                        limpar_form_forn()
+                        st.session_state["show_form_forn"] = False
+                        st.session_state["edit_forn_id"] = None
+                        import time; time.sleep(1.5); st.rerun()
+                else:
+                    chk_nome_new = fetch_all("SELECT id FROM fornecedores WHERE UPPER(TRIM(nome))=?", (nome_limpo,))
+                    chk_cnpj_new = fetch_all("SELECT id FROM fornecedores WHERE TRIM(cnpj_cpf)=?", (cnpj_limpo,)) if cnpj_limpo else pd.DataFrame()
+
+                    if not chk_nome_new.empty:
+                        st.error(f"Já existe um fornecedor com a Razão Social '{forn_nome_val.strip()}'.")
+                    elif not chk_cnpj_new.empty:
+                        st.error(f"Já existe um fornecedor com o CNPJ '{cnpj_limpo}'.")
+                    else:
+                        run_query("""
+                            INSERT INTO fornecedores
+                            (nome, nome_fantasia, cnpj_cpf, inscricao_estadual,
+                             telefone, email, endereco, bairro, cidade, uf, cep,
+                             chave_pix, prazo_pagamento, plano_de_contas, status,
+                             plano_conta_id, forma_pagamento_id, observacoes, contatos_json)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (forn_nome_val, forn_fantasia_val, forn_cnpj_val, forn_ie_val,
+                              forn_tel_val, forn_email_val, forn_end_val, forn_bairro_val,
+                              forn_cidade_val, forn_uf_val, forn_cep_val,
+                              forn_pix_val, forn_fp_sel, forn_plano_sel, forn_status_val,
+                              forn_plano_id_val, forn_fp_id_val, forn_obs_val,
+                              forn_contatos_json_val))
+                        st.success("Fornecedor cadastrado com sucesso!")
+                        limpar_form_forn()
+                        st.session_state["show_form_forn"] = False
+                        import time; time.sleep(1.5); st.rerun()
+
+        if fbn_cancelar.button("✖ Cancelar", use_container_width=True):
+            limpar_form_forn()
+            st.session_state["show_form_forn"] = False
+            st.session_state["edit_forn_id"] = None
+            st.rerun()
+
 
 # ======= REGRAS DE COMISSÃO =======
 with tab4:
