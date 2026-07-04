@@ -953,7 +953,9 @@ def _create_tables_internal(conn):
         "ALTER TABLE clientes ADD COLUMN limite_credito REAL DEFAULT 0.0",
         "ALTER TABLE clientes ADD COLUMN limite_ilimitado INTEGER DEFAULT 1",
         "ALTER TABLE clientes ADD COLUMN contatos_json TEXT",
-        "ALTER TABLE fornecedores ADD COLUMN contatos_json TEXT"
+        "ALTER TABLE fornecedores ADD COLUMN contatos_json TEXT",
+        "ALTER TABLE fornecedores ADD COLUMN observacoes TEXT",
+        "ALTER TABLE fornecedores ADD COLUMN nome_fantasia TEXT"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)
