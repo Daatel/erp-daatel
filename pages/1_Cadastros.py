@@ -1740,43 +1740,43 @@ with tab8:
                             st.success(f"Usuário '{ub['nome']}' excluído com sucesso.")
                             import time; time.sleep(1); st.rerun()
 
-# ======= RESET DE SENHA (apenas ADMIN) =======
-st.markdown("---")
-st.subheader("🔐 Reset de Senha de Usuário")
-st.caption("Gera um código temporário de 6 dígitos (válido por 30 minutos) enviado ao Telegram do administrador. Repasse o código ao colaborador para que ele mesmo defina a nova senha.")
+    # ======= RESET DE SENHA (apenas ADMIN) =======
+    st.markdown("---")
+    st.subheader("🔐 Reset de Senha de Usuário")
+    st.caption("Gera um código temporário de 6 dígitos (válido por 30 minutos) enviado ao Telegram do administrador. Repasse o código ao colaborador para que ele mesmo defina a nova senha.")
 
-from database import gerar_token_reset, validar_token_reset, consumir_token_reset, enviar_mensagem_telegram
+    from database import gerar_token_reset, validar_token_reset, consumir_token_reset, enviar_mensagem_telegram
 
-with st.expander("📨 Gerar Código de Reset para um Colaborador"):
-    df_usr_reset = fetch_all("""
-        SELECT u.id, u.nome, u.email FROM usuarios u WHERE u.status = 'ATIVO' ORDER BY u.nome
-    """)
-    if not df_usr_reset.empty:
-        opts_reset = {f"{r['nome']} ({r['email']})": (int(r['id']), r['email'], r['nome']) for _, r in df_usr_reset.iterrows()}
-        u_reset_sel = st.selectbox("Selecione o usuário:", list(opts_reset.keys()), key="sel_reset_usr")
-        if st.button("📤 Gerar e Enviar Código via Telegram", key="btn_gerar_token"):
-            uid_r, email_r, nome_r = opts_reset[u_reset_sel]
-            token_r = gerar_token_reset(uid_r)
-            msg = (
-                f"🔐 <b>Reset de Senha — ERP Alho</b>\n"
-                f"Colaborador: <b>{nome_r}</b>\n"
-                f"Código temporário: <code>{token_r}</code>\n"
-                f"\u26a0️ Válido por <b>30 minutos</b>. Após usar, o código é descartado.\n"
-                f"Instrua o colaborador a acessar a tela de login e clicar em <i>Esqueci minha senha</i>."
-            )
-            ok, err = enviar_mensagem_telegram(msg)
-            if ok:
-                registrar_log_acesso(
-                    st.session_state.get('user_id'), st.session_state.get('logged_user', ''),
-                    st.session_state.get('logged_user', ''),
-                    'RESET_SENHA_SOLICITADO', f"Token gerado para: {email_r}"
+    with st.expander("📨 Gerar Código de Reset para um Colaborador"):
+        df_usr_reset = fetch_all("""
+            SELECT u.id, u.nome, u.email FROM usuarios u WHERE u.status = 'ATIVO' ORDER BY u.nome
+        """)
+        if not df_usr_reset.empty:
+            opts_reset = {f"{r['nome']} ({r['email']})": (int(r['id']), r['email'], r['nome']) for _, r in df_usr_reset.iterrows()}
+            u_reset_sel = st.selectbox("Selecione o usuário:", list(opts_reset.keys()), key="sel_reset_usr")
+            if st.button("📤 Gerar e Enviar Código via Telegram", key="btn_gerar_token"):
+                uid_r, email_r, nome_r = opts_reset[u_reset_sel]
+                token_r = gerar_token_reset(uid_r)
+                msg = (
+                    f"🔐 <b>Reset de Senha — ERP Alho</b>\n"
+                    f"Colaborador: <b>{nome_r}</b>\n"
+                    f"Código temporário: <code>{token_r}</code>\n"
+                    f"\u26a0️ Válido por <b>30 minutos</b>. Após usar, o código é descartado.\n"
+                    f"Instrua o colaborador a acessar a tela de login e clicar em <i>Esqueci minha senha</i>."
                 )
-                st.success(f"✅ Código enviado ao Telegram! Repasse-o a {nome_r}.")
-            else:
-                st.warning(f"⚠️ Telegram não configurado ou erro no envio: {err}")
-                st.info(f"📝 Código gerado (anote e repasse manualmente): **{token_r}**")
-    else:
-        st.info("Nenhum usuário ativo encontrado.")
+                ok, err = enviar_mensagem_telegram(msg)
+                if ok:
+                    registrar_log_acesso(
+                        st.session_state.get('user_id'), st.session_state.get('logged_user', ''),
+                        st.session_state.get('logged_user', ''),
+                        'RESET_SENHA_SOLICITADO', f"Token gerado para: {email_r}"
+                    )
+                    st.success(f"✅ Código enviado ao Telegram! Repasse-o a {nome_r}.")
+                else:
+                    st.warning(f"⚠️ Telegram não configurado ou erro no envio: {err}")
+                    st.info(f"📝 Código gerado (anote e repasse manualmente): **{token_r}**")
+        else:
+            st.info("Nenhum usuário ativo encontrado.")
 
 # ======= REDES E GRUPOS =======
 with tab9:
