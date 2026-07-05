@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+st.set_page_config(page_title="Financeiro e Tesouraria", layout="wide")
 from datetime import datetime, date, timedelta
 import plotly.graph_objects as go
 import traceback
@@ -210,7 +211,6 @@ def mostrar_transferencia_modal(opcoes_bancos, df_bancos):
 
 from utils_financeiro_modals import *
 
-st.set_page_config(page_title="Financeiro e Tesouraria", layout="wide")
 carregar_estilo()
 
 st.markdown("""
