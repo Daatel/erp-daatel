@@ -1,4 +1,5 @@
 import streamlit as st
+st.error("🔴 TESTE DE ATUALIZAÇÃO DO AGENTE 🔴 Se você está vendo isso, o arquivo novo carregou!")
 import pandas as pd
 st.set_page_config(page_title="Financeiro e Tesouraria", layout="wide")
 from datetime import datetime, date, timedelta
