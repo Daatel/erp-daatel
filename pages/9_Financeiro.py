@@ -776,7 +776,10 @@ try:
             df_pago = df_all_contas[df_all_contas['Status'] == 'PAGO'].copy()
             if not df_pago.empty:
                 df_pago['p_date'] = pd.to_datetime(df_pago['Data PGTO']).dt.date
-                total_pago_mes_p = float(df_pago[(df_pago['p_date'] >= dt_ini) & (df_pago['p_date'] <= dt_fi)]['Valor'].sum())
+                hoje = date.today()
+                primeiro_dia = date(hoje.year, hoje.month, 1)
+                ultimo_dia = date(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
+                total_pago_mes_p = float(df_pago[(df_pago['p_date'] >= primeiro_dia) & (df_pago['p_date'] <= ultimo_dia)]['Valor'].sum())
 
         def formatar_moeda(val): return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         
@@ -900,7 +903,10 @@ try:
             df_recebido_r = df_receber[df_receber['Status'] == 'RECEBIDO'].copy()
             if not df_recebido_r.empty:
                 df_recebido_r['r_date'] = pd.to_datetime(df_recebido_r['Recebido Em']).dt.date
-                total_recebido_mes_r = float(df_recebido_r[(df_recebido_r['r_date'] >= dt_ini) & (df_recebido_r['r_date'] <= dt_fi)]['Valor'].sum())
+                hoje = date.today()
+                primeiro_dia = date(hoje.year, hoje.month, 1)
+                ultimo_dia = date(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
+                total_recebido_mes_r = float(df_recebido_r[(df_recebido_r['r_date'] >= primeiro_dia) & (df_recebido_r['r_date'] <= ultimo_dia)]['Valor'].sum())
 
         def formatar_moeda(val): return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         
