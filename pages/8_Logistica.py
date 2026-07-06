@@ -159,8 +159,8 @@ with tab1:
                         pc_id = p_c.iloc[0]['id'] if not p_c.empty else None
                         
                         desc_pagar = f"Acerto Rota/Manifesto #{man_id} - Placa: {placa}"
-                        run_query("INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?)",
-                                  (f_id, pc_id, desc_pagar, custo_frete, venc_frete, 'PENDENTE'))
+                        run_query("INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                  (f_id, pc_id, f"Manifesto #{man_id}", desc_pagar, custo_frete, venc_frete, 'PENDENTE'))
                         st.info(f"💸 Conta a Pagar gerada para a Transportadora {fornecedor_selecionado} com vencimento em {venc_frete.strftime('%d/%m/%Y')}.")
                         
                     st.success(f"🚚 Manifesto #{man_id} finalizado e lacrado com Sucesso!")
