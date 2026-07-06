@@ -517,7 +517,7 @@ with tab_pedidos:
             df_exibir.style.apply(highlight_status, axis=1),
             hide_index=True,
             width="stretch",
-            selection_mode="multiple_rows",
+            selection_mode="multi-row",
             on_select="rerun"
         )
         
