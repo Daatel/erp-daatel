@@ -475,7 +475,7 @@ with tab_pedidos:
             if bool(row['flag_op_casada']):
                 filial = row['filial_atacadao'] or ""
                 num_int = row['pedido_atacadao_numero'] or ""
-                return f"Filial: {filial} - Pedido: {num_int}"
+                return f"{filial} - Pedido: {num_int}"
             if row['status_pedido'] == 'APROVADO' and row['valor_total'] == 0:
                 return "Bonificação"
             return "Venda padrão"
