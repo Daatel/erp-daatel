@@ -428,6 +428,7 @@ with tab_pedidos:
     query_pedidos += " ORDER BY v.pedido_grupo DESC, v.id DESC"
     
     df_raw = fetch_all(query_pedidos, tuple(params_pedidos))
+    st.write("DEBUG COLUNAS RETORNADAS:", df_raw.columns.tolist() if not df_raw.empty else "VAZIO")
     
     if df_raw.empty:
         st.info("Nenhum pedido encontrado para o filtro selecionado.")
@@ -480,16 +481,21 @@ with tab_pedidos:
                 return "Bonificação"
             return "Venda padrão"
             
-        df_raw['Pedido'] = df_raw['pedido_id'].apply(lambda x: pedido_labels.get(int(x), f"#{x}"))
-        df_raw['Data Captação'] = pd.to_datetime(df_raw['data_pedido']).dt.strftime('%d/%m/%Y')
-        df_raw['Cliente'] = df_raw['cliente_name']
-        df_raw['Histórico'] = df_raw.apply(format_historico, axis=1)
-        df_raw['Carga'] = df_raw['produto_name']
-        df_raw['Qtd'] = df_raw['quantidade'].apply(lambda x: f"{x:.0f} UN")
-        df_raw['Valor Total'] = df_raw['valor_total'].apply(format_brl)
-        df_raw['Forma Pagto'] = df_raw['forma_payment'].fillna("A vista") if 'forma_payment' in df_raw.columns else df_raw['forma_pagamento'].fillna("A vista")
-        df_raw['Vendedor'] = df_raw['vendedor_name'].fillna("Venda Direta")
-        df_raw['Situação do Pedido'] = df_raw.apply(format_status_badge, axis=1)
+        try:
+            df_raw['Pedido'] = df_raw['pedido_id'].apply(lambda x: pedido_labels.get(int(x), f"#{x}"))
+            df_raw['Data Captação'] = pd.to_datetime(df_raw['data_pedido']).dt.strftime('%d/%m/%Y')
+            df_raw['Cliente'] = df_raw['cliente_name']
+            df_raw['Histórico'] = df_raw.apply(format_historico, axis=1)
+            df_raw['Carga'] = df_raw['produto_name']
+            df_raw['Qtd'] = df_raw['quantidade'].apply(lambda x: f"{x:.0f} UN")
+            df_raw['Valor Total'] = df_raw['valor_total'].apply(format_brl)
+            df_raw['Forma Pagto'] = df_raw['forma_payment'].fillna("A vista") if 'forma_payment' in df_raw.columns else df_raw['forma_pagamento'].fillna("A vista")
+            df_raw['Vendedor'] = df_raw['vendedor_name'].fillna("Venda Direta")
+            df_raw['Situação do Pedido'] = df_raw.apply(format_status_badge, axis=1)
+        except KeyError as ke:
+            st.error(f"ERRO DE COLUNA DETECTADO: {ke}")
+            st.write("Colunas que existem no df_raw:", df_raw.columns.tolist())
+            raise ke
         
         # Colorir status
         def highlight_status(row):
