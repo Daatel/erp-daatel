@@ -1325,7 +1325,7 @@ try:
 
             df_display_view = df_display_prev[['Vencimento', 'tipo', 'nome_contato', 'descricao', 'Valor (R$)', 'Status Interno']]
 
-            df_display_view.columns = ['Vencimento', 'Tipo', 'Contato', 'Descrição/Fatura', 'Valor', 'Status de Prazo']
+            df_display_view.columns = ['Vencimento', 'Tipo', 'Contato', 'Histórico', 'Valor', 'Status de Prazo']
 
             
 
@@ -1463,7 +1463,7 @@ try:
 
             SELECT c.id, f.nome_fantasia as 'Fornecedor', c.numero_documento as 'N. Doc', p.nome as 'Planta de Custo', 
 
-                   c.descricao as 'Descrição/Fatura', c.data_vencimento as 'Vencimento', 
+                   c.descricao as 'Histórico', c.data_vencimento as 'Vencimento', 
 
                    c.valor as 'Valor', c.status as 'Status', c.data_pagamento as 'Data PGTO',
 
@@ -1513,7 +1513,7 @@ try:
 
         if not df_all_contas.empty:
 
-            df_all_contas['Bloqueado'] = df_all_contas['Descrição/Fatura'].apply(checar_trava)
+            df_all_contas['Bloqueado'] = df_all_contas['Histórico'].apply(checar_trava)
 
             df_all_contas['Fornecedor'] = df_all_contas.apply(
 
@@ -1664,14 +1664,14 @@ try:
                 doc = f"#{row['id']}" if d == 'None' or d == 'nan' or d == '' else d
                 
                 import re
-                m = re.search(r'\(\s*(\d+/\d+)\s*\)', str(row['Descrição/Fatura']))
+                m = re.search(r'\(\s*(\d+/\d+)\s*\)', str(row['Histórico']))
                 if m:
                     return f"{doc} - {m.group(1)}"
                 return doc
             df_view_p['N. Doc'] = df_view_p.apply(format_doc_p, axis=1)
             
             def clean_fatura_p(row):
-                desc = str(row['Descrição/Fatura'])
+                desc = str(row['Histórico'])
                 if 'Venda #' in desc and 'Descarga' not in desc and 'Acordo' not in desc:
                      m = re.search(r'\([^)]+-\s*(.*?)\)$', desc)
                      if m:
@@ -1680,7 +1680,7 @@ try:
                      return 'Acerto Rota/Manifesto'
                 return desc
                 
-            df_view_p['Descrição/Fatura'] = df_view_p.apply(clean_fatura_p, axis=1)
+            df_view_p['Histórico'] = df_view_p.apply(clean_fatura_p, axis=1)
 
 
 
@@ -1698,7 +1698,7 @@ try:
 
                     df_view_p['Fornecedor'].str.lower().str.contains(b_p, na=False) |
 
-                    df_view_p['Descrição/Fatura'].str.lower().str.contains(b_p, na=False)
+                    df_view_p['Histórico'].str.lower().str.contains(b_p, na=False)
 
                 ]
 
@@ -1730,7 +1730,7 @@ try:
 
                 edited_df_p = st.data_editor(
 
-                    df_view_p[['Pagar?', 'id', 'Fornecedor', 'N. Doc', 'Vencimento', 'Valor', 'Descrição/Fatura', 'Status', 'Data PGTO']],
+                    df_view_p[['Pagar?', 'id', 'Fornecedor', 'N. Doc', 'Vencimento', 'Valor', 'Histórico', 'Status', 'Data PGTO']],
 
                     hide_index=True,
 
@@ -1780,7 +1780,7 @@ try:
 
         df_receber = fetch_all("""
 
-            SELECT c.id, cl.nome as 'Cliente', c.numero_documento as 'N. Doc', c.descricao as 'Fatura', 
+            SELECT c.id, cl.nome as 'Cliente', c.numero_documento as 'N. Doc', c.descricao as 'Histórico', 
 
                    c.data_vencimento as 'Vencimento', c.valor as 'Valor', 
 
@@ -1948,7 +1948,7 @@ try:
                 
                 # Check for (X/X) in Fatura
                 import re
-                m = re.search(r'\(\s*(\d+/\d+)\s*\)', str(row['Fatura']))
+                m = re.search(r'\(\s*(\d+/\d+)\s*\)', str(row['Histórico']))
                 if m:
                     return f"{doc} - {m.group(1)}"
                 return doc
@@ -1956,12 +1956,12 @@ try:
             df_view_r['N. Doc'] = df_view_r.apply(format_doc_r, axis=1)
             
             def clean_fatura_r(row):
-                desc = str(row['Fatura'])
+                desc = str(row['Histórico'])
                 if 'Venda #' in desc:
                     return "-" # Ocultar info redundante para vendas automáticas
                 return desc
                 
-            df_view_r['Fatura'] = df_view_r.apply(clean_fatura_r, axis=1)
+            df_view_r['Histórico'] = df_view_r.apply(clean_fatura_r, axis=1)
 
 
 
@@ -1979,7 +1979,7 @@ try:
 
                     df_view_r['Cliente'].str.lower().str.contains(b_r, na=False) |
 
-                    df_view_r['Fatura'].str.lower().str.contains(b_r, na=False)
+                    df_view_r['Histórico'].str.lower().str.contains(b_r, na=False)
 
                 ]
 
@@ -2009,7 +2009,7 @@ try:
 
                 edited_df_r = st.data_editor(
 
-                    df_view_r[['Receber?', 'id', 'Cliente', 'N. Doc', 'Vencimento', 'Valor', 'Fatura', 'Status', 'Recebido Em']],
+                    df_view_r[['Receber?', 'id', 'Cliente', 'N. Doc', 'Vencimento', 'Valor', 'Histórico', 'Status', 'Recebido Em']],
 
                     hide_index=True,
 
@@ -2487,7 +2487,7 @@ try:
 
             SELECT c.id, f.nome_fantasia as 'Fornecedor', c.numero_documento as 'N. Doc', p.nome as 'Planta de Custo', 
 
-                   c.descricao as 'Descrição/Fatura', c.data_vencimento as 'Vencimento', 
+                   c.descricao as 'Histórico', c.data_vencimento as 'Vencimento', 
 
                    c.valor as 'Valor', c.status as 'Status', c.data_pagamento as 'Data PGTO',
 
@@ -2511,7 +2511,7 @@ try:
 
             st.markdown("Verifique os comprovantes anexados pela expedição antes de autorizar o pagamento.")
 
-            contas_man = df_all_contas[df_all_contas['Descrição/Fatura'].str.contains("Acerto Rota/Manifesto #", na=False)]
+            contas_man = df_all_contas[df_all_contas['Histórico'].str.contains("Acerto Rota/Manifesto #", na=False)]
 
             if not contas_man.empty:
 
@@ -2521,7 +2521,7 @@ try:
 
                     try:
 
-                        man_id = int(r['Descrição/Fatura'].split("#")[1].split("-")[0].strip())
+                        man_id = int(r['Histórico'].split("#")[1].split("-")[0].strip())
 
                         opcoes_audit[f"Manifesto #{man_id} ({r['Fornecedor']})"] = man_id
 
@@ -2595,7 +2595,7 @@ try:
 
             df_desc_ag = df_all_contas[
 
-                df_all_contas['Descrição/Fatura'].str.contains("Taxa de Descarga", na=False)
+                df_all_contas['Histórico'].str.contains("Taxa de Descarga", na=False)
 
             ]
 
@@ -2607,7 +2607,7 @@ try:
 
                 for _, rd in df_desc_ag.iterrows():
 
-                    st.markdown(f"**#{rd['id']} | {rd['Descrição/Fatura']}**")
+                    st.markdown(f"**#{rd['id']} | {rd['Histórico']}**")
 
                     col_d1, col_d2 = st.columns([2, 1])
 
