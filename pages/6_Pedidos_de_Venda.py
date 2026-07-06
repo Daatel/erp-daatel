@@ -428,7 +428,6 @@ with tab_pedidos:
     query_pedidos += " ORDER BY v.pedido_grupo DESC, v.id DESC"
     
     df_raw = fetch_all(query_pedidos, tuple(params_pedidos))
-    st.write("DEBUG COLUNAS RETORNADAS:", df_raw.columns.tolist() if not df_raw.empty else "VAZIO")
     
     if df_raw.empty:
         st.info("Nenhum pedido encontrado para o filtro selecionado.")
