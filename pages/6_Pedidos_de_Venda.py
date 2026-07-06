@@ -425,7 +425,7 @@ with tab_pedidos:
     elif filtro_status == "Faturados":
         query_pedidos += " AND v.status = 'FATURADO' AND (v.tipo_documento LIKE '%DAV%' OR (v.tipo_documento = 'Nota Fiscal (NF)' AND v.numero_documento NOT LIKE 'Bling #%' AND v.numero_documento IS NOT NULL AND v.numero_documento != ''))"
         
-    query_pedidos += " ORDER BY v.pedido_grupo DESC, v.id DESC"
+    query_pedidos += " ORDER BY CASE WHEN v.pedido_grupo IS NULL THEN 0 ELSE 1 END DESC, v.pedido_grupo DESC, v.id DESC"
     
     df_raw = fetch_all(query_pedidos, tuple(params_pedidos))
     
