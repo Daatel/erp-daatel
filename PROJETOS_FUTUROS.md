@@ -46,3 +46,8 @@ Abaixo está o mapeamento dos locais e respectivos emojis que foram removidos da
   - Mensagens de Erro (`st.error`): `❌` (ex: "❌ Não é permitido cancelar...")
   - Mensagens de Aviso (`st.warning` / `st.markdown`): `⚠️` (ex: "⚠️ Gravação em andamento...", "⚠️ Tem certeza...")
   - Título do modal de bloqueio: `Lançamento Direto Bloqueado 🔒`
+
+## 📋 Kanban de Pedidos (Produção) - Repasse Horta do Príncipe
+- **Objetivo:** Implementar o Kanban interativo (drag-and-drop) de pedidos de produção baseado na especificação `MD_Kanban_de_pedidos.MD` e no mockup `kanban_pedidos_producao_v3.html`.
+- **Escopo Técnico:** Requer a criação de novas colunas e tabelas no Supabase (`data_prevista`, `grade_id`, etc.), configuração de Edge Functions (`mover-pedido`) para gerenciar as permissões e atualização de banco, e injeção do componente de interface Kanban no front-end Streamlit utilizando JavaScript vanilla e SortableJS.
+- **Status:** Arquivado para o futuro devido ao elevado esforço técnico (estimativa de 4 a 6 horas) envolvendo manipulação simultânea de SQL, Serverless Functions (Deno) e integrações reativas de Front-end com JWT auth.
