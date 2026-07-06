@@ -1658,6 +1658,14 @@ try:
         else:
 
             df_view_p = df_all_contas.copy()
+            
+            def format_doc_p(row):
+                d = str(row['N. Doc']).strip()
+                if d == 'None' or d == 'nan' or d == '':
+                    return f"#{row['id']}"
+                return d
+            df_view_p['N. Doc'] = df_view_p.apply(format_doc_p, axis=1)
+
 
             if status_filter_p != "TODAS":
 
@@ -1916,6 +1924,20 @@ try:
         else:
 
             df_view_r = df_receber.copy()
+            
+            def format_doc_r(row):
+                d = str(row['N. Doc']).strip()
+                doc = f"#{row['id']}" if d == 'None' or d == 'nan' or d == '' else d
+                
+                # Check for (X/X) in Fatura
+                import re
+                m = re.search(r'\(\s*(\d+/\d+)\s*\)', str(row['Fatura']))
+                if m:
+                    return f"{doc} - {m.group(1)}"
+                return doc
+                
+            df_view_r['N. Doc'] = df_view_r.apply(format_doc_r, axis=1)
+
 
             if status_filter_r != "TODAS":
 
