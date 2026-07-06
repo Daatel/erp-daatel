@@ -1,3 +1,4 @@
+# Rebuild trigger: 2026-07-06 07:22
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
