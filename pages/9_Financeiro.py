@@ -1661,9 +1661,13 @@ try:
             
             def format_doc_p(row):
                 d = str(row['N. Doc']).strip()
-                if d == 'None' or d == 'nan' or d == '':
-                    return f"#{row['id']}"
-                return d
+                doc = f"#{row['id']}" if d == 'None' or d == 'nan' or d == '' else d
+                
+                import re
+                m = re.search(r'\(\s*(\d+/\d+)\s*\)', str(row['Descrição/Fatura']))
+                if m:
+                    return f"{doc} - {m.group(1)}"
+                return doc
             df_view_p['N. Doc'] = df_view_p.apply(format_doc_p, axis=1)
 
 
