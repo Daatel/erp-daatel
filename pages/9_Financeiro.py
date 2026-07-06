@@ -1574,17 +1574,11 @@ try:
             st.markdown(f"""
 
             <div style="display: flex; gap: 20px; font-size: 0.95rem; color: #475569; margin-top: 5px; margin-bottom: 15px; background-color: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-
                 <div>Total Pendente (Global): <strong style="color: #b45309;">{formatar_moeda(total_pendente_p)}</strong></div>
-
                 <div style="color: #cbd5e1;">|</div>
-
                 <div>Atrasado (Vencido): <strong style="color: #ef4444;">{formatar_moeda(total_vencido_p)}</strong></div>
-
                 <div style="color: #cbd5e1;">|</div>
-
                 <div>Liquidados (Período): <strong style="color: #10b981;">{formatar_moeda(total_pago_mes_p)}</strong></div>
-
             </div>
 
             """, unsafe_allow_html=True)
@@ -1828,17 +1822,11 @@ try:
             st.markdown(f"""
 
             <div style="display: flex; gap: 20px; font-size: 0.95rem; color: #475569; margin-top: 5px; margin-bottom: 15px; background-color: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-
                 <div>Total a Receber (Global): <strong style="color: #2563eb;">{formatar_moeda(total_a_receber_r)}</strong></div>
-
                 <div style="color: #cbd5e1;">|</div>
-
                 <div>Atrasado (Vencido): <strong style="color: #ef4444;">{formatar_moeda(total_vencido_r)}</strong></div>
-
                 <div style="color: #cbd5e1;">|</div>
-
                 <div>Recebidos (Período): <strong style="color: #10b981;">{formatar_moeda(total_recebido_mes_r)}</strong></div>
-
             </div>
 
             """, unsafe_allow_html=True)
@@ -2350,21 +2338,13 @@ try:
             st.markdown(f"""
 
             <div style="display: flex; gap: 20px; font-size: 0.95rem; color: #475569; margin-top: 5px; margin-bottom: 15px; background-color: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-
                 <div>Saldo Atual: <strong style="color: #1e293b;">{formatar_moeda(saldo_atual_conta)}</strong></div>
-
                 <div style="color: #cbd5e1;">|</div>
-
                 <div>Entradas (Período): <strong style="color: #16a34a;">{formatar_moeda(total_entradas_periodo)}</strong></div>
-
                 <div style="color: #cbd5e1;">|</div>
-
                 <div>Saídas (Período): <strong style="color: #dc2626;">{formatar_moeda(total_saidas_periodo)}</strong></div>
-
                 <div style="color: #cbd5e1;">|</div>
-
                 <div>Resultado: <strong style="color: {color_res};">{formatar_moeda(resultado_periodo)}</strong></div>
-
             </div>
 
             """, unsafe_allow_html=True)
