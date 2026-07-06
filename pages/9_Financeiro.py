@@ -1958,9 +1958,7 @@ try:
             def clean_fatura_r(row):
                 desc = str(row['Fatura'])
                 if 'Venda #' in desc:
-                    m = re.search(r'\([^)]+-\s*(.*?)\)$', desc)
-                    if m:
-                        return m.group(1)
+                    return "-" # Ocultar info redundante para vendas automáticas
                 return desc
                 
             df_view_r['Fatura'] = df_view_r.apply(clean_fatura_r, axis=1)
