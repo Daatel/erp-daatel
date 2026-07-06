@@ -468,9 +468,9 @@ if st.session_state.itens_nf:
                                         desc = f"{tipo_doc} {p_num} | {fornecedor_sel}"
                                         cursor.execute("""
                                             INSERT INTO contas_a_pagar
-                                                (compra_id, fornecedor_id, plano_conta_id, descricao, valor, data_vencimento, status)
-                                            VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')
-                                        """, (compra_id, fid, plano_id, desc, p_val, d_str))
+                                                (compra_id, fornecedor_id, plano_conta_id, numero_documento, descricao, valor, data_vencimento, status)
+                                            VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDENTE')
+                                        """, (compra_id, fid, plano_id, str(p_num), desc, p_val, d_str))
 
                                     conn.commit()
 

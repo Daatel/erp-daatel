@@ -518,6 +518,7 @@ def _create_tables_internal(conn):
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS contas_a_pagar (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        numero_documento TEXT,
         compra_id INTEGER,
         fornecedor_id INTEGER,
         plano_conta_id INTEGER,
@@ -553,6 +554,7 @@ def _create_tables_internal(conn):
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS contas_a_receber (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        numero_documento TEXT,
         venda_id INTEGER,
         cliente_id INTEGER,
         plano_conta_id INTEGER,

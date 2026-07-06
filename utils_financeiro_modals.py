@@ -48,6 +48,7 @@ def dialog_lancar_pagar():
     if st.session_state.get("cap_limpar_formulario", False):
         st.session_state["cap_forn_sel"] = list(op_forn.keys())[0]
         st.session_state["cap_pc_sel"] = list(op_pc.keys())[0]
+        st.session_state["cap_num_doc_p"] = ""
         st.session_state["cap_desc_p"] = ""
         st.session_state["cap_val_p"] = 0.01
         st.session_state["cap_venc_p"] = date.today() + timedelta(days=30)
@@ -62,9 +63,10 @@ def dialog_lancar_pagar():
     forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()), key="cap_forn_sel")
     pc_sel = col_m2.selectbox("Plano de Contas (Planta de Custo)", list(op_pc.keys()), key="cap_pc_sel")
     
-    col_m3, col_m4 = st.columns([2, 1])
-    desc_p = col_m3.text_input("Descrição / Fatura (Ex: Nota Fiscal nº 123)", key="cap_desc_p")
-    val_p = col_m4.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0, key="cap_val_p")
+    col_m3, col_m4, col_mx = st.columns([1, 2, 1])
+    num_doc_p = col_m3.text_input("Nº Documento (Opcional)", value=st.session_state.get("cap_num_doc_p", ""), key="cap_num_doc_p")
+    desc_p = col_m4.text_input("Descrição / Fatura (Ex: Nota Fiscal nº 123)", value=st.session_state.get("cap_desc_p", ""), key="cap_desc_p")
+    val_p = col_mx.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0, key="cap_val_p")
     
     col_m5, col_m6 = st.columns(2)
     venc_p = col_m5.date_input("Vencimento (ou da 1ª Parcela)", date.today() + timedelta(days=30), key="cap_venc_p")
@@ -127,8 +129,8 @@ def dialog_lancar_pagar():
                         desc_final = f"{desc_p} ({i+1}/{n_parcelas})" if n_parcelas > 1 else desc_p
                         
                         run_query(
-                            "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
-                            (forn_id, pc_id, cli_id, desc_final, val_p, dt_venc.strftime("%Y-%m-%d"))
+                            "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, cliente_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                            (forn_id, pc_id, cli_id, num_doc_p, desc_final, val_p, dt_venc.strftime("%Y-%m-%d"))
                         )
                 
                 st.session_state["cap_clique_bloqueado"] = False
@@ -304,10 +306,11 @@ def dialog_editar_pagar(id_selecionado):
         ed1, ed2 = st.columns(2)
         novo_venc = ed1.date_input("Novo Vencimento", value=pd.to_datetime(dup_data['data_vencimento']).date())
         novo_valor = ed2.number_input("Novo Valor (R$)", value=valor_original, min_value=0.01)
+        novo_doc = st.text_input("Nº Documento", value=dup_data["numero_documento"] if dup_data["numero_documento"] else "")
         nova_desc = st.text_input("Descrição", value=dup_data['descricao'])
         if st.button("Salvar Alteração", type="primary"):
-            run_query("UPDATE contas_a_pagar SET data_vencimento=?, valor=?, descricao=? WHERE id=?",
-                        (novo_venc.strftime("%Y-%m-%d"), novo_valor, nova_desc, id_selecionado))
+            run_query("UPDATE contas_a_pagar SET data_vencimento=?, valor=?, descricao=?, numero_documento=? WHERE id=?",
+                        (novo_venc.strftime("%Y-%m-%d"), novo_valor, nova_desc, novo_doc, id_selecionado))
             st.success("Duplicata atualizada!")
             import time; time.sleep(1); st.rerun()
 
@@ -416,9 +419,10 @@ def dialog_lancar_receber():
     plan_sel = c2.selectbox("Plano de Contas", list(op_plan.keys()))
     venc = c3.date_input("Vencimento", date.today() + timedelta(days=15))
     
-    c4, c5 = st.columns([2, 1])
-    desc = c4.text_input("Fatura (No. NF, Parcela, Referência)")
-    val_r = c5.number_input("Valor da Fatura (R$)", min_value=0.01)
+    c4, c5, c6 = st.columns([1, 2, 1])
+    num_doc_r = c4.text_input("Nº Documento (Opcional)")
+    desc = c5.text_input("Fatura (Referência)")
+    val_r = c6.number_input("Valor da Fatura (R$)", min_value=0.01)
     
     if st.button("Lançar Promessa de Faturamento", type="primary", use_container_width=True):
         if cli_nome == "-- SELECIONE O CLIENTE --":
@@ -429,8 +433,8 @@ def dialog_lancar_receber():
             st.error("Preencha a descrição.")
         else:
             with st.spinner("Registrando recebível..."):
-                run_query("INSERT INTO contas_a_receber (cliente_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 'PENDENTE')",
-                          (op_cli[cli_nome], op_plan[plan_sel], desc, val_r, venc.strftime("%Y-%m-%d")))
+                run_query("INSERT INTO contas_a_receber (cliente_id, plano_conta_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                          (op_cli[cli_nome], op_plan[plan_sel], num_doc_r, desc, val_r, venc.strftime("%Y-%m-%d")))
             st.success("Boleto emitido (pendente)")
             import time; time.sleep(1); st.rerun()
 
@@ -652,10 +656,11 @@ def dialog_editar_receber(id_selecionado):
         else:
             novo_valor = ed2.number_input("Novo Valor (R$)", value=valor_original, min_value=0.01)
             
+        novo_doc = st.text_input("Nº Documento", value=rec_data["numero_documento"] if rec_data["numero_documento"] else "")
         nova_desc = st.text_input("Descrição", value=rec_data['descricao'])
         if st.button("Salvar Alteração", type="primary"):
-            run_query("UPDATE contas_a_receber SET data_vencimento=?, valor=?, descricao=? WHERE id=?",
-                      (novo_venc.strftime("%Y-%m-%d"), novo_valor, nova_desc, id_selecionado))
+            run_query("UPDATE contas_a_receber SET data_vencimento=?, valor=?, descricao=?, numero_documento=? WHERE id=?",
+                      (novo_venc.strftime("%Y-%m-%d"), novo_valor, nova_desc, novo_doc, id_selecionado))
             st.success("Recebível atualizado!")
             import time; time.sleep(1); st.rerun()
 

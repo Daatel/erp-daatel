@@ -467,8 +467,8 @@ with tab1:
                                 venc_str = venc_i.strftime("%Y-%m-%d") if hasattr(venc_i, 'strftime') else str(venc_i)
                                 desc_i = f"{tipo_doc} ({p['Parcela']}) - Venda #{pid} ({cli_nome} - {prod_nome})"
                                 
-                                run_query_tx(cursor, "INSERT INTO contas_a_receber (venda_id, cliente_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                          (pid, cli_id, pc_id, desc_i, val_i, venc_str, 'PENDENTE'))
+                                run_query_tx(cursor, "INSERT INTO contas_a_receber (venda_id, cliente_id, plano_conta_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                          (pid, cli_id, pc_id, tipo_doc, desc_i, val_i, venc_str, 'PENDENTE'))
                             
                             # 4. Acordos de Rede
                             custo_acordos = float(vd['custo_acordos_rede']) if pd.notnull(vd['custo_acordos_rede']) else 0.0
@@ -481,8 +481,8 @@ with tab1:
                                 p_c_acordo = fetch_all_tx(cursor, "SELECT id FROM planos_de_contas WHERE codigo = '2.2.2' OR nome LIKE '%Acordo%' OR nome LIKE '%Comiss%' LIMIT 1")
                                 pc_acord_id = int(p_c_acordo.iloc[0]['id']) if not p_c_acordo.empty else None
                                 
-                                run_query_tx(cursor, "INSERT INTO contas_a_pagar (plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 'PENDENTE')",
-                                          (pc_acord_id, cli_id, desc_acordo, custo_acordos, venc_acordo.strftime("%Y-%m-%d")))
+                                run_query_tx(cursor, "INSERT INTO contas_a_pagar (plano_conta_id, cliente_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                                          (pc_acord_id, cli_id, "Acordo/Rede", desc_acordo, custo_acordos, venc_acordo.strftime("%Y-%m-%d")))
                             
                             # 5. Taxa de Descarga
                             cli_taxa_df = fetch_all_tx(cursor, "SELECT taxa_descarga, regras_descarga, nome FROM clientes WHERE id=?", (cli_id,))
@@ -495,8 +495,8 @@ with tab1:
                                     p_c_descarga = fetch_all_tx(cursor, "SELECT id FROM planos_de_contas WHERE codigo = '2.1.5' OR nome LIKE '%Frete%' OR nome LIKE '%Descarga%' LIMIT 1")
                                     pc_desc_id = int(p_c_descarga.iloc[0]['id']) if not p_c_descarga.empty else None
                                     
-                                    run_query_tx(cursor, "INSERT INTO contas_a_pagar (plano_conta_id, cliente_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 'PENDENTE')",
-                                              (pc_desc_id, cli_id, desc_taxa, taxa_desc, date.today().strftime("%Y-%m-%d")))
+                                    run_query_tx(cursor, "INSERT INTO contas_a_pagar (plano_conta_id, cliente_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                                              (pc_desc_id, cli_id, "Taxa Descarga", desc_taxa, taxa_desc, date.today().strftime("%Y-%m-%d")))
                                     run_query_tx(cursor, "UPDATE vendas SET custo_descarga=? WHERE id=?", (taxa_desc, pid))
                                      
                             # 6. Comissão

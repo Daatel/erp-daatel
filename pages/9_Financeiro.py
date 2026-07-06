@@ -855,7 +855,7 @@ try:
                     is_disabled_p.append("Pagar?")
                     
                 edited_df_p = st.data_editor(
-                    df_view_p[['Pagar?', 'id', 'Fornecedor', 'Planta de Custo', 'Descrição/Fatura', 'Vencimento', 'Valor', 'Status', 'Data PGTO']],
+                    df_view_p[['Pagar?', 'id', 'Fornecedor', 'Nº Doc', 'Vencimento', 'Valor', 'Descrição/Fatura', 'Status', 'Data PGTO']],
                     hide_index=True,
                     disabled=is_disabled_p,
                     width="stretch",
@@ -986,7 +986,7 @@ try:
                     is_disabled_r.append("Receber?")
                     
                 edited_df_r = st.data_editor(
-                    df_view_r[['Receber?', 'id', 'Cliente', 'Fatura', 'Vencimento', 'Valor', 'Status', 'Recebido Em']],
+                    df_view_r[['Receber?', 'id', 'Cliente', 'Nº Doc', 'Vencimento', 'Valor', 'Fatura', 'Status', 'Recebido Em']],
                     hide_index=True,
                     disabled=is_disabled_r,
                     width="stretch",
