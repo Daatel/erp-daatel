@@ -91,7 +91,7 @@ def format_cnpj_cpf(doc):
         return ""
     return "".join(ch for ch in str(doc) if ch.isdigit())
 
-def enviar_faturamento_ao_bling(venda_id, cliente_id, produto_id, quantidade, valor_unitario, valor_total, lote, validade, parcelas):
+def enviar_faturamento_ao_bling(venda_id_ref, cliente_id, itens_list, lote, validade, parcelas, obs_extras=""):
     """Envia o pedido de faturamento para o Bling v3 como Pedido de Venda."""
     from database import fetch_all
     
@@ -101,12 +101,6 @@ def enviar_faturamento_ao_bling(venda_id, cliente_id, produto_id, quantidade, va
         raise ValueError(f"Cliente ID {cliente_id} nao encontrado no banco de dados.")
     cli_data = df_cli.iloc[0]
     
-    # Busca dados completos do produto
-    df_prod = fetch_all("SELECT nome, preco_venda_base, unidade_medida FROM produtos WHERE id = ?", (produto_id,))
-    if df_prod.empty:
-        raise ValueError(f"Produto ID {produto_id} nao encontrado no banco de dados.")
-    prod_data = df_prod.iloc[0]
-    
     # Prepara o documento do cliente
     doc_limpo = format_cnpj_cpf(cli_data['cnpj_cpf'])
     tipo_pessoa = "J" if len(doc_limpo) == 14 else "F"
@@ -114,7 +108,6 @@ def enviar_faturamento_ao_bling(venda_id, cliente_id, produto_id, quantidade, va
     # Formata as parcelas (installments)
     bling_parcelas = []
     for idx, p in enumerate(parcelas):
-        # A data vem em formato date ou str
         venc_val = p.get('Vencimento')
         venc_str = venc_val.strftime("%Y-%m-%d") if hasattr(venc_val, 'strftime') else str(venc_val)
         bling_parcelas.append({
@@ -122,30 +115,38 @@ def enviar_faturamento_ao_bling(venda_id, cliente_id, produto_id, quantidade, va
             "valor": round(float(p.get('Valor (R$)', 0.0)), 2)
         })
         
-    # Limpa a unidade de medida
-    unidade = str(prod_data['unidade_medida']).strip().upper()[:4]
-    if not unidade:
-        unidade = "UN"
+    bling_itens = []
+    for item in itens_list:
+        produto_id = item['produto_id']
+        df_prod = fetch_all("SELECT nome, preco_venda_base, unidade_medida FROM produtos WHERE id = ?", (produto_id,))
+        if df_prod.empty:
+            raise ValueError(f"Produto ID {produto_id} nao encontrado no banco de dados.")
+        prod_data = df_prod.iloc[0]
+        
+        unidade = str(prod_data['unidade_medida']).strip().upper()[:4]
+        if not unidade or unidade == "NONE":
+            unidade = "UN"
+            
+        bling_itens.append({
+            "codigo": f"PROD-{produto_id}",
+            "descricao": str(prod_data['nome'])[:120],
+            "quantidade": float(item['quantidade']),
+            "valor": float(item['valor_unitario']),
+            "unidade": unidade
+        })
         
     # Monta a estrutura do pedido de venda
+    # Usaremos venda_id_ref (que pode ser o ID do grupo) apenas para a observação e controle interno, o Bling vai gerar o ID dele.
+    
     payload = {
-        "numero": int(venda_id),
         "contato": {
             "nome": str(cli_data['nome'])[:120],
             "numeroDocumento": doc_limpo,
             "tipoPessoa": tipo_pessoa
         },
-        "itens": [
-            {
-                "codigo": f"PROD-{produto_id}",
-                "descricao": str(prod_data['nome'])[:120],
-                "quantidade": float(quantidade),
-                "valor": float(valor_unitario),
-                "unidade": unidade
-            }
-        ],
+        "itens": bling_itens,
         "parcelas": bling_parcelas,
-        "observacoes": f"Lote: {lote} | Validade: {validade} | Venda ERP #{venda_id}"
+        "observacoes": (f"Lote: {lote} | Validade: {validade} | Ref: {venda_id_ref}" + (f" | {obs_extras}" if obs_extras else ""))
     }
     
     # Envia para a API do Bling v3

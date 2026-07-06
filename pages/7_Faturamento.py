@@ -108,13 +108,14 @@ with tab1:
     df_fila = fetch_all('''
         SELECT v.id as pedido_id, v.data as data_pedido, c.nome as cliente, c.uf as uf_cliente, c.cnpj_cpf as cnpj_cliente,
                p.nome as produto, p.id as p_id, v.quantidade, v.valor_total, v.custo_acordos_rede,
-               v.forma_pagamento_id, fp.nome as forma_pagamento, fp.parcelas as rule_str
+               v.forma_pagamento_id, fp.nome as forma_pagamento, fp.parcelas as rule_str,
+               v.pedido_grupo, v.cliente_id
         FROM vendas v 
         JOIN clientes c ON v.cliente_id=c.id
         JOIN produtos p ON v.produto_id=p.id
         LEFT JOIN formas_pagamento fp ON v.forma_pagamento_id=fp.id
         WHERE v.status = 'APROVADO'
-        ORDER BY v.id ASC
+        ORDER BY v.pedido_grupo ASC, v.id ASC
     ''')
 
     if df_fila.empty:
@@ -147,6 +148,21 @@ with tab1:
         st.markdown("<div style='margin-top: -10px; margin-bottom: 10px; border-top: 1px solid #ccc;'></div>", unsafe_allow_html=True)
         
         import re
+        
+        # Montar nomenclatura visual do pedido_grupo (ex: 57.1, 57.2)
+        grupo_contadores = {}
+        pedido_labels = {}
+        for _, r in df_exibir_fila.iterrows():
+            grp = r['pedido_grupo']
+            pid = int(r['pedido_id'])
+            if grp and pd.notna(grp):
+                if grp not in grupo_contadores:
+                    grupo_contadores[grp] = 0
+                grupo_contadores[grp] += 1
+                pedido_labels[pid] = f"{grp}.{grupo_contadores[grp]}"
+            else:
+                pedido_labels[pid] = f"#{pid}"
+        
         for idx, row in df_exibir_fila.iterrows():
             pid = int(row['pedido_id'])
             p_id = int(row['p_id'])
@@ -177,7 +193,8 @@ with tab1:
             col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 2.2], vertical_alignment="center")
             
             faturar_check = col1.checkbox("Faturar", value=False, key=f"sel_{pid}", label_visibility="collapsed")
-            col2.markdown(f"#{pid}")
+            label_pedido = pedido_labels.get(pid, f"#{pid}")
+            col2.markdown(f"**{label_pedido}**")
             col3.markdown(cliente_nome)
             col4.markdown(cnpj_val)
             col5.markdown(format_brl(valor_total_pedido))
@@ -210,10 +227,14 @@ with tab1:
             st.markdown("<div style='margin-top: 5px; margin-bottom: 5px; border-top: 1px dashed #eee;'></div>", unsafe_allow_html=True)
             
             if faturar_check:
+                ped_grp = row['pedido_grupo'] if pd.notna(row.get('pedido_grupo')) else None
                 pedidos_selecionados_lista.append({
                     "pedido_id": pid,
+                    "pedido_grupo": ped_grp,
                     "cliente": cliente_nome,
+                    "cliente_id": int(row['cliente_id']),
                     "produto": prod_nome,
+                    "p_id": p_id,
                     "quantidade": qtd_pedida,
                     "valor_total": valor_total_pedido,
                     "Forma de Pagamento": cur_fp_nome,
@@ -246,23 +267,40 @@ with tab1:
             sobrescrever = col_f2.checkbox("Sobrescrever Vencimento do Cliente?")
             venc_boleto_override = col_f2.date_input("Vencimento Forçado", value=date.today() + timedelta(days=30)) if sobrescrever else None
             
-            # Lógica de geração de parcelas para a prévia
+            # Lógica de geração de parcelas para a prévia - AGRUPADA por pedido_grupo
             import re
             insts = []
             
+            # Agrupar os pedidos selecionados por pedido_grupo (ou por pedido_id individual se sem grupo)
+            grupos_faturamento = {}
             for _, row in pedidos_selecionados.iterrows():
                 pid = int(row['pedido_id'])
-                fp_nome = row['Forma de Pagamento']
-                v_total = float(df_fila[df_fila['pedido_id'] == pid].iloc[0]['valor_total'])
+                grp = row.get('pedido_grupo')
+                chave_grupo = str(grp) if grp and pd.notna(grp) else f"solo_{pid}"
+                if chave_grupo not in grupos_faturamento:
+                    grupos_faturamento[chave_grupo] = {
+                        "ids": [],
+                        "cliente": row['cliente'],
+                        "fp_nome": row['Forma de Pagamento'],
+                        "total": 0.0
+                    }
+                grupos_faturamento[chave_grupo]["ids"].append(pid)
+                grupos_faturamento[chave_grupo]["total"] += float(df_fila[df_fila['pedido_id'] == pid].iloc[0]['valor_total'])
+            
+            for chave_grupo, ginfo in grupos_faturamento.items():
+                v_total_grupo = ginfo["total"]
+                fp_nome = ginfo["fp_nome"]
+                label_grupo = chave_grupo if not chave_grupo.startswith("solo_") else f"#{ginfo['ids'][0]}"
                 
                 if sobrescrever:
                     insts.append({
-                        "Pedido ID": pid,
-                        "Cliente": row['cliente'],
+                        "Grupo": chave_grupo,
+                        "Pedido/Grupo": label_grupo,
+                        "Cliente": ginfo["cliente"],
                         "Parcela": "1/1",
                         "Vencimento": venc_boleto_override,
-                        "Valor (R$)": float(v_total),
-                        "Valor Original": float(v_total)
+                        "Valor (R$)": float(v_total_grupo),
+                        "Valor Original": float(v_total_grupo)
                     })
                 else:
                     rule_str = fp_rule_dict.get(fp_nome, "30")
@@ -271,19 +309,20 @@ with tab1:
                         dias_list = [0]
                     
                     N = len(dias_list)
-                    val_p = round(v_total / N, 2)
-                    diff_p = round(v_total - val_p * N, 2)
+                    val_p = round(v_total_grupo / N, 2)
+                    diff_p = round(v_total_grupo - val_p * N, 2)
                     
                     for i, dias in enumerate(dias_list):
                         v_p = val_p + (diff_p if i == N - 1 else 0.0)
                         dt_v = date.today() + timedelta(days=dias)
                         insts.append({
-                            "Pedido ID": pid,
-                            "Cliente": row['cliente'],
+                            "Grupo": chave_grupo,
+                            "Pedido/Grupo": label_grupo,
+                            "Cliente": ginfo["cliente"],
                             "Parcela": f"{i+1}/{N}",
                             "Vencimento": dt_v,
                             "Valor (R$)": float(v_p),
-                            "Valor Original": float(v_total)
+                            "Valor Original": float(v_total_grupo)
                         })
             
             # Cria uma chave única que inclui o ID de cada pedido e a Forma de Pagamento selecionada nele
@@ -305,7 +344,8 @@ with tab1:
                 df_insts,
                 hide_index=True,
                 column_config={
-                    "Pedido ID": st.column_config.NumberColumn("Pedido ID", disabled=True),
+                    "Grupo": st.column_config.TextColumn("Grupo", disabled=True),
+                    "Pedido/Grupo": st.column_config.TextColumn("Pedido/Grupo", disabled=True),
                     "Cliente": st.column_config.TextColumn("Cliente", disabled=True),
                     "Parcela": st.column_config.TextColumn("Parcela", disabled=True),
                     "Vencimento": st.column_config.DateColumn("Vencimento", required=True),
@@ -318,13 +358,14 @@ with tab1:
             st.session_state['parcelas_faturamento'] = edited_insts_df.to_dict('records')
             
             validacao_somas = True
-            for pid in df_insts['Pedido ID'].unique():
-                df_p = edited_insts_df[edited_insts_df['Pedido ID'] == pid]
+            for grp_key in df_insts['Grupo'].unique():
+                df_p = edited_insts_df[edited_insts_df['Grupo'] == grp_key]
                 orig_val = float(df_p.iloc[0]['Valor Original'])
                 soma_val = round(df_p['Valor (R$)'].sum(), 2)
+                label = df_p.iloc[0]['Pedido/Grupo']
                 if abs(orig_val - soma_val) > 0.01:
                     validacao_somas = False
-                    st.error(f"⚠️ **Erro no Pedido #{pid}:** A soma das parcelas (R$ {soma_val:,.2f}) não é igual ao total original (R$ {orig_val:,.2f}). Diferença: R$ {round(orig_val - soma_val, 2):,.2f}")
+                    st.error(f"**Erro no Grupo {label}:** A soma das parcelas (R$ {soma_val:,.2f}) nao e igual ao total original (R$ {orig_val:,.2f}). Diferenca: R$ {round(orig_val - soma_val, 2):,.2f}")
 
             def simular_emissao_sefaz_with_retry(venda_id, cliente_nome, valor, max_retries=3):
                 import random
@@ -349,7 +390,7 @@ with tab1:
                         status_placeholder.warning(f"⚠️ Tentativa {attempt} falhou ({str(e)}). Retentando em {sleep_time:.2f}s...")
                         time.sleep(sleep_time)
 
-            if col_f3.button("📦 Processar Faturamento Selecionado", type="primary", use_container_width=True, disabled=not validacao_somas):
+            if col_f3.button("Processar Faturamento Selecionado", type="primary", use_container_width=True, disabled=not validacao_somas):
                 p_c = fetch_all("SELECT id FROM planos_de_contas WHERE categoria LIKE '%Receita%' LIMIT 1")
                 pc_id = int(p_c.iloc[0]['id']) if not p_c.empty else None
                 
@@ -357,7 +398,7 @@ with tab1:
                 qtd_processada = 0
                 
                 try:
-                    # Envolve tudo em uma transação atômica
+                    # Envolve tudo em uma transacao atomica
                     with db_transaction() as conn:
                         cursor = conn.cursor()
                         
@@ -366,14 +407,94 @@ with tab1:
                         modo = _get_modo_estoque(cursor, is_pg)
                         alertas_custo_ausente = []
                         
+                        # === FASE 1: AGRUPAR por pedido_grupo para NF/DAV/Financeiro ===
+                        grupos_proc = {}
                         for _, row in pedidos_selecionados.iterrows():
                             pid = int(row['pedido_id'])
+                            grp = row.get('pedido_grupo')
+                            chave = str(grp) if grp and pd.notna(grp) else f"solo_{pid}"
+                            if chave not in grupos_proc:
+                                grupos_proc[chave] = []
+                            grupos_proc[chave].append(row)
+                        
+                        dav_numeros_grupo = {}
+                        bling_ids_grupo = {}
+                        
+                        for chave_grupo, rows_grupo in grupos_proc.items():
+                            first_row = rows_grupo[0]
+                            primeiro_pid = int(first_row['pedido_id'])
+                            cli_id_grupo = int(first_row['cliente_id'])
+                            lote_impresso = first_row.get('Lote Impresso (NF/DAV)', '')
+                            validade_impressa = first_row.get('Validade (NF/DAV)', '')
                             
-                            # Pega detalhes originais da venda para o DB
+                            # --- DAV: Gerar 1 unico numero para todo o grupo ---
+                            if "DAV" in tipo_doc:
+                                df_dav_max = fetch_all_tx(cursor, "SELECT MAX(CAST(numero_documento AS INTEGER)) as max_dav FROM vendas WHERE tipo_documento LIKE '%DAV%'")
+                                max_dav = df_dav_max.iloc[0]['max_dav'] if not df_dav_max.empty and pd.notna(df_dav_max.iloc[0]['max_dav']) else 0
+                                novo_dav = int(max_dav) + 1
+                                dav_numeros_grupo[chave_grupo] = f"{novo_dav:010d}"
+                            
+                            # --- NF (Bling): Enviar 1 unica NF consolidada ---
+                            if "Nota Fiscal" in tipo_doc:
+                                from utils_bling import enviar_faturamento_ao_bling
+                                
+                                itens_bling = []
+                                for r in rows_grupo:
+                                    itens_bling.append({
+                                        'produto_id': int(r['p_id']),
+                                        'quantidade': float(r['quantidade']),
+                                        'valor_unitario': float(r['valor_total']) / float(r['quantidade']) if float(r['quantidade']) > 0 else 0
+                                    })
+                                
+                                vd_first = fetch_all_tx(cursor, "SELECT flag_op_casada, filial_atacadao, pedido_atacadao_numero FROM vendas WHERE id=?", (primeiro_pid,))
+                                obs_extras_grupo = ""
+                                if not vd_first.empty:
+                                    vf = vd_first.iloc[0]
+                                    if bool(vf.get('flag_op_casada')):
+                                        obs_extras_grupo = f"Operacao Casada - Filial: {vf.get('filial_atacadao','')} - Pedido Interno: {vf.get('pedido_atacadao_numero','')}"
+                                
+                                insts_grupo = [p for p in st.session_state['parcelas_faturamento'] if p.get('Grupo') == chave_grupo]
+                                
+                                bling_id = enviar_faturamento_ao_bling(
+                                    venda_id_ref=f"Grupo-{chave_grupo}",
+                                    cliente_id=cli_id_grupo,
+                                    itens_list=itens_bling,
+                                    lote=lote_impresso,
+                                    validade=validade_impressa,
+                                    parcelas=insts_grupo,
+                                    obs_extras=obs_extras_grupo
+                                )
+                                bling_ids_grupo[chave_grupo] = bling_id
+                            
+                            # --- FINANCEIRO: Gerar duplicatas consolidadas por grupo ---
+                            insts_grupo = [p for p in st.session_state['parcelas_faturamento'] if p.get('Grupo') == chave_grupo]
+                            
+                            fp_sel_nome = first_row['Forma de Pagamento']
+                            df_fp_sel = fetch_all_tx(cursor, "SELECT id FROM formas_pagamento WHERE nome=?", (fp_sel_nome,))
+                            fp_id_val = int(df_fp_sel.iloc[0]['id']) if not df_fp_sel.empty else None
+                            
+                            prods_desc = ", ".join([r['produto'] for r in rows_grupo])
+                            cli_nome_grupo = first_row['cliente']
+                            
+                            for p in insts_grupo:
+                                val_i = float(p['Valor (R$)'])
+                                venc_i = p['Vencimento']
+                                venc_str = venc_i.strftime("%Y-%m-%d") if hasattr(venc_i, 'strftime') else str(venc_i)
+                                desc_i = f"{tipo_doc} ({p['Parcela']}) - Grupo {chave_grupo} ({cli_nome_grupo} - {prods_desc})"
+                                
+                                run_query_tx(cursor, "INSERT INTO contas_a_receber (venda_id, cliente_id, plano_conta_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                          (primeiro_pid, cli_id_grupo, pc_id, tipo_doc, desc_i, val_i, venc_str, 'PENDENTE'))
+                        
+                        # === FASE 2: PROCESSAR CADA ITEM INDIVIDUALMENTE ===
+                        for _, row in pedidos_selecionados.iterrows():
+                            pid = int(row['pedido_id'])
+                            grp = row.get('pedido_grupo')
+                            chave = str(grp) if grp and pd.notna(grp) else f"solo_{pid}"
+                            
                             vd_df = fetch_all_tx(cursor, '''
                                 SELECT v.id as pedido_id, v.data as data_pedido, c.nome as cliente, c.uf as uf_cliente, 
                                        p.nome as produto, p.id as p_id, v.quantidade, v.valor_total, v.custo_acordos_rede,
-                                       v.cliente_id
+                                       v.cliente_id, v.flag_op_casada, v.filial_atacadao, v.pedido_atacadao_numero
                                 FROM vendas v 
                                 JOIN clientes c ON v.cliente_id=c.id
                                 JOIN produtos p ON v.produto_id=p.id
@@ -384,56 +505,36 @@ with tab1:
                                 continue
                             
                             vd = vd_df.iloc[0]
-                            v_total = float(vd['valor_total'])
-                            cli_nome = vd['cliente']
                             prod_nome = vd['produto']
                             prod_id = int(vd['p_id'])
                             qtd = float(vd['quantidade'])
+                            cli_id = int(vd['cliente_id'])
+                            cli_nome = vd['cliente']
                             
                             lote_impresso = row.get('Lote Impresso (NF/DAV)', '')
                             validade_impressa = row.get('Validade (NF/DAV)', '')
                             
-                            # Se for Nota Fiscal, transmite para o Bling e salva o ID retornado
-                            bling_id = None
-                            if "Nota Fiscal" in tipo_doc:
-                                from utils_bling import enviar_faturamento_ao_bling
-                                # Precisamos buscar a forma de pagamento selecionada no grid para repassar
-                                row_grid = pedidos_selecionados[pedidos_selecionados['pedido_id'] == pid].iloc[0]
-                                fp_sel_nome = row_grid['Forma de Pagamento']
-                                
-                                insts_pedido = [p for p in st.session_state['parcelas_faturamento'] if p['Pedido ID'] == pid]
-                                
-                                # Envia para o Bling
-                                bling_id = enviar_faturamento_ao_bling(
-                                    venda_id=pid,
-                                    cliente_id=int(vd['cliente_id']),
-                                    produto_id=int(vd['p_id']),
-                                    quantidade=float(vd['quantidade']),
-                                    valor_unitario=float(vd['valor_total']) / float(vd['quantidade']),
-                                    valor_total=float(vd['valor_total']),
-                                    lote=lote_impresso,
-                                    validade=validade_impressa,
-                                    parcelas=insts_pedido
-                                )
+                            fp_sel_nome = row['Forma de Pagamento']
+                            df_fp_sel = fetch_all_tx(cursor, "SELECT id FROM formas_pagamento WHERE nome=?", (fp_sel_nome,))
+                            fp_id_val = int(df_fp_sel.iloc[0]['id']) if not df_fp_sel.empty else None
+                            run_query_tx(cursor, "UPDATE vendas SET forma_pagamento_id=? WHERE id=?", (fp_id_val, pid))
                             
-                            # 1. Muda Status da Venda e Numeração (DAV ou Bling ID)
+                            # 1. Status + Numeracao DO GRUPO
                             if "DAV" in tipo_doc:
-                                df_dav_max = fetch_all_tx(cursor, "SELECT MAX(CAST(numero_documento AS INTEGER)) as max_dav FROM vendas WHERE tipo_documento LIKE '%DAV%'")
-                                max_dav = df_dav_max.iloc[0]['max_dav'] if not df_dav_max.empty and pd.notna(df_dav_max.iloc[0]['max_dav']) else 0
-                                novo_dav = int(max_dav) + 1
-                                dav_str = f"{novo_dav:010d}"
+                                dav_str = dav_numeros_grupo.get(chave, "0000000000")
                                 run_query_tx(cursor, "UPDATE vendas SET status='FATURADO', tipo_documento=?, numero_documento=?, lote_impresso=?, validade_impressa=? WHERE id=?", (tipo_doc, dav_str, lote_impresso, validade_impressa, pid))
                             else:
+                                bling_id = bling_ids_grupo.get(chave)
                                 doc_num = f"Bling #{bling_id}" if bling_id else ""
                                 run_query_tx(cursor, "UPDATE vendas SET status='FATURADO', tipo_documento=?, numero_documento=?, lote_impresso=?, validade_impressa=? WHERE id=?", (tipo_doc, doc_num, lote_impresso, validade_impressa, pid))
                             
-                            # 2. Baixa de Estoque via FIFO na transação
+                            # 2. Baixa de Estoque via FIFO
                             custo_cmv_real, is_estimado, cmv_metodo, custo_ausente = consumir_estoque_fifo_tx(
                                 cursor=cursor,
                                 produto_id=prod_id,
                                 quantidade=qtd,
                                 data_mov=date.today().strftime("%Y-%m-%d"),
-                                origem=f'Expedição {tipo_doc}',
+                                origem=f'Expedicao {tipo_doc}',
                                 doc_ref=f"Venda Lote #{pid}",
                                 modo_estoque=modo
                             )
@@ -443,40 +544,13 @@ with tab1:
                             if custo_ausente:
                                 alertas_custo_ausente.append(prod_nome)
                             
-                            if is_estimado and cmv_metodo != 'SIMPLIFICADO':
-                                st.warning(f"⚠️ O CMV do Pedido #{pid} ({cli_nome}) foi estimado por falta de lote correspondente no estoque (Estoque Negativo).")
-                            
-                            # 3. Lançamento Financeiro
-                            cli_id = int(vd['cliente_id'])
-                            
-                            # Obter parcelas customizadas salvas
-                            insts_pedido = [p for p in st.session_state['parcelas_faturamento'] if p['Pedido ID'] == pid]
-                            
-                            # Pegar ID da Forma de Pagamento selecionada no grid
-                            row_grid = pedidos_selecionados[pedidos_selecionados['pedido_id'] == pid].iloc[0]
-                            fp_sel_nome = row_grid['Forma de Pagamento']
-                            df_fp_sel = fetch_all_tx(cursor, "SELECT id FROM formas_pagamento WHERE nome=?", (fp_sel_nome,))
-                            fp_id_val = int(df_fp_sel.iloc[0]['id']) if not df_fp_sel.empty else None
-                            
-                            # Atualizar forma de pagamento id no pedido
-                            run_query_tx(cursor, "UPDATE vendas SET forma_pagamento_id=? WHERE id=?", (fp_id_val, pid))
-                            
-                            for p in insts_pedido:
-                                val_i = float(p['Valor (R$)'])
-                                venc_i = p['Vencimento']
-                                venc_str = venc_i.strftime("%Y-%m-%d") if hasattr(venc_i, 'strftime') else str(venc_i)
-                                desc_i = f"{tipo_doc} ({p['Parcela']}) - Venda #{pid} ({cli_nome} - {prod_nome})"
-                                
-                                run_query_tx(cursor, "INSERT INTO contas_a_receber (venda_id, cliente_id, plano_conta_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                          (pid, cli_id, pc_id, tipo_doc, desc_i, val_i, venc_str, 'PENDENTE'))
-                            
-                            # 4. Acordos de Rede
+                            # 3. Acordos de Rede
                             custo_acordos = float(vd['custo_acordos_rede']) if pd.notnull(vd['custo_acordos_rede']) else 0.0
                             if custo_acordos > 0:
                                 venc_acordo = date.today() + timedelta(days=30)
                                 cli_rede_df = fetch_all_tx(cursor, "SELECT rede_clientes FROM clientes WHERE id=?", (cli_id,))
                                 rede_str = cli_rede_df.iloc[0]['rede_clientes'] if not cli_rede_df.empty and cli_rede_df.iloc[0]['rede_clientes'] else "Rede Desconhecida"
-                                desc_acordo = f"Repasse Acordo Comercial (Contrato/Logística): REDE {str(rede_str).upper()} - Venda #{pid}"
+                                desc_acordo = f"Repasse Acordo Comercial: REDE {str(rede_str).upper()} - Venda #{pid}"
                                 
                                 p_c_acordo = fetch_all_tx(cursor, "SELECT id FROM planos_de_contas WHERE codigo = '2.2.2' OR nome LIKE '%Acordo%' OR nome LIKE '%Comiss%' LIMIT 1")
                                 pc_acord_id = int(p_c_acordo.iloc[0]['id']) if not p_c_acordo.empty else None
@@ -484,12 +558,12 @@ with tab1:
                                 run_query_tx(cursor, "INSERT INTO contas_a_pagar (plano_conta_id, cliente_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
                                           (pc_acord_id, cli_id, "Acordo/Rede", desc_acordo, custo_acordos, venc_acordo.strftime("%Y-%m-%d")))
                             
-                            # 5. Taxa de Descarga
+                            # 4. Taxa de Descarga
                             cli_taxa_df = fetch_all_tx(cursor, "SELECT taxa_descarga, regras_descarga, nome FROM clientes WHERE id=?", (cli_id,))
                             if not cli_taxa_df.empty:
                                 taxa_desc = float(cli_taxa_df.iloc[0]['taxa_descarga'] or 0.0)
                                 if taxa_desc > 0:
-                                    regra_str = cli_taxa_df.iloc[0]['regras_descarga'] or "Sem regras específicas"
+                                    regra_str = cli_taxa_df.iloc[0]['regras_descarga'] or "Sem regras especificas"
                                     desc_taxa = f"Taxa de Descarga CD - {cli_nome} - Venda #{pid} | Regra: {regra_str}"
                                     
                                     p_c_descarga = fetch_all_tx(cursor, "SELECT id FROM planos_de_contas WHERE codigo = '2.1.5' OR nome LIKE '%Frete%' OR nome LIKE '%Descarga%' LIMIT 1")
@@ -499,7 +573,7 @@ with tab1:
                                               (pc_desc_id, cli_id, "Taxa Descarga", desc_taxa, taxa_desc, date.today().strftime("%Y-%m-%d")))
                                     run_query_tx(cursor, "UPDATE vendas SET custo_descarga=? WHERE id=?", (taxa_desc, pid))
                                      
-                            # 6. Comissão
+                            # 5. Comissao
                             gerar_comissao_se_necessario_tx(cursor, pid, 'FATURAMENTO', cli_nome)
                         
                         qtd_processada = len(pedidos_selecionados)
@@ -511,7 +585,16 @@ with tab1:
                 if sucesso:
                     st.success(f"✅ {qtd_processada} Pedido(s) Faturados com Sucesso! Estoque e Financeiro atualizados de forma consistente.")
                     if "DAV" in tipo_doc:
-                        st.session_state['pedidos_dav_faturados'] = [int(row['pedido_id']) for _, row in pedidos_selecionados.iterrows()]
+                        # Passar apenas 1 ID por grupo para evitar DAVs duplicados
+                        ids_para_dav = []
+                        grupos_ja_adicionados = set()
+                        for _, row in pedidos_selecionados.iterrows():
+                            grp = row.get('pedido_grupo')
+                            chave = str(grp) if grp and pd.notna(grp) else f"solo_{int(row['pedido_id'])}"
+                            if chave not in grupos_ja_adicionados:
+                                grupos_ja_adicionados.add(chave)
+                                ids_para_dav.append(int(row['pedido_id']))
+                        st.session_state['pedidos_dav_faturados'] = ids_para_dav
                     
                     if alertas_custo_ausente:
                         produtos_unicos = ", ".join(sorted(set(alertas_custo_ausente)))

@@ -155,6 +155,15 @@ with tab1:
             st.info(f"💡 Origem do Preço Aplicado: **{origem_preco}**")
             preco = col5.number_input("Preço Unitário Fechado (R$)", min_value=0.0, value=preco_tabela, step=0.1, key="preco_venda")
         
+        st.markdown("---")
+        flag_op_casada = st.checkbox("Pedido de Repasse / Operação Casada (ex: Horta do Príncipe para Atacadão)")
+        filial_atacadao = ""
+        pedido_atacadao_numero = ""
+        if flag_op_casada:
+            col_op1, col_op2 = st.columns(2)
+            filial_atacadao = col_op1.text_input("Filial Destino (Atacadão):", placeholder="Ex: Niterói")
+            pedido_atacadao_numero = col_op2.text_input("Nº Pedido Interno (Grade Atacadão):", placeholder="Ex: 88231")
+
         if st.button("➕ Adicionar ao Pedido", type="secondary", use_container_width=True):
             cli = c_opts[cliente_sel]
             ven = v_opts[vendedor_sel]
@@ -193,7 +202,10 @@ with tab1:
                 "tipo_item": tipo_item,
                 "is_bonificacao": is_bonif,
                 "comissao_valor": float(com_val),
-                "custo_acordos_rede": float(custo_acordos)
+                "custo_acordos_rede": float(custo_acordos),
+                "flag_op_casada": flag_op_casada,
+                "filial_atacadao": filial_atacadao,
+                "pedido_atacadao_numero": pedido_atacadao_numero
             })
             
             st.session_state['carrinho_cliente_nome'] = cliente_sel
@@ -280,12 +292,25 @@ with tab1:
                 fp_id_val = st.session_state['carrinho_fp_id']
                 
                 vids_criados = []
+                
+                # Gerar o pedido_grupo (Número do Pedido Pai)
+                # Pega o maior id de vendas atual e soma 1 para usar como grupo base
+                df_max = fetch_all("SELECT MAX(id) as max_id FROM vendas")
+                next_group_id = int(df_max.iloc[0]['max_id']) + 1 if not df_max.empty and pd.notna(df_max.iloc[0]['max_id']) else 1
+                pedido_grupo_val = str(next_group_id)
+                
                 for item in st.session_state['carrinho_venda']:
                     run_query(
                         """INSERT INTO vendas 
-                           (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, comissao_valor, custo_acordos_rede, is_bonificacao, status, forma_pagamento_id) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO', ?)""",
-                        (data_v.strftime("%Y-%m-%d"), cli['id'], ven['id'], item['produto_id'], item['quantidade'], item['valor_unitario'], item['valor_total'], item['comissao_valor'], item['custo_acordos_rede'], item['is_bonificacao'], fp_id_val)
+                           (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, 
+                            comissao_valor, custo_acordos_rede, is_bonificacao, status, forma_pagamento_id, 
+                            flag_op_casada, filial_atacadao, pedido_atacadao_numero, pedido_grupo) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO', ?, ?, ?, ?, ?)""",
+                        (data_v.strftime("%Y-%m-%d"), cli['id'], ven['id'], item['produto_id'], 
+                         item['quantidade'], item['valor_unitario'], item['valor_total'], item['comissao_valor'], 
+                         item['custo_acordos_rede'], item['is_bonificacao'], fp_id_val, 
+                         item.get('flag_op_casada', False), item.get('filial_atacadao', ''), 
+                         item.get('pedido_atacadao_numero', ''), pedido_grupo_val)
                     )
                     v_id_df = fetch_all("SELECT MAX(id) as lg FROM vendas")
                     vids_criados.append(str(int(v_id_df.iloc[0]['lg'])))
@@ -511,7 +536,7 @@ with tab2:
                 # Puxa informações detalhadas dessa venda
                 v_det = fetch_all('''
                     SELECT v.id, v.quantidade, v.valor_unitario, v.valor_total, v.vendedor_id, v.produto_id, v.cliente_id,
-                           v.forma_pagamento_id, p.nome as produto, c.nome as cliente
+                           v.forma_pagamento_id, v.flag_op_casada, v.filial_atacadao, v.pedido_atacadao_numero, p.nome as produto, c.nome as cliente
                     FROM vendas v
                     JOIN produtos p ON v.produto_id = p.id
                     JOIN clientes c ON v.cliente_id = c.id
@@ -540,6 +565,17 @@ with tab2:
                                 
                     new_fp_sel = st.selectbox("Nova Forma de Pagamento:", fp_list_edit, index=fp_default_index_edit, key=f"edit_fp_{v_id}")
                     new_fp_id = fp_opts_edit.get(new_fp_sel)
+                    
+                    st.markdown("---")
+                    st.markdown("#### Repasse / Operação Casada")
+                    edit_op_casada = st.checkbox("Operação Casada (Atacadão)", value=bool(v_det.get('flag_op_casada')), key=f"edit_flag_{v_id}")
+                    edit_filial = ""
+                    edit_pedido_int = ""
+                    if edit_op_casada:
+                        col_e1, col_e2 = st.columns(2)
+                        edit_filial = col_e1.text_input("Filial Destino:", value=v_det.get('filial_atacadao') or "", key=f"edit_filial_{v_id}")
+                        edit_pedido_int = col_e2.text_input("Nº Pedido Interno:", value=v_det.get('pedido_atacadao_numero') or "", key=f"edit_pedido_int_{v_id}")
+
                     
                     if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"btn_save_edit_{v_id}"):
                         new_total = new_qtd * new_price
@@ -572,9 +608,9 @@ with tab2:
                         # Executa atualização no banco
                         run_query('''
                             UPDATE vendas 
-                            SET quantidade = ?, valor_unitario = ?, valor_total = ?, comissao_valor = ?, custo_acordos_rede = ?, forma_pagamento_id = ?
+                            SET quantidade = ?, valor_unitario = ?, valor_total = ?, comissao_valor = ?, custo_acordos_rede = ?, forma_pagamento_id = ?, flag_op_casada = ?, filial_atacadao = ?, pedido_atacadao_numero = ?
                             WHERE id = ?
-                        ''', (new_qtd, new_price, new_total, new_comissao, new_acordos, new_fp_id, v_id))
+                        ''', (new_qtd, new_price, new_total, new_comissao, new_acordos, new_fp_id, edit_op_casada, edit_filial, edit_pedido_int, v_id))
                         
                         st.success(f"✅ Pedido #{v_id} atualizado com sucesso! Novo total: {format_brl(new_total)}")
                         import time; time.sleep(1.5); st.rerun()

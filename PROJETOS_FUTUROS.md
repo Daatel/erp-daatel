@@ -51,3 +51,14 @@ Abaixo está o mapeamento dos locais e respectivos emojis que foram removidos da
 - **Objetivo:** Implementar o Kanban interativo (drag-and-drop) de pedidos de produção baseado na especificação `MD_Kanban_de_pedidos.MD` e no mockup `kanban_pedidos_producao_v3.html`.
 - **Escopo Técnico:** Requer a criação de novas colunas e tabelas no Supabase (`data_prevista`, `grade_id`, etc.), configuração de Edge Functions (`mover-pedido`) para gerenciar as permissões e atualização de banco, e injeção do componente de interface Kanban no front-end Streamlit utilizando JavaScript vanilla e SortableJS.
 - **Status:** Arquivado para o futuro devido ao elevado esforço técnico (estimativa de 4 a 6 horas) envolvendo manipulação simultânea de SQL, Serverless Functions (Deno) e integrações reativas de Front-end com JWT auth.
+
+
+## Transicao para Arquitetura SaaS (Longo Prazo)
+- **Objetivo:** Refatorar o ERP monolito atual para uma arquitetura Multi-Tenant escalavel na nuvem.
+- **Motivacao:** A arquitetura atual (Streamlit + Banco Flat) atende perfeitamente a uma operacao single-company, mas estruturalmente obriga adocao de dividas tecnicas (como agrupar multiplos itens em registros de vendas individuais). Para suportar multiplas empresas (SaaS) no futuro, o sistema inteiro precisa ser repensado do zero.
+- **Arquitetura Proposta:**
+  - **Banco de Dados:** Migracao para PostgreSQL Multi-Tenant (utilizando Row-Level Security com tenant_id em todas as tabelas) e separacao estrutural de vendas (cabecalho) e itens_venda (detalhes).
+  - **Backend:** Separacao do front-end e criacao de uma API robusta em FastAPI (Python) ou Node.js para regras de negocio e integracoes pesadas.
+  - **Frontend:** Substituicao do Streamlit por um framework SPA moderno (React/Next.js ou Vue.js), proporcionando interfaces assincronas de alta performance para dezenas de usuarios concorrentes.
+  - **Infraestrutura:** Hospedagem baseada em containers (Docker/Kubernetes) ou arquitetura Serverless para escalar automaticamente durante picos de faturamento no final do mes.
+- **Status:** Decisao estrategica registrada. Sera executada quando o produto evoluir para modelo SaaS comercial.

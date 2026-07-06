@@ -7,10 +7,27 @@ def f_b(val):
     return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def buscar_dados_venda(venda_id):
-    # Busca a venda
-    df_venda = fetch_all("""
+    # Primeiro busca a venda base para saber o numero_documento
+    df_base = fetch_all("SELECT numero_documento, pedido_grupo FROM vendas WHERE id = ?", (venda_id,))
+    if df_base.empty: return None
+    
+    num_doc = df_base.iloc[0]['numero_documento']
+    ped_grp = df_base.iloc[0]['pedido_grupo']
+    
+    # Se tiver pedido_grupo, busca todos os itens desse grupo
+    if ped_grp:
+        query_where = "v.pedido_grupo = ?"
+        param = ped_grp
+    elif num_doc:
+        query_where = "v.numero_documento = ?"
+        param = num_doc
+    else:
+        query_where = "v.id = ?"
+        param = venda_id
+
+    df_venda = fetch_all(f"""
         SELECT v.id, v.data, v.quantidade, v.valor_unitario, v.valor_total, 
-               v.custo_frete_rateado, v.numero_documento, v.tipo_documento,
+               v.custo_frete_rateado, v.numero_documento, v.tipo_documento, v.pedido_grupo,
                c.nome as cliente_nome, c.cnpj_cpf as cliente_cnpj, c.uf as uf, c.status,
                p.nome as produto_nome, p.id as p_id,
                f.nome as vendedor_nome
@@ -18,13 +35,13 @@ def buscar_dados_venda(venda_id):
         JOIN clientes c ON v.cliente_id = c.id
         JOIN produtos p ON v.produto_id = p.id
         LEFT JOIN funcionarios f ON v.vendedor_id = f.id
-        WHERE v.id = ?
-    """, (venda_id,))
+        WHERE {query_where}
+    """, (param,))
     
     if df_venda.empty:
         return None
         
-    row = df_venda.iloc[0]
+    row = df_venda.iloc[0] # Pega dados do cabeçalho do primeiro item
     
     # Conversão de data/hora
     dt_obj = pd.to_datetime(row['data'], errors='coerce')
@@ -32,8 +49,26 @@ def buscar_dados_venda(venda_id):
     hora_str = dt_obj.strftime('%H:%M:%S') if pd.notna(dt_obj) else "00:00:00"
     validade_str = (dt_obj + timedelta(days=30)).strftime('%d/%m/%Y') if pd.notna(dt_obj) else ""
     
-    # Prepara o dict (tentando simular um CNPJ com fantasia e detalhes)
-    # Como não temos fantasia/endereço no db atual de forma granular, usaremos placeholders vazios ou o que tivermos.
+    produtos = []
+    total_qtd = 0.0
+    subtotal = 0.0
+    frete_total = 0.0
+    
+    for _, item in df_venda.iterrows():
+        produtos.append({
+            'cod': str(item['p_id']).zfill(3), 
+            'cod_barras': str(item['p_id']), 
+            'desc': item['produto_nome'], 
+            'qtd': f_b(item['quantidade']), 
+            'med': 'KG', 
+            'unit': f_b(item['valor_unitario']), 
+            'desc_valor': '0,00', 
+            'total': f_b(item['valor_total'])
+        })
+        total_qtd += float(item['quantidade'] or 0)
+        subtotal += float(item['valor_total'] or 0)
+        frete_total += float(item['custo_frete_rateado'] or 0)
+    
     venda_info = {
         'tipo_documento': row['tipo_documento'] or "",
         'dav_numero': str(row['numero_documento'] or "").zfill(10),
@@ -52,26 +87,14 @@ def buscar_dados_venda(venda_id):
         'cliente_bairro': "CENTRO",
         'cliente_cidade_uf': f"CIDADE / {row['uf']}",
         'celular': "",
-        'produtos': [
-            {
-                'cod': str(row['p_id']).zfill(3), 
-                'cod_barras': str(row['p_id']), 
-                'desc': row['produto_nome'], 
-                'qtd': f_b(row['quantidade']), 
-                'med': 'KG', 
-                'unit': f_b(row['valor_unitario']), 
-                'desc_valor': '0,00', 
-                'total': f_b(row['valor_total'])
-            }
-        ],
-        'total_qtd': f_b(row['quantidade']),
-        'subtotal': f_b(row['valor_total']),
+        'produtos': produtos,
+        'total_qtd': f_b(total_qtd),
+        'subtotal': f_b(subtotal),
         'desconto_total': '0,00',
-        'frete': f_b(row.get('custo_frete_rateado', 0.0)),
-        'total': f_b(row['valor_total'])
+        'frete': f_b(frete_total),
+        'total': f_b(subtotal)
     }
     return venda_info
-
 def gerar_html_dav(info):
     linhas_prod = ""
     for p in info['produtos']:
