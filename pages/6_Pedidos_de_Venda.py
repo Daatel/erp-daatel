@@ -399,8 +399,8 @@ with tab_pedidos:
     # Query de busca
     query_pedidos = '''
         SELECT v.id as 'pedido_id', v.data as 'data_pedido', 
-               COALESCE(c.nome_fantasia, c.nome) as 'cliente_nome', 
-               vn.nome as 'vendedor_nome', p.nome as 'produto_nome', v.quantidade as 'quantidade', 
+               COALESCE(c.nome_fantasia, c.nome) as 'cliente_name', 
+               vn.nome as 'vendedor_name', p.nome as 'produto_name', v.quantidade as 'quantidade', 
                v.valor_total as 'valor_total', fp.nome as 'forma_pagamento', v.status as 'status_pedido',
                v.tipo_documento, v.numero_documento, v.pedido_grupo,
                v.flag_op_casada, v.filial_atacadao, v.pedido_atacadao_numero
