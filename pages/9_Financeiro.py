@@ -1669,6 +1669,19 @@ try:
                     return f"{doc} - {m.group(1)}"
                 return doc
             df_view_p['N. Doc'] = df_view_p.apply(format_doc_p, axis=1)
+            
+            def clean_fatura_p(row):
+                desc = str(row['Descrição/Fatura'])
+                if 'Venda #' in desc and 'Descarga' not in desc and 'Acordo' not in desc:
+                     m = re.search(r'\([^)]+-\s*(.*?)\)$', desc)
+                     if m:
+                         return m.group(1)
+                elif 'Acerto Rota/Manifesto' in desc:
+                     return 'Acerto Rota/Manifesto'
+                return desc
+                
+            df_view_p['Descrição/Fatura'] = df_view_p.apply(clean_fatura_p, axis=1)
+
 
 
             if status_filter_p != "TODAS":
@@ -1941,6 +1954,17 @@ try:
                 return doc
                 
             df_view_r['N. Doc'] = df_view_r.apply(format_doc_r, axis=1)
+            
+            def clean_fatura_r(row):
+                desc = str(row['Fatura'])
+                if 'Venda #' in desc:
+                    m = re.search(r'\([^)]+-\s*(.*?)\)$', desc)
+                    if m:
+                        return m.group(1)
+                return desc
+                
+            df_view_r['Fatura'] = df_view_r.apply(clean_fatura_r, axis=1)
+
 
 
             if status_filter_r != "TODAS":
