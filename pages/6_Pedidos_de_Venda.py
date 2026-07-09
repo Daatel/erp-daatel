@@ -624,21 +624,11 @@ with tab_pedidos:
                             border_style = "border: 2px dashed #dee2e6;"
                             label_color = "#6c757d"
                             
-                        html_stepper += f'''
-                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; text-align: center;">
-                            <div style="width: 40px; height: 40px; border-radius: 50%; background: {bg_color}; color: {text_color}; display: flex; justify-content: center; align-items: center; font-size: 16px; {border_style} font-weight: bold;">
-                                {et['num']}
-                            </div>
-                            <div style="margin-top: 10px; font-weight: bold; color: {label_color}; font-size: 13px;">{et['nome']}</div>
-                            <div style="font-size: 11px; color: #868e96; margin-top: 2px; padding: 0 5px;">{et['desc']}</div>
-                        </div>
-                        '''
+                        html_stepper += f'<div style="flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; text-align: center;"><div style="width: 40px; height: 40px; border-radius: 50%; background: {bg_color}; color: {text_color}; display: flex; justify-content: center; align-items: center; font-size: 16px; {border_style} font-weight: bold;">{et["num"]}</div><div style="margin-top: 10px; font-weight: bold; color: {label_color}; font-size: 13px;">{et["nome"]}</div><div style="font-size: 11px; color: #868e96; margin-top: 2px; padding: 0 5px;">{et["desc"]}</div></div>'
                         if i < 3:
                             line_color = "#01743d" if (num_etapa < etapa) else "#dee2e6"
                             line_style = "solid" if (num_etapa < etapa) else "dashed"
-                            html_stepper += f'''
-                            <div style="flex: 1.5; height: 3px; background: {line_color}; border-top: 1px {line_style} {line_color}; margin-top: -25px;"></div>
-                            '''
+                            html_stepper += f'<div style="flex: 1.5; height: 3px; background: {line_color}; border-top: 1px {line_style} {line_color}; margin-top: -25px;"></div>'
                     html_stepper += '</div>'
                     st.markdown(html_stepper, unsafe_allow_html=True)
                     
@@ -659,23 +649,23 @@ with tab_pedidos:
                         
                     with col_det2:
                         hist_linhas = []
-                        hist_linhas.append(f"• **Etapa 1 (Captação):** Pedido captado em {pd.to_datetime(row_det['data']).strftime('%d/%m/%Y')} pelo vendedor {row_det['vendedor'] or 'Venda Direta'}.")
+                        hist_linhas.append(f"• <b>Etapa 1 (Captação):</b> Pedido captado em {pd.to_datetime(row_det['data']).strftime('%d/%m/%Y')} pelo vendedor {row_det['vendedor'] or 'Venda Direta'}.")
                         if etapa >= 2:
                             tipo = row_det['tipo_documento'] or "Nota Fiscal (NF)"
                             num_doc = row_det['numero_documento']
                             doc_label = f"DAV #{str(num_doc).zfill(10)}" if "DAV" in tipo else f"NF-e #{num_doc}" if num_doc else "NF-e (Aguardando SEFAZ)"
-                            hist_linhas.append(f"• **Etapa 2 (Faturamento):** Baixado de estoque e faturado como {doc_label}.")
+                            hist_linhas.append(f"• <b>Etapa 2 (Faturamento):</b> Baixado de estoque e faturado como {doc_label}.")
                         else:
-                            hist_linhas.append("• **Etapa 2 (Faturamento):** Aguardando faturamento no galpão.")
+                            hist_linhas.append("• <b>Etapa 2 (Faturamento):</b> Aguardando faturamento no galpão.")
                         if etapa >= 3:
                             dt_s = pd.to_datetime(row_det['data_saida']).strftime('%d/%m/%Y') if row_det['data_saida'] else "Em trânsito"
-                            hist_linhas.append(f"• **Etapa 3 (Expedição):** Despachado no manifesto #{row_det['manifesto_id']} em {dt_s} (Motorista: {row_det['motorista_nome']} | Placa: {row_det['placa_veiculo']}).")
+                            hist_linhas.append(f"• <b>Etapa 3 (Expedição):</b> Despachado no manifesto #{row_det['manifesto_id']} em {dt_s} (Motorista: {row_det['motorista_nome']} | Placa: {row_det['placa_veiculo']}).")
                         else:
-                            hist_linhas.append("• **Etapa 3 (Expedição):** Aguardando despacho na Logística.")
+                            hist_linhas.append("• <b>Etapa 3 (Expedição):</b> Aguardando despacho na Logística.")
                         if etapa >= 4:
-                            hist_linhas.append("• **Etapa 4 (Entregue):** Entrega concluída e canhotos físicos homologados.")
+                            hist_linhas.append("• <b>Etapa 4 (Entregue):</b> Entrega concluída e canhotos físicos homologados.")
                         else:
-                            hist_linhas.append("• **Etapa 4 (Entregue):** Aguardando retorno de canhoto físico.")
+                            hist_linhas.append("• <b>Etapa 4 (Entregue):</b> Aguardando retorno de canhoto físico.")
                             
                         st.markdown(f"""
                         <div style='background-color:#f8f9fa;padding:15px;border-radius:10px;border:1px solid #dee2e6;min-height:180px;line-height:1.4;'>
