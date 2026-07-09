@@ -104,19 +104,23 @@ def dialog_lancar_pagar():
     if st.button("Salvar Duplicata a Pagar", type="primary", use_container_width=True):
         if st.session_state.get("cap_clique_bloqueado", False):
             st.warning("Gravação já em andamento. Aguarde...")
-        elif forn_sel == "-- SELECIONE O FORNECEDOR --":
-            st.error("Por favor, selecione um Fornecedor.")
+        elif forn_sel == "-- SELECIONE O FORNECEDOR --" and not is_vinc:
+            st.error("Por favor, selecione um Fornecedor ou marque a caixinha de Cliente Vinculado.")
+        elif is_vinc and cli_sel == "-- SELECIONE O CLIENTE --":
+            st.error("Por favor, selecione um Cliente Vinculado.")
         elif pc_sel == "-- SELECIONE O PLANO DE CONTAS --":
             st.error("Por favor, selecione um Plano de Contas.")
         elif not desc_p:
             st.error("Preencha a descrição do lançamento.")
         else:
             pc_id, pc_codigo = op_pc[pc_sel]
-            forn_id = op_forn[forn_sel]
+            forn_id = op_forn[forn_sel] if forn_sel != "-- SELECIONE O FORNECEDOR --" else None
             cli_id = op_cli[cli_sel] if is_vinc else None
             
             if pc_codigo in ('2.2.1', '2.2.2', '2.2.4') and cli_id is None:
                 st.error(f"A conta selecionada ({pc_sel}) exige a vinculação obrigatória de um Cliente (CNPJ).")
+            elif forn_id is None and cli_id is None:
+                st.error("Por favor, selecione um Fornecedor ou um Cliente Vinculado.")
             else:
                 st.session_state["cap_clique_bloqueado"] = True
                 with st.spinner("Registrando duplicatas a pagar..."):
