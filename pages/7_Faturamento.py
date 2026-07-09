@@ -412,10 +412,10 @@ with tab1:
                             "Valor Original": float(v_total_grupo)
                         })
             
-            # Cria uma chave única que inclui o ID de cada pedido e a Forma de Pagamento selecionada nele
-            sel_ids_and_fps = sorted([(int(row['pedido_id']), row['Forma de Pagamento']) for _, row in pedidos_selecionados.iterrows()], key=lambda x: x[0])
+            # Cria uma chave única que inclui o ID, a Forma de Pagamento e o Valor Total de cada pedido selecionado
+            sel_ids_fps_vals = sorted([(int(row['pedido_id']), row['Forma de Pagamento'], float(row['valor_total'])) for _, row in pedidos_selecionados.iterrows()], key=lambda x: x[0])
             sobrescreveu_flag = f"{sobrescrever}_{venc_boleto_override}"
-            session_key_ids = f"last_sel_{sel_ids_and_fps}_{sobrescreveu_flag}"
+            session_key_ids = f"last_sel_{sel_ids_fps_vals}_{sobrescreveu_flag}"
             if st.session_state.get('last_selected_combo') != session_key_ids:
                 st.session_state['parcelas_faturamento'] = insts
                 st.session_state['last_selected_combo'] = session_key_ids
