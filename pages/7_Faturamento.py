@@ -533,12 +533,18 @@ with tab1:
                                         'valor_unitario': float(r['valor_total']) / float(r['quantidade']) if float(r['quantidade']) > 0 else 0
                                     })
                                 
-                                vd_first = fetch_all_tx(cursor, "SELECT flag_op_casada, filial_atacadao, pedido_atacadao_numero FROM vendas WHERE id=?", (primeiro_pid,))
+                                vd_first = fetch_all_tx(cursor, "SELECT flag_op_casada, filial_atacadao, pedido_atacadao_numero, observacoes FROM vendas WHERE id=?", (primeiro_pid,))
                                 obs_extras_grupo = ""
                                 if not vd_first.empty:
                                     vf = vd_first.iloc[0]
                                     if bool(vf.get('flag_op_casada')):
                                         obs_extras_grupo = f"Operacao Casada - Filial: {vf.get('filial_atacadao','')} - Pedido Interno: {vf.get('pedido_atacadao_numero','')}"
+                                    custom_obs = vf.get('observacoes')
+                                    if custom_obs and custom_obs.strip():
+                                        if obs_extras_grupo:
+                                            obs_extras_grupo += f" | Obs: {custom_obs.strip()}"
+                                        else:
+                                            obs_extras_grupo = f"Obs: {custom_obs.strip()}"
                                 
                                 insts_grupo = [p for p in st.session_state['parcelas_faturamento'] if p.get('Grupo') == chave_grupo]
                                 

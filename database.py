@@ -468,6 +468,7 @@ def _create_tables_internal(conn):
         flag_op_casada BOOLEAN DEFAULT 0,
         filial_atacadao TEXT,
         pedido_atacadao_numero TEXT,
+        observacoes TEXT,
         FOREIGN KEY(cliente_id) REFERENCES clientes(id),
         FOREIGN KEY(vendedor_id) REFERENCES funcionarios(id),
         FOREIGN KEY(produto_id) REFERENCES produtos(id),
@@ -960,7 +961,8 @@ def _create_tables_internal(conn):
         "ALTER TABLE clientes ADD COLUMN contatos_json TEXT",
         "ALTER TABLE fornecedores ADD COLUMN contatos_json TEXT",
         "ALTER TABLE fornecedores ADD COLUMN observacoes TEXT",
-        "ALTER TABLE fornecedores ADD COLUMN nome_fantasia TEXT"
+        "ALTER TABLE fornecedores ADD COLUMN nome_fantasia TEXT",
+        "ALTER TABLE vendas ADD COLUMN observacoes TEXT"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)

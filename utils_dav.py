@@ -27,7 +27,7 @@ def buscar_dados_venda(venda_id):
 
     df_venda = fetch_all(f"""
         SELECT v.id, v.data, v.quantidade, v.valor_unitario, v.valor_total, 
-               v.custo_frete_rateado, v.numero_documento, v.tipo_documento, v.pedido_grupo,
+               v.custo_frete_rateado, v.numero_documento, v.tipo_documento, v.pedido_grupo, v.observacoes,
                c.nome as cliente_nome, c.cnpj_cpf as cliente_cnpj, c.uf as uf, c.status,
                p.nome as produto_nome, p.id as p_id,
                f.nome as vendedor_nome
@@ -92,7 +92,8 @@ def buscar_dados_venda(venda_id):
         'subtotal': f_b(subtotal),
         'desconto_total': '0,00',
         'frete': f_b(frete_total),
-        'total': f_b(subtotal)
+        'total': f_b(subtotal),
+        'observacoes': row['observacoes'] or ""
     }
     return venda_info
 def gerar_html_dav(info):
@@ -229,7 +230,7 @@ def gerar_html_dav(info):
                     <span class="bold">Quantidade:</span> 0,00 &nbsp;&nbsp;&nbsp; <span class="bold">Peso Bruto:</span> 0,0000 &nbsp;&nbsp;&nbsp; <span class="bold">Peso Líquido:</span> 0,0000<br>
                     <span class="bold">Qtd Total de Itens:</span> {info['total_qtd']}<br><br>
                     <span class="bold">Pagamento:</span> Nenhum<br><br>
-                    <span class="bold">Observações:</span>
+                    <span class="bold">Observações:</span> {info['observacoes']}
                 </td>
                 <td class="no-border br bt bb" style="width:35%">
                     <table>

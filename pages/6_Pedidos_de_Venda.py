@@ -237,6 +237,8 @@ def modal_lancar_pedido():
         total_pedido = sum(item['valor_total'] for item in st.session_state['carrinho_venda'])
         st.markdown(f"**Total do Pedido: {format_brl(total_pedido)}**")
         
+        obs_pedido = st.text_area("Observações do Pedido (NF / DAV)", key="carrinho_obs")
+        
         col_action1, col_action2 = st.columns(2)
         if col_action1.button("Limpar Tudo", use_container_width=True):
             st.session_state['carrinho_venda'] = []
@@ -244,6 +246,8 @@ def modal_lancar_pedido():
             st.session_state['carrinho_vendedor_nome'] = None
             st.session_state['carrinho_data'] = None
             st.session_state['carrinho_fp_id'] = None
+            if 'carrinho_obs' in st.session_state:
+                st.session_state['carrinho_obs'] = ""
             st.rerun()
             
         if col_action2.button("Aprovar e Gravar Pedido", type="primary", use_container_width=True):
@@ -251,6 +255,7 @@ def modal_lancar_pedido():
             ven = v_opts[st.session_state['carrinho_vendedor_nome']]
             data_v = st.session_state['carrinho_data']
             fp_id_val = st.session_state['carrinho_fp_id']
+            obs_val = st.session_state.get('carrinho_obs', '').strip()
             
             df_max = fetch_all("SELECT MAX(id) as max_id FROM vendas")
             next_group_id = int(df_max.iloc[0]['max_id']) + 1 if not df_max.empty and pd.notna(df_max.iloc[0]['max_id']) else 1
@@ -261,13 +266,13 @@ def modal_lancar_pedido():
                     """INSERT INTO vendas 
                        (data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, 
                         comissao_valor, custo_acordos_rede, is_bonificacao, status, forma_pagamento_id, 
-                        flag_op_casada, filial_atacadao, pedido_atacadao_numero, pedido_grupo) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO', ?, ?, ?, ?, ?)""",
+                        flag_op_casada, filial_atacadao, pedido_atacadao_numero, pedido_grupo, observacoes) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO', ?, ?, ?, ?, ?, ?)""",
                     (data_v.strftime("%Y-%m-%d"), cli['id'], ven['id'], item['produto_id'], 
                      item['quantidade'], item['valor_unitario'], item['valor_total'], item['comissao_valor'], 
                      item['custo_acordos_rede'], item['is_bonificacao'], fp_id_val, 
                      item.get('flag_op_casada', False), item.get('filial_atacadao', ''), 
-                     item.get('pedido_atacadao_numero', ''), pedido_grupo_val)
+                     item.get('pedido_atacadao_numero', ''), pedido_grupo_val, obs_val)
                 )
             
             st.session_state['carrinho_venda'] = []
@@ -275,6 +280,8 @@ def modal_lancar_pedido():
             st.session_state['carrinho_vendedor_nome'] = None
             st.session_state['carrinho_data'] = None
             st.session_state['carrinho_fp_id'] = None
+            if 'carrinho_obs' in st.session_state:
+                st.session_state['carrinho_obs'] = ""
             st.toast("Pedido gravado com sucesso!", icon="✅")
             st.rerun()
 
@@ -283,7 +290,7 @@ def modal_lancar_pedido():
 def modal_editar_pedido(v_id):
     v_det = fetch_all('''
         SELECT v.id, v.quantidade, v.valor_unitario, v.vendedor_id, v.produto_id, v.cliente_id,
-               v.forma_pagamento_id, v.flag_op_casada, v.filial_atacadao, v.pedido_atacadao_numero, p.nome as produto, c.nome as cliente
+               v.forma_pagamento_id, v.flag_op_casada, v.filial_atacadao, v.pedido_atacadao_numero, v.observacoes, p.nome as produto, c.nome as cliente
         FROM vendas v
         JOIN produtos p ON v.produto_id = p.id
         JOIN clientes c ON v.cliente_id = c.id
@@ -314,6 +321,7 @@ def modal_editar_pedido(v_id):
     if edit_op_casada:
         edit_filial = st.text_input("Filial Destino:", value=v_det.get('filial_atacadao') or "")
         edit_pedido_int = st.text_input("Nº Pedido Interno:", value=v_det.get('pedido_atacadao_numero') or "")
+    edit_obs = st.text_area("Observações (NF / DAV):", value=v_det.get('observacoes') or "")
 
     if st.button("Salvar Alterações", type="primary", use_container_width=True):
         new_total = new_qtd * new_price
@@ -340,9 +348,9 @@ def modal_editar_pedido(v_id):
         
         run_query('''
             UPDATE vendas 
-            SET quantidade = ?, valor_unitario = ?, valor_total = ?, comissao_valor = ?, custo_acordos_rede = ?, forma_pagamento_id = ?, flag_op_casada = ?, filial_atacadao = ?, pedido_atacadao_numero = ?
+            SET quantidade = ?, valor_unitario = ?, valor_total = ?, comissao_valor = ?, custo_acordos_rede = ?, forma_pagamento_id = ?, flag_op_casada = ?, filial_atacadao = ?, pedido_atacadao_numero = ?, observacoes = ?
             WHERE id = ?
-        ''', (new_qtd, new_price, new_total, new_comissao, new_acordos, new_fp_id, edit_op_casada, edit_filial, edit_pedido_int, v_id))
+        ''', (new_qtd, new_price, new_total, new_comissao, new_acordos, new_fp_id, edit_op_casada, edit_filial, edit_pedido_int, edit_obs, v_id))
         
         st.toast("Pedido atualizado com sucesso!", icon="✅")
         st.rerun()
