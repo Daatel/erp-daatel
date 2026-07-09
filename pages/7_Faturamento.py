@@ -49,11 +49,92 @@ def modal_impressao_dav(vendas_ids):
             del st.session_state['disparar_impressao_davs']
         st.rerun()
 
+@st.dialog("Faturamento Parcial / Fracionar Pedido")
+def dialog_fracionar_pedido(pedido_id):
+    # Busca detalhes da venda
+    df_vd = fetch_all("""
+        SELECT v.id, v.quantidade, v.valor_unitario, p.nome as produto_nome
+        FROM vendas v
+        JOIN produtos p ON v.produto_id = p.id
+        WHERE v.id = ?
+    """, (pedido_id,))
+    if df_vd.empty:
+        st.error("Pedido não encontrado.")
+        return
+    row = df_vd.iloc[0]
+    qtd_total = float(row['quantidade'])
+    v_uni = float(row['valor_unitario'])
+    prod = row['produto_nome']
+    
+    st.write(f"Você está fracionando o item **{prod}** do pedido.")
+    st.write(f"Quantidade total cadastrada: **{qtd_total:,.2f}**")
+    
+    qtd_part = st.number_input("Quantidade a Faturar Agora", min_value=0.01, max_value=qtd_total - 0.01, value=qtd_total * 0.5, step=1.0)
+    qtd_resto = qtd_total - qtd_part
+    valor_total_part = qtd_part * v_uni
+    valor_total_resto = qtd_resto * v_uni
+    
+    st.info(f"💡 **Resultado do Fracionamento:**\n"
+            f"* **Lote 1 (Faturar Agora):** {qtd_part:,.2f} UN (Total: R$ {valor_total_part:,.2f})\n"
+            f"* **Lote 2 (Novo Pedido Pendente):** {qtd_resto:,.2f} UN (Total: R$ {valor_total_resto:,.2f})")
+            
+    if st.button("Confirmar Fracionamento", type="primary", use_container_width=True):
+        df_orig = fetch_all("SELECT * FROM vendas WHERE id = ?", (pedido_id,))
+        if not df_orig.empty:
+            orig = df_orig.iloc[0]
+            
+            comissao_orig = float(orig['comissao_valor']) if pd.notna(orig['comissao_valor']) else 0.0
+            comissao_part = round(comissao_orig * (qtd_part / qtd_total), 2)
+            comissao_resto = round(comissao_orig - comissao_part, 2)
+            
+            custo_acordos_orig = float(orig['custo_acordos_rede']) if pd.notna(orig['custo_acordos_rede']) else 0.0
+            custo_acordos_part = round(custo_acordos_orig * (qtd_part / qtd_total), 2)
+            custo_acordos_resto = round(custo_acordos_orig - custo_acordos_part, 2)
+            
+            # Atualiza o original para a quantidade parcial
+            run_query("""
+                UPDATE vendas 
+                SET quantidade = ?, valor_total = ?, comissao_valor = ?, custo_acordos_rede = ?
+                WHERE id = ?
+            """, (qtd_part, valor_total_part, comissao_part, custo_acordos_part, pedido_id))
+            
+            # Insere o saldo restante como novo pedido pendente
+            run_query("""
+                INSERT INTO vendas (
+                    data, cliente_id, vendedor_id, produto_id, quantidade, valor_unitario, valor_total, 
+                    comissao_valor, custo_acordos_rede, is_bonificacao, status, forma_pagamento_id, 
+                    flag_op_casada, filial_atacadao, pedido_atacadao_numero, pedido_grupo
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                orig['data'],
+                int(orig['cliente_id']) if pd.notna(orig['cliente_id']) else None,
+                int(orig['vendedor_id']) if pd.notna(orig['vendedor_id']) else None,
+                int(orig['produto_id']) if pd.notna(orig['produto_id']) else None,
+                qtd_resto,
+                v_uni,
+                valor_total_resto,
+                comissao_resto,
+                custo_acordos_resto,
+                orig['is_bonificacao'],
+                orig['status'],
+                int(orig['forma_pagamento_id']) if pd.notna(orig['forma_pagamento_id']) else None,
+                orig['flag_op_casada'],
+                orig['filial_atacadao'] if pd.notna(orig['filial_atacadao']) else '',
+                orig['pedido_atacadao_numero'] if pd.notna(orig['pedido_atacadao_numero']) else '',
+                orig['pedido_grupo'] if pd.notna(orig['pedido_grupo']) else None
+            ))
+            
+            st.success("Pedido fracionado com sucesso!")
+            import time; time.sleep(1.5); st.rerun()
+
 # Disparadores de Modais baseados em Session State
 if st.session_state.get('pedidos_dav_faturados'):
     modal_perguntar_impressao(st.session_state['pedidos_dav_faturados'])
 elif st.session_state.get('disparar_impressao_davs'):
     modal_impressao_dav(st.session_state['disparar_impressao_davs'])
+elif st.session_state.get('split_dialog_pid'):
+    pid_to_split = st.session_state.pop('split_dialog_pid')
+    dialog_fracionar_pedido(pid_to_split)
 
 st.markdown("""
 <style>
@@ -135,7 +216,7 @@ with tab1:
         st.markdown("*Selecione os pedidos para faturar. Ajuste o lote e validade se necessário. Os vencimentos de cada duplicata são calculados automaticamente conforme a forma de pagamento cadastrada no pedido.*")
         
         # Cabeçalho da Tabela
-        col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7, col_h8, col_h9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 2.2], vertical_alignment="center")
+        col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7, col_h8, col_h9, col_h10 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 1.8, 0.4], vertical_alignment="center")
         col_h1.markdown("**Faturar?**")
         col_h2.markdown("**Pedido**")
         col_h3.markdown("**Cliente**")
@@ -145,6 +226,7 @@ with tab1:
         col_h7.markdown("**Lote**")
         col_h8.markdown("**Val.**")
         col_h9.markdown("**Vencimentos**")
+        col_h10.markdown("**Part.**")
         st.markdown("<div style='margin-top: -10px; margin-bottom: 10px; border-top: 1px solid #ccc;'></div>", unsafe_allow_html=True)
         
         import re
@@ -189,8 +271,8 @@ with tab1:
             default_lote = date.today().strftime('FAB %d/%m')
             default_validade = (date.today() + timedelta(days=90)).strftime('%d/%m/%Y')
             
-            # Renderizar linha da tabela usando st.columns
-            col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 2.2], vertical_alignment="center")
+            # Renderizar linha da tabela usando st.columns (10 colunas)
+            col1, col2, col3, col4, col5, col6, col7, col8, col9, col10 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 1.8, 0.4], vertical_alignment="center")
             
             faturar_check = col1.checkbox("Faturar", value=False, key=f"sel_{pid}", label_visibility="collapsed")
             label_pedido = pedido_labels.get(pid, f"#{pid}")
@@ -223,6 +305,11 @@ with tab1:
             venc_str_horizontal = f"{N} x {val_p_str} ({dates_str})"
             
             col9.markdown(f"<div style='font-size: 14px; font-weight: bold; color: #292d77; white-space: nowrap;'>{venc_str_horizontal}</div>", unsafe_allow_html=True)
+            
+            # Botão de Fracionamento de Pedidos (Faturamento Parcial)
+            if col10.button("✂️", key=f"split_btn_{pid}", help="Fracionar Pedido (Faturamento Parcial)"):
+                st.session_state['split_dialog_pid'] = pid
+                st.rerun()
             
             st.markdown("<div style='margin-top: 5px; margin-bottom: 5px; border-top: 1px dashed #eee;'></div>", unsafe_allow_html=True)
             
