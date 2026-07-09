@@ -22,6 +22,14 @@ def carregar_estilo():
             -webkit-text-fill-color: #0f172a !important;
         }
         /* Caixas de Seleção (Selectbox / Dropdown / Multiselect) */
+        .stSelectbox > div, .stMultiSelect > div {
+            background-color: #ffffff !important;
+            border-radius: 6px !important;
+        }
+        .stSelectbox div, .stMultiSelect div {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+        }
         div[data-baseweb="select"] > div {
             border-color: #01743d40 !important;
             background-color: #ffffff !important;
