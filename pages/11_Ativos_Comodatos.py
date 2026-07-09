@@ -119,6 +119,90 @@ with tab3:
             st.success("Equipamento cadastrado com sucesso! Já disponível para comodato.")
             import time; time.sleep(1); st.rerun()
 
+    st.markdown("---")
+    st.subheader("📋 Equipamentos Cadastrados (Maquinário)")
+    df_maq = fetch_all("SELECT id, nome, patrimônio, numero_serie, valor_aquisicao, vida_util_anos, data_aquisicao, status, localizacao FROM maquinario ORDER BY id DESC")
+    if df_maq.empty:
+        st.info("Nenhum equipamento cadastrado ainda.")
+    else:
+        df_maq_view = df_maq.copy()
+        df_maq_view['data_aquisicao'] = pd.to_datetime(df_maq_view['data_aquisicao'])
+        
+        edited_maq = st.data_editor(
+            df_maq_view,
+            column_config={
+                "id": st.column_config.NumberColumn("ID", disabled=True),
+                "nome": "Nome/Modelo",
+                "patrimônio": "Patrimônio",
+                "numero_serie": "Nº Série",
+                "valor_aquisicao": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f", min_value=0.0),
+                "vida_util_anos": st.column_config.NumberColumn("Vida Útil (Anos)", min_value=0.1),
+                "data_aquisicao": st.column_config.DateColumn("Data de Aquisição"),
+                "status": st.column_config.SelectboxColumn("Status", options=["ATIVO", "INATIVO"]),
+                "localizacao": st.column_config.TextColumn("Localização", disabled=True)
+            },
+            num_rows="dynamic",
+            hide_index=True,
+            use_container_width=True,
+            key="maq_editor_state"
+        )
+        
+        col_act_maq, _ = st.columns([1, 4])
+        if col_act_maq.button("💾 Salvar Alterações", type="primary", use_container_width=True):
+            editor_state = st.session_state.get("maq_editor_state", {})
+            deleted_rows = editor_state.get("deleted_rows", [])
+            
+            sucesso = True
+            
+            # 1. Trata deleções
+            if deleted_rows:
+                for idx in deleted_rows:
+                    m_row = df_maq.iloc[idx]
+                    m_id = int(m_row['id'])
+                    m_nome = m_row['nome']
+                    
+                    df_com = fetch_all("SELECT id FROM comodatos WHERE maquina_id = ? AND status = 'ATIVO'", (m_id,))
+                    if not df_com.empty:
+                        st.error(f"❌ Não é possível excluir '{m_nome}' pois há um comodato ATIVO vinculado.")
+                        sucesso = False
+                    else:
+                        run_query("DELETE FROM maquinario WHERE id = ?", (m_id,))
+            
+            # 2. Trata edições
+            for _, row in edited_maq.iterrows():
+                m_id = int(row['id'])
+                if any(df_maq.iloc[d_idx]['id'] == m_id for d_idx in deleted_rows):
+                    continue
+                    
+                orig_match = df_maq[df_maq['id'] == m_id]
+                if not orig_match.empty:
+                    orig = orig_match.iloc[0]
+                    new_val_aq = float(row['valor_aquisicao'])
+                    new_vida = float(row['vida_util_anos'])
+                    new_date_str = pd.to_datetime(row['data_aquisicao']).strftime("%Y-%m-%d")
+                    orig_date_str = pd.to_datetime(orig['data_aquisicao']).strftime("%Y-%m-%d") if pd.notna(orig['data_aquisicao']) else ""
+                    
+                    if (row['nome'] != orig['nome'] or
+                        row['patrimônio'] != orig['patrimônio'] or
+                        row['numero_serie'] != orig['numero_serie'] or
+                        new_val_aq != float(orig['valor_aquisicao'] or 0.0) or
+                        new_vida != float(orig['vida_util_anos'] or 10.0) or
+                        new_date_str != orig_date_str or
+                        row['status'] != orig['status']):
+                        
+                        dep_mensal = (new_val_aq / new_vida) / 12 if new_vida > 0 else 0
+                        run_query("""
+                            UPDATE maquinario
+                            SET nome = ?, patrimônio = ?, numero_serie = ?, valor_aquisicao = ?,
+                                vida_util_anos = ?, valor_depreciacao_mensal = ?, data_aquisicao = ?, status = ?
+                            WHERE id = ?
+                        """, (row['nome'], row['patrimônio'], row['numero_serie'], new_val_aq,
+                              new_vida, dep_mensal, new_date_str, row['status'], m_id))
+                              
+            if sucesso:
+                st.success("Cadastro de equipamentos atualizado com sucesso!")
+                import time; time.sleep(1); st.rerun()
+
 # ==========================================
 # TAB 1: ATIVAR NOVO COMODATO
 # ==========================================
