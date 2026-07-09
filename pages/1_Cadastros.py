@@ -1537,9 +1537,24 @@ with tab7:
     st.markdown("---")
     df_maq = fetch_all("SELECT id, nome as 'Máquina/Ativo', data_aquisicao as 'Data', valor_aquisicao as 'Valor R$', valor_depreciacao_mensal as 'Perda Mensal R$' FROM maquinario")
     if not df_maq.empty:
-        df_maq['Data'] = pd.to_datetime(df_maq['Data']).dt.strftime('%d/%m/%Y')
-        export_btn(df_maq, 'maquinario.csv')
-        st.dataframe(df_maq, hide_index=True, width="stretch")
+        df_maq_show = df_maq.copy()
+        df_maq_show['Data'] = pd.to_datetime(df_maq_show['Data']).dt.strftime('%d/%m/%Y')
+        export_btn(df_maq_show, 'maquinario.csv')
+        st.dataframe(df_maq_show, hide_index=True, width="stretch")
+        
+        with st.expander("🗑️ Excluir Máquina/Ativo"):
+            opts_maq_del = {f"ID {row['id']} | {row['Máquina/Ativo']} (R$ {row['Valor R$']:,.2f})": row['id'] for _, row in df_maq.iterrows()}
+            m_del = st.selectbox("Selecione o Equipamento para Excluir:", ["-- SELECIONE --"] + list(opts_maq_del.keys()), key="sb_maq_delete")
+            if m_del != "-- SELECIONE --":
+                maq_id_del = opts_maq_del[m_del]
+                if st.button("Confirmar Exclusão do Ativo", type="primary", key="btn_maq_delete"):
+                    df_com = fetch_all("SELECT id FROM comodatos WHERE maquina_id = ? AND status = 'ATIVO'", (maq_id_del,))
+                    if not df_com.empty:
+                        st.error("⚠️ Não é permitido excluir esta máquina pois ela possui um comodato ATIVO com um cliente.")
+                    else:
+                        run_query("DELETE FROM maquinario WHERE id = ?", (maq_id_del,))
+                        st.success("Equipamento excluído com sucesso!")
+                        import time; time.sleep(1); st.rerun()
 
 # ======= USUÁRIOS =======
 with tab8:
