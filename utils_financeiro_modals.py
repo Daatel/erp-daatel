@@ -618,7 +618,7 @@ def dialog_confirmar_baixa_lote_receber(ids_selecionados, df_receber, opcoes_ban
             rr_id = int(r['id'])
             v_base = float(r['Valor'])
             cli = r['Cliente'] if pd.notna(r['Cliente']) else "Diversos"
-            fat = r['Fatura']
+            fat = r['N. Doc'] if pd.notna(r['N. Doc']) else r['Histórico'] if pd.notna(r['Histórico']) else ""
             
             run_query("UPDATE contas_a_receber SET status='RECEBIDO', data_recebimento=?, conta_bancaria_id=? WHERE id=?",
                       (dt_rec.strftime("%Y-%m-%d"), bCid, rr_id))
