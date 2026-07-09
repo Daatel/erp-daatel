@@ -8,6 +8,19 @@ def carregar_estilo():
             font-weight: 600 !important;
         }
         /* --- CORREÇÃO GERAL DE ENTRADAS DE DADOS (INPUTS CLAROS E LEGÍVEIS) --- */
+        .stTextInput > div, .stNumberInput > div, .stDateInput > div, .stTextArea > div {
+            background-color: #ffffff !important;
+            border-radius: 6px !important;
+        }
+        .stTextInput div, .stNumberInput div, .stDateInput div, .stTextArea div {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+        }
+        .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            -webkit-text-fill-color: #0f172a !important;
+        }
         div[data-baseweb="input"] {
             background-color: #ffffff !important;
             border-radius: 6px !important;
