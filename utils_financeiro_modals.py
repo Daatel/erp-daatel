@@ -172,12 +172,17 @@ def dialog_confirmar_baixa_lote_pagar(ids_selecionados, df_all_contas, opcoes_ba
         for _, r in df_selecionadas.iterrows():
             c_id = int(r['id'])
             v_base = float(r['Valor'])
-            forn = r['Fornecedor'] if pd.notna(r['Fornecedor']) else ""
-            fat = r['Descrição/Fatura']
-            plant = r['Planta de Custo'] if pd.notna(r['Planta de Custo']) else "Gasto"
+            
+            # Obtém o credor unificado de forma resiliente
+            credor = r.get('Credor', r.get('Fornecedor', ''))
+            credor = str(credor) if pd.notna(credor) else ""
+            
+            # Obtém histórico e planta de custo de forma resiliente para evitar KeyError
+            fat = r.get('Histórico', r.get('Descrição/Fatura', ''))
+            plant = r.get('Planta de Custo', r.get('Categoria', 'Gasto'))
             
             # Limpa tag de bloqueio do nome
-            forn = forn.replace("🔴 [BLOQUEADO FALTAM CANHOTOS] ", "")
+            credor = credor.replace("🔴 [BLOQUEADO FALTAM CANHOTOS] ", "")
             
             df_cap_cli = fetch_all("SELECT cliente_id FROM contas_a_pagar WHERE id=?", (c_id,))
             cap_cli_id = int(df_cap_cli.iloc[0]['cliente_id']) if not df_cap_cli.empty and pd.notna(df_cap_cli.iloc[0]['cliente_id']) else None
@@ -204,7 +209,7 @@ def dialog_confirmar_baixa_lote_pagar(ids_selecionados, df_all_contas, opcoes_ba
                       (d_pgto.strftime("%Y-%m-%d"), conta_id, val_efetivo, c_id))
             
             run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado, cliente_id) VALUES (?, 'Saída', ?, ?, ?, ?, ?, TRUE, ?)",
-                      (d_pgto.strftime("%Y-%m-%d"), plant, f"PGTO Forn. {forn}: {fat}", val_efetivo, c_id, conta_id, cap_cli_id))
+                      (d_pgto.strftime("%Y-%m-%d"), plant, f"PGTO Credor: {credor} - Fat: {fat}", val_efetivo, c_id, conta_id, cap_cli_id))
                       
         st.success(f"✔️ {len(df_selecionadas)} contas liquidadas e debitadas do banco {conta_saida} com sucesso!")
         import time; time.sleep(1.5); st.rerun()

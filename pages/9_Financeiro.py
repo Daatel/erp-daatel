@@ -1460,23 +1460,15 @@ try:
     with tab2:
 
         df_all_contas = fetch_all("""
-
-            SELECT c.id, f.nome_fantasia as 'Fornecedor', c.numero_documento as 'N. Doc', p.nome as 'Planta de Custo', 
-
+            SELECT c.id, f.nome_fantasia as 'Fornecedor', cl.nome as 'Cliente', c.numero_documento as 'N. Doc', p.nome as 'Planta de Custo', 
                    c.descricao as 'Histórico', c.data_vencimento as 'Vencimento', 
-
                    c.valor as 'Valor', c.status as 'Status', c.data_pagamento as 'Data PGTO',
-
                    c.comprovante_url as 'Comprovante', c.cliente_id
-
             FROM contas_a_pagar c
-
             LEFT JOIN fornecedores f ON c.fornecedor_id = f.id
-
+            LEFT JOIN clientes cl ON c.cliente_id = cl.id
             LEFT JOIN planos_de_contas p ON c.plano_conta_id = p.id
-
             ORDER BY c.data_vencimento ASC
-
         """)
 
         
@@ -1511,14 +1503,32 @@ try:
 
             
 
+        def determinar_credor(r):
+            forn = r.get('Fornecedor')
+            if forn and pd.notna(forn) and str(forn).strip() and str(forn) != 'None':
+                return str(forn).strip()
+            
+            cli = r.get('Cliente')
+            if cli and pd.notna(cli) and str(cli).strip() and str(cli) != 'None':
+                return str(cli).strip()
+                
+            desc = r.get('Histórico') or ""
+            if " - VT - " in desc:
+                return desc.split(" - VT - ")[-1].strip()
+            if " - VR - " in desc:
+                return desc.split(" - VR - ")[-1].strip()
+            if "Repasse de Comissão Consolidada - " in desc:
+                try:
+                    return desc.split("Repasse de Comissão Consolidada - ")[1].split(" - ")[0].strip()
+                except:
+                    pass
+            return ""
+
         if not df_all_contas.empty:
-
             df_all_contas['Bloqueado'] = df_all_contas['Histórico'].apply(checar_trava)
-
-            df_all_contas['Fornecedor'] = df_all_contas.apply(
-
-                lambda r: f"🔴 [BLOQUEADO FALTAM CANHOTOS] {r['Fornecedor']}" if r.get('Bloqueado', False) else r['Fornecedor'], axis=1
-
+            df_all_contas['Credor'] = df_all_contas.apply(determinar_credor, axis=1)
+            df_all_contas['Credor'] = df_all_contas.apply(
+                lambda r: f"🔴 [BLOQUEADO FALTAM CANHOTOS] {r['Credor']}" if r.get('Bloqueado', False) else r['Credor'], axis=1
             )
 
             
@@ -1696,7 +1706,7 @@ try:
 
                 df_view_p = df_view_p[
 
-                    df_view_p['Fornecedor'].str.lower().str.contains(b_p, na=False) |
+                    df_view_p['Credor'].str.lower().str.contains(b_p, na=False) |
 
                     df_view_p['Histórico'].str.lower().str.contains(b_p, na=False)
 
@@ -1720,7 +1730,7 @@ try:
 
                 # Se for pago, desabilitamos o checkbox Pagar?
 
-                is_disabled_p = ["id", "Fornecedor", "Planta de Custo", "Descrição/Fatura", "Vencimento", "Valor", "Status", "Data PGTO"]
+                is_disabled_p = ["id", "Credor", "Planta de Custo", "Histórico", "Vencimento", "Valor", "Status", "Data PGTO"]
 
                 if status_filter_p == "PAGO":
 
@@ -1730,7 +1740,7 @@ try:
 
                 edited_df_p = st.data_editor(
 
-                    df_view_p[['Pagar?', 'id', 'Fornecedor', 'N. Doc', 'Vencimento', 'Valor', 'Histórico', 'Status', 'Data PGTO']],
+                    df_view_p[['Pagar?', 'id', 'Credor', 'N. Doc', 'Vencimento', 'Valor', 'Histórico', 'Status', 'Data PGTO']],
 
                     hide_index=True,
 
