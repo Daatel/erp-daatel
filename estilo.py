@@ -21,14 +21,37 @@ def carregar_estilo():
             color: #0f172a !important; /* Slate 900 */
             -webkit-text-fill-color: #0f172a !important;
         }
-        /* Caixas de Seleção (Selectbox / Dropdown) */
+        /* Caixas de Seleção (Selectbox / Dropdown / Multiselect) */
         div[data-baseweb="select"] > div {
             border-color: #01743d40 !important;
+            background-color: #ffffff !important;
+        }
+        div[data-baseweb="select"] div {
             background-color: #ffffff !important;
             color: #0f172a !important;
         }
         div[data-baseweb="select"] * {
             color: #0f172a !important;
+        }
+        div[data-baseweb="select"] svg {
+            fill: #0f172a !important;
+            color: #0f172a !important;
+        }
+        /* Ajuste do dropdown (popover de opções quando aberto) */
+        div[role="listbox"], div[data-baseweb="menu"] {
+            background-color: #ffffff !important;
+        }
+        div[role="listbox"] ul, div[data-baseweb="menu"] ul {
+            background-color: #ffffff !important;
+        }
+        div[role="listbox"] li, div[data-baseweb="menu"] li {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+        }
+        div[role="listbox"] li:hover, div[data-baseweb="menu"] li:hover,
+        div[role="listbox"] [aria-selected="true"], div[data-baseweb="menu"] [aria-selected="true"] {
+            background-color: #f1f5f9 !important;
+            color: #01743d !important;
         }
         /* Textareas (Áreas de texto longo) */
         div[data-baseweb="textarea"] textarea {
