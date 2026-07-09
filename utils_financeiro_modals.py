@@ -155,6 +155,17 @@ def dialog_confirmar_baixa_lote_pagar(ids_selecionados, df_all_contas, opcoes_ba
     d_pgto = colA.date_input("Data real do Pagamento", date.today())
     conta_saida = colB.selectbox("Sair de qual banco/conta?", list(opcoes_bancos.keys()))
     
+    # Lógica de Baixa Parcial
+    valor_pago = total
+    is_partial = False
+    if len(ids_selecionados) == 1:
+        st.markdown("---")
+        is_partial = st.checkbox("Pagamento Parcial? (Baixar apenas uma parte do valor)")
+        if is_partial:
+            valor_pago = st.number_input("Valor Pago (R$)", min_value=0.01, max_value=float(total) - 0.01, value=float(total) * 0.5, step=10.0)
+            saldo = float(total) - valor_pago
+            st.info(f"ℹ️ O título original de R$ {total:,.2f} será desmembrado: R$ {valor_pago:,.2f} será liquidado e o saldo restante de R$ {saldo:,.2f} continuará pendente.")
+            
     if st.button("💸 Confirmar Liquidação", type="primary", use_container_width=True):
         conta_id = opcoes_bancos[conta_saida]
         
@@ -171,11 +182,29 @@ def dialog_confirmar_baixa_lote_pagar(ids_selecionados, df_all_contas, opcoes_ba
             df_cap_cli = fetch_all("SELECT cliente_id FROM contas_a_pagar WHERE id=?", (c_id,))
             cap_cli_id = int(df_cap_cli.iloc[0]['cliente_id']) if not df_cap_cli.empty and pd.notna(df_cap_cli.iloc[0]['cliente_id']) else None
 
-            run_query("UPDATE contas_a_pagar SET status='PAGO', data_pagamento=?, conta_bancaria_id=? WHERE id=?", 
-                      (d_pgto.strftime("%Y-%m-%d"), conta_id, c_id))
+            val_efetivo = valor_pago if is_partial else v_base
+            
+            if is_partial:
+                saldo = v_base - val_efetivo
+                df_orig = fetch_all("SELECT * FROM contas_a_pagar WHERE id = ?", (c_id,))
+                if not df_orig.empty:
+                    orig = df_orig.iloc[0]
+                    forn_id_orig = int(orig['fornecedor_id']) if pd.notna(orig['fornecedor_id']) else None
+                    pc_id_orig = int(orig['plano_conta_id']) if pd.notna(orig['plano_conta_id']) else None
+                    desc_orig = orig['descricao'] if pd.notna(orig['descricao']) else ""
+                    venc_orig = orig['data_vencimento']
+                    doc_orig = orig['numero_documento'] if pd.notna(orig['numero_documento']) else None
+                    cli_id_orig = int(orig['cliente_id']) if pd.notna(orig['cliente_id']) else None
+                    
+                    # Insere o saldo restante
+                    run_query("INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, descricao, valor, data_vencimento, status, numero_documento, cliente_id) VALUES (?, ?, ?, ?, ?, 'PENDENTE', ?, ?)",
+                              (forn_id_orig, pc_id_orig, f"{desc_orig} (Saldo Parcial)", saldo, venc_orig, doc_orig, cli_id_orig))
+
+            run_query("UPDATE contas_a_pagar SET status='PAGO', data_pagamento=?, conta_bancaria_id=?, valor=? WHERE id=?", 
+                      (d_pgto.strftime("%Y-%m-%d"), conta_id, val_efetivo, c_id))
             
             run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado, cliente_id) VALUES (?, 'Saída', ?, ?, ?, ?, ?, TRUE, ?)",
-                      (d_pgto.strftime("%Y-%m-%d"), plant, f"PGTO Forn. {forn}: {fat}", v_base, c_id, conta_id, cap_cli_id))
+                      (d_pgto.strftime("%Y-%m-%d"), plant, f"PGTO Forn. {forn}: {fat}", val_efetivo, c_id, conta_id, cap_cli_id))
                       
         st.success(f"✔️ {len(df_selecionadas)} contas liquidadas e debitadas do banco {conta_saida} com sucesso!")
         import time; time.sleep(1.5); st.rerun()
@@ -611,6 +640,17 @@ def dialog_confirmar_baixa_lote_receber(ids_selecionados, df_receber, opcoes_ban
     dt_rec = rA.date_input("Data que o dinheiro caiu", date.today())
     banco_destino = rB.selectbox("PAGO EM QUAL BANCO?", list(opcoes_bancos.keys()))
     
+    # Lógica de Baixa Parcial
+    valor_pago = total
+    is_partial = False
+    if len(ids_selecionados) == 1:
+        st.markdown("---")
+        is_partial = st.checkbox("Recebimento Parcial? (Baixar apenas uma parte do valor)")
+        if is_partial:
+            valor_pago = st.number_input("Valor Recebido (R$)", min_value=0.01, max_value=float(total) - 0.01, value=float(total) * 0.5, step=10.0)
+            saldo = float(total) - valor_pago
+            st.info(f"ℹ️ O título original de R$ {total:,.2f} será desmembrado: R$ {valor_pago:,.2f} será recebido e o saldo restante de R$ {saldo:,.2f} continuará pendente.")
+            
     if st.button("💸 Confirmar Recebimento", type="primary", use_container_width=True):
         bCid = opcoes_bancos[banco_destino]
         
@@ -620,8 +660,27 @@ def dialog_confirmar_baixa_lote_receber(ids_selecionados, df_receber, opcoes_ban
             cli = r['Cliente'] if pd.notna(r['Cliente']) else "Diversos"
             fat = r['N. Doc'] if pd.notna(r['N. Doc']) else r['Histórico'] if pd.notna(r['Histórico']) else ""
             
-            run_query("UPDATE contas_a_receber SET status='RECEBIDO', data_recebimento=?, conta_bancaria_id=? WHERE id=?",
-                      (dt_rec.strftime("%Y-%m-%d"), bCid, rr_id))
+            val_efetivo = valor_pago if is_partial else v_base
+            
+            if is_partial:
+                saldo = v_base - val_efetivo
+                df_orig = fetch_all("SELECT * FROM contas_a_receber WHERE id = ?", (rr_id,))
+                if not df_orig.empty:
+                    orig = df_orig.iloc[0]
+                    c_id_orig = int(orig['cliente_id']) if pd.notna(orig['cliente_id']) else None
+                    v_id_orig = int(orig['venda_id']) if pd.notna(orig['venda_id']) else None
+                    pc_id_orig = int(orig['plano_conta_id']) if pd.notna(orig['plano_conta_id']) else None
+                    desc_orig = orig['descricao'] if pd.notna(orig['descricao']) else ""
+                    venc_orig = orig['data_vencimento']
+                    doc_orig = orig['numero_documento'] if pd.notna(orig['numero_documento']) else None
+                    
+                    # Insere o saldo restante
+                    run_query("INSERT INTO contas_a_receber (cliente_id, venda_id, plano_conta_id, descricao, valor, data_vencimento, status, numero_documento) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE', ?)",
+                              (c_id_orig, v_id_orig, pc_id_orig, f"{desc_orig} (Saldo Parcial)", saldo, venc_orig, doc_orig))
+            
+            # Atualiza o original com val_efetivo
+            run_query("UPDATE contas_a_receber SET status='RECEBIDO', data_recebimento=?, conta_bancaria_id=?, valor=? WHERE id=?",
+                      (dt_rec.strftime("%Y-%m-%d"), bCid, val_efetivo, rr_id))
             
             df_v = fetch_all("SELECT venda_id FROM contas_a_receber WHERE id = ?", (rr_id,))
             if not df_v.empty and pd.notna(df_v.iloc[0]['venda_id']):
@@ -630,7 +689,7 @@ def dialog_confirmar_baixa_lote_receber(ids_selecionados, df_receber, opcoes_ban
                 
             desc_final = f"REC. Cliente {cli}: {fat}"
             run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, TRUE)",
-                      (dt_rec.strftime("%Y-%m-%d"), desc_final, v_base, rr_id, bCid))
+                      (dt_rec.strftime("%Y-%m-%d"), desc_final, val_efetivo, rr_id, bCid))
                       
         st.success(f"✔️ {len(df_selecionadas)} recebimentos injetados no Fluxo do banco {banco_destino}!")
         import time; time.sleep(1.5); st.rerun()
