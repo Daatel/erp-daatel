@@ -3,3 +3,5 @@ pandas
 plotly
 psycopg2-binary
 fpdf2
+openpyxl
+requests
