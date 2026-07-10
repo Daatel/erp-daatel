@@ -1409,7 +1409,7 @@ def registrar_log_acesso(usuario_id, usuario_nome: str, usuario_email: str, acao
     """Registra uma ação de acesso/governança no audit_log_acesso."""
     from datetime import datetime
     try:
-        data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        data_hora = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         run_query(
             """
             INSERT INTO audit_log_acesso (data_hora, usuario_id, usuario_nome, usuario_email, acao, detalhe)
@@ -1430,7 +1430,7 @@ def gerar_token_reset(usuario_id: int) -> str:
     from datetime import datetime
     import random
     token = str(random.randint(100000, 999999))
-    criado_em = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    criado_em = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     # Invalida tokens anteriores do mesmo usuário
     run_query("UPDATE tokens_reset_senha SET usado = 1 WHERE usuario_id = ? AND usado = 0", (usuario_id,))
     run_query(
@@ -1458,7 +1458,7 @@ def validar_token_reset(email: str, token: str) -> int | None:
         criado_em = datetime.strptime(criado_em_str, "%Y-%m-%d %H:%M:%S")
     except Exception:
         return None
-    if datetime.now() - criado_em > timedelta(minutes=30):
+    if datetime.utcnow() - criado_em > timedelta(minutes=30):
         return None
     return usuario_id
 
@@ -1485,7 +1485,7 @@ def verificar_sessao_ativa(usuario_id: int, token_atual: str = None) -> bool:
     """
     from datetime import datetime, timedelta
     # Limpa sessões expiradas de todos os usuários
-    expiry = (datetime.now() - timedelta(minutes=SESSAO_TIMEOUT_MINUTOS)).strftime("%Y-%m-%d %H:%M:%S")
+    expiry = (datetime.utcnow() - timedelta(minutes=SESSAO_TIMEOUT_MINUTOS)).strftime("%Y-%m-%d %H:%M:%S")
     run_query("DELETE FROM sessoes_ativas WHERE ultimo_heartbeat < ?", (expiry,))
     # Verifica se ainda existe sessão ativa para este usuário
     if token_atual:
@@ -1503,7 +1503,7 @@ def abrir_sessao(usuario_id: int) -> str:
     import secrets as _secrets
     from datetime import datetime
     token = _secrets.token_hex(16)
-    agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    agora = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     # UPSERT: substitui qualquer sessão anterior deste usuário
     run_query("DELETE FROM sessoes_ativas WHERE usuario_id = ?", (usuario_id,))
     run_query(
@@ -1526,7 +1526,7 @@ def renovar_heartbeat(usuario_id: int, session_token: str) -> bool:
     )
     if df.empty:
         return False  # Token inválido — sessão encerrada externamente
-    agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    agora = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     run_query(
         "UPDATE sessoes_ativas SET ultimo_heartbeat = ? WHERE usuario_id = ? AND session_token = ?",
         (agora, usuario_id, session_token)
