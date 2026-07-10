@@ -168,7 +168,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # ======= 1. FILA DE FATURAMENTO =======
 with tab1:
     st.subheader("Fila de Pedidos Aprovados")
-    st.markdown("Selecione os pedidos que deseja faturar agora. **Atenção ao farol de estoque:** O sistema permite faturar no vermelho, mas o saldo do Produto Acabado ficará negativo.")
+    st.markdown("Selecione os pedidos para faturar. Ajuste o lote, validade e parcelamento se necessário. Os vencimentos são calculados automaticamente. *O sistema permite faturar no vermelho, mas o saldo do Produto Acabado ficará negativo.*")
 
     # Busca saldos de estoque atuais por produto
     df_saldos = fetch_all('''
@@ -211,9 +211,6 @@ with tab1:
             st.warning(f"Mostrando apenas os primeiros {max_exibir} de {total_pendentes} pedidos pendentes para otimização de performance.")
             
         pedidos_selecionados_lista = []
-        
-        st.markdown("### Fila de Pedidos para Faturamento")
-        st.markdown("*Selecione os pedidos para faturar. Ajuste o lote e validade se necessário. Os vencimentos de cada duplicata são calculados automaticamente conforme a forma de pagamento cadastrada no pedido.*")
         
         # Cabeçalho da Tabela
         col_h1, col_h2, col_h3, col_h4, col_h5, col_h6, col_h7, col_h8, col_h9, col_h10 = st.columns([0.4, 0.6, 2.0, 1.4, 1.0, 1.0, 0.7, 0.7, 1.8, 0.4], vertical_alignment="center")
@@ -697,104 +694,7 @@ with tab1:
                         time.sleep(2)
                     st.rerun()
                 
-    st.markdown("---")
-    with st.expander("🖨️ Reimpressão e Visualização de Documentos (DAV)"):
-        st.markdown("Busque pela venda digitando o ID do Pedido ou Número da NF/DAV. Se o campo de busca estiver vazio, serão exibidas as 10 faturas mais recentes.")
-        busca_reimp = st.text_input("Buscar Pedido ou NF/DAV (ID ou Número)", key="busca_reimpressao_doc").strip()
-        
-        # Constrói query dinâmica com base na busca
-        if busca_reimp:
-            q_reimp = '''
-                SELECT v.id, c.nome, v.tipo_documento, v.numero_documento, v.data 
-                FROM vendas v 
-                JOIN clientes c ON v.cliente_id=c.id 
-                WHERE v.status='FATURADO' 
-                  AND (v.id = ? OR v.numero_documento LIKE ?)
-                ORDER BY v.id DESC 
-                LIMIT 50
-            '''
-            search_id = int(busca_reimp) if busca_reimp.isdigit() else -1
-            search_doc = f"%{busca_reimp}%"
-            df_fat = fetch_all(q_reimp, (search_id, search_doc))
-        else:
-            df_fat = fetch_all('''
-                SELECT v.id, c.nome, v.tipo_documento, v.numero_documento, v.data 
-                FROM vendas v 
-                JOIN clientes c ON v.cliente_id=c.id 
-                WHERE v.status='FATURADO' 
-                ORDER BY v.id DESC 
-                LIMIT 10
-            ''')
-            
-        if not df_fat.empty:
-            opcoes_fat = {}
-            for _, r in df_fat.iterrows():
-                num_doc = r['numero_documento']
-                doc_desc = f" - Nº {num_doc}" if num_doc and str(num_doc).strip() else ""
-                label = f"Venda #{r['id']} - {r['nome']} ({r['tipo_documento']}{doc_desc})"
-                opcoes_fat[label] = r['id']
-            v_sel = st.selectbox("Selecione o pedido faturado para visualizar/imprimir:", ["-- SELECIONE --"] + list(opcoes_fat.keys()), key="sb_reimpressao_venda")
-            if v_sel != "-- SELECIONE --":
-                vid = opcoes_fat[v_sel]
-                
-                # 1. Visualização do Documento (DAV ou NF) primeiro (recarregando modulo para evitar caches de import)
-                import streamlit.components.v1 as components
-                import sys
-                import importlib
-                import utils_dav
-                importlib.reload(utils_dav)
-                from utils_dav import buscar_dados_venda, gerar_html_dav
-                
-                venda_info = buscar_dados_venda(vid)
-                if venda_info and "DAV" in venda_info['tipo_documento']:
-                    html_dav = gerar_html_dav(venda_info)
-                    components.html(html_dav, height=800, scrolling=True)
-                elif venda_info:
-                    # Painel de dados para NF (sem XML, mas com todas as informações do registro)
-                    st.markdown("#### 🧾 Dados da Nota Fiscal Registrada")
-                    df_nf_detail = fetch_all("""
-                        SELECT v.id, v.data, v.numero_documento, v.tipo_documento,
-                               v.valor_total, v.quantidade, v.lote_impresso, v.validade_impressa,
-                               c.nome as cliente, c.cnpj_cpf, c.cidade, c.uf,
-                               p.nome as produto, f.nome as vendedor
-                        FROM vendas v
-                        JOIN clientes c ON v.cliente_id = c.id
-                        JOIN produtos p ON v.produto_id = p.id
-                        LEFT JOIN funcionarios f ON v.vendedor_id = f.id
-                        WHERE v.id = ?
-                    """, (vid,))
-                    if not df_nf_detail.empty:
-                        nf = df_nf_detail.iloc[0]
-                        num_nf = nf['numero_documento'] or "(Aguardando número SEFAZ)"
-                        data_fat = pd.to_datetime(nf['data']).strftime('%d/%m/%Y') if pd.notna(nf['data']) else "-"
-                        
-                        info_col1, info_col2, info_col3 = st.columns(3)
-                        info_col1.metric("Nº do Documento", num_nf)
-                        info_col1.metric("Data de Faturamento", data_fat)
-                        info_col1.metric("Tipo", nf['tipo_documento'])
-                        
-                        info_col2.metric("Cliente", nf['cliente'])
-                        info_col2.metric("CNPJ/CPF", nf['cnpj_cpf'] or "(não informado)")
-                        info_col2.metric("Cidade/UF", f"{nf['cidade'] or '-'} / {nf['uf'] or '-'}")
-                        
-                        info_col3.metric("Produto", nf['produto'])
-                        info_col3.metric("Quantidade", f"{nf['quantidade']:,.2f}")
-                        info_col3.metric("Valor Total", format_brl(nf['valor_total']))
-                        
-                        st.markdown("---")
-                        det_col1, det_col2 = st.columns(2)
-                        det_col1.info(f"📦 **Lote Impresso:** {nf['lote_impresso'] or '(não informado)'}")
-                        det_col2.info(f"📅 **Validade Impressa:** {nf['validade_impressa'] or '(não informada)'}")
-                        
-                        if not num_nf or num_nf == "(Aguardando número SEFAZ)":
-                            st.warning(
-                                "⏳ Esta NF ainda não possui número SEFAZ registrado. "
-                                "Registre o número na aba **Gerador Fiscal (SEFAZ/Emissor)** para liberar o embarque."
-                            )
-                        else:
-                            st.success(f"✅ NF autorizada. Para reimprimir o DANFE, utilize seu Emissor SEFAZ com o número **{num_nf}**.")
-        else:
-            st.info("Nenhuma venda faturada encontrada.")
+
 
 # ======= 2. EXPORTADOR SEFAZ =======
 with tab2:
