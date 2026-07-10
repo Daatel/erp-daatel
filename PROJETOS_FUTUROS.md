@@ -53,6 +53,12 @@ Abaixo está o mapeamento dos locais e respectivos emojis que foram removidos da
 - **Status:** Arquivado para o futuro devido ao elevado esforço técnico (estimativa de 4 a 6 horas) envolvendo manipulação simultânea de SQL, Serverless Functions (Deno) e integrações reativas de Front-end com JWT auth.
 
 
+## 📋 Kanban de Pedidos (Produção) - Repasse Horta do Príncipe
+- **Objetivo:** Implementar o Kanban interativo (drag-and-drop) de pedidos de produção baseado na especificação `MD_Kanban_de_pedidos.MD` e no mockup `kanban_pedidos_producao_v3.html`.
+- **Escopo Técnico:** Requer a criação de novas colunas e tabelas no Supabase (`data_prevista`, `grade_id`, etc.), configuração de Edge Functions (`mover-pedido`) para gerenciar as permissões e atualização de banco, e injeção do componente de interface Kanban no front-end Streamlit utilizando JavaScript vanilla e SortableJS.
+- **Status:** Arquivado para o futuro devido ao elevado esforço técnico (estimativa de 4 a 6 horas) envolvendo manipulação simultânea de SQL, Serverless Functions (Deno) e integrações reativas de Front-end com JWT auth.
+
+
 ## Transicao para Arquitetura SaaS (Longo Prazo)
 - **Objetivo:** Refatorar o ERP monolito atual para uma arquitetura Multi-Tenant escalavel na nuvem.
 - **Motivacao:** A arquitetura atual (Streamlit + Banco Flat) atende perfeitamente a uma operacao single-company, mas estruturalmente obriga adocao de dividas tecnicas (como agrupar multiplos itens em registros de vendas individuais). Para suportar multiplas empresas (SaaS) no futuro, o sistema inteiro precisa ser repensado do zero.
@@ -62,3 +68,17 @@ Abaixo está o mapeamento dos locais e respectivos emojis que foram removidos da
   - **Frontend:** Substituicao do Streamlit por um framework SPA moderno (React/Next.js ou Vue.js), proporcionando interfaces assincronas de alta performance para dezenas de usuarios concorrentes.
   - **Infraestrutura:** Hospedagem baseada em containers (Docker/Kubernetes) ou arquitetura Serverless para escalar automaticamente durante picos de faturamento no final do mes.
 - **Status:** Decisao estrategica registrada. Sera executada quando o produto evoluir para modelo SaaS comercial.
+
+---
+
+## 📊 Redesenho do Cockpit Financeiro Diário (Projeção vs Fechamento)
+- **Objetivo:** Reformular o painel executivo diário para separar a rotina em duas visões complementares (Projeção Financeira do Dia & Fechamento Financeiro do Dia), com identidade visual sóbria, sem emojis e com foco em usabilidade.
+- **Requisitos de Negócio e UX mapeados:**
+  1. **Migração de Banco de Dados:** Adicionar a coluna `limite_credito` (NUMERIC/DECIMAL, default `0.0`) na tabela `contas_bancarias` (SQLite e PostgreSQL) e suportar sua edição na tela de Cadastros.
+  2. **Exigência de Conciliação Matinal:** Exibir o aviso `⚠️ Relatório Requer Posições Conciliadas` na visão de Projeção caso existam lançamentos não conciliados de dias anteriores, orientando o usuário a conciliar antes de projetar.
+  3. **Limite de Crédito Transparente:** Adicionar coluna de Limite de Crédito nas tabelas de saldo, sem somá-lo ao saldo líquido geral.
+  4. **Aging de Atrasados:** Exibir em linha separada o aging de inadimplência acumulada (`0-30` / `31-60` / `60+` dias) para receber e pagar.
+  5. **Plano de Contas Integrado:** Exibir e agrupar duplicatas com seu respectivo Plano de Contas (código e nome) e destacar lançamentos sem classificação (`Sem categoria — classificar` em vermelho).
+  6. **Gráfico de Fluxo de Caixa Projetado:** Linha de saldo futuro acumulado e barras de entradas/saídas projetadas para os próximos 30 dias (em vez de histórico passado).
+  7. **Fechamento Diário em PDF:** Botão na visão de Fechamento para emitir um relatório A4 corporativo limpo do dia realizado.
+- **Status:** Planejado para futura implementação baseando-se nas especificações de `spec_mvp_financeiro.md` e `MD_Painel_Financeiro.md`.
