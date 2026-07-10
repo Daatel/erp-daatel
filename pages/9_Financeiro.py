@@ -151,130 +151,6 @@ def gerar_pdf_financeiro(df_pdf, dt_ini, dt_fim, t_ent, t_sai, s_liq, banco_filt
 
 
 
-def gerar_pdf_diario_financeiro(hoje, rows_data, receipts_data, payments_data):
-    from fpdf import FPDF
-    
-    class DiarioPDF(FPDF):
-        def header(self):
-            self.set_fill_color(41, 45, 119) # Navy #292d77
-            self.rect(0, 0, 210, 30, 'F')
-            
-            self.set_y(5)
-            self.set_text_color(255, 255, 255)
-            self.set_font("helvetica", "B", 15)
-            self.cell(190, 8, "EMPORIO DO ALHO - DIARIO FINANCEIRO", align="C", new_x="LMARGIN", new_y="NEXT")
-            self.set_font("helvetica", "", 10)
-            self.cell(190, 5, f"Relatorio Diario de Caixa | Data: {hoje.strftime('%d/%m/%Y')}", align="C", new_x="LMARGIN", new_y="NEXT")
-            self.ln(12)
-            
-        def footer(self):
-            self.set_y(-15)
-            self.set_font("helvetica", "I", 8)
-            self.set_text_color(128, 128, 128)
-            self.cell(0, 10, f"Pagina {self.page_no()}/{{nb}} - ERP Emporio do Alho", align="R")
-            
-    pdf = DiarioPDF()
-    pdf.alias_nb_pages()
-    pdf.add_page()
-    
-    pdf.set_text_color(30, 41, 59)
-    pdf.set_font("helvetica", "B", 11)
-    pdf.cell(190, 7, "1. Posicao de Caixa e Conciliacao por Conta", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-    
-    pdf.set_fill_color(230, 235, 245)
-    pdf.set_font("helvetica", "B", 8.5)
-    headers = ["Conta", "Saldo Inicial", "Entradas", "Saidas", "Resultado", "Saldo Final", "Conciliacao"]
-    widths = [36, 26, 24, 24, 25, 26, 29]
-    for h, w in zip(headers, widths):
-        pdf.cell(w, 7, h, border=1, align="C", fill=True)
-    pdf.ln(7)
-    
-    pdf.set_font("helvetica", "", 8.5)
-    tot_inicial = 0.0
-    tot_entradas = 0.0
-    tot_saidas = 0.0
-    tot_resultado = 0.0
-    tot_final = 0.0
-    
-    for r in rows_data:
-        pdf.cell(widths[0], 7, str(r['Conta']), border=1, align="L")
-        pdf.cell(widths[1], 7, f"R$ {r['Saldo Inicial']:,.2f}", border=1, align="R")
-        pdf.cell(widths[2], 7, f"R$ {r['Entradas (Hoje)']:,.2f}", border=1, align="R")
-        pdf.cell(widths[3], 7, f"R$ {r['Saidas (Hoje)']:,.2f}", border=1, align="R")
-        pdf.cell(widths[4], 7, f"R$ {r['Resultado (Hoje)']:,.2f}", border=1, align="R")
-        pdf.cell(widths[5], 7, f"R$ {r['Saldo Final']:,.2f}", border=1, align="R")
-        pdf.cell(widths[6], 7, str(r['Conciliacao']), border=1, align="C")
-        pdf.ln(7)
-        
-        tot_inicial += r['Saldo Inicial']
-        tot_entradas += r['Entradas (Hoje)']
-        tot_saidas += r['Saidas (Hoje)']
-        tot_resultado += r['Resultado (Hoje)']
-        tot_final += r['Saldo Final']
-        
-    pdf.set_font("helvetica", "B", 8.5)
-    pdf.set_fill_color(245, 247, 250)
-    pdf.cell(widths[0], 7, "TOTAL GERAL", border=1, align="L", fill=True)
-    pdf.cell(widths[1], 7, f"R$ {tot_inicial:,.2f}", border=1, align="R", fill=True)
-    pdf.cell(widths[2], 7, f"R$ {tot_entradas:,.2f}", border=1, align="R", fill=True)
-    pdf.cell(widths[3], 7, f"R$ {tot_saidas:,.2f}", border=1, align="R", fill=True)
-    pdf.cell(widths[4], 7, f"R$ {tot_resultado:,.2f}", border=1, align="R", fill=True)
-    pdf.cell(widths[5], 7, f"R$ {tot_final:,.2f}", border=1, align="R", fill=True)
-    pdf.cell(widths[6], 7, "-", border=1, align="C", fill=True)
-    pdf.ln(10)
-    
-    pdf.set_font("helvetica", "B", 11)
-    pdf.cell(190, 7, "2. Recebimentos Realizados no Dia (Entradas)", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-    
-    pdf.set_font("helvetica", "B", 8.5)
-    pdf.set_fill_color(230, 245, 235)
-    rec_headers = ["Descricao", "Categoria", "Conta", "Valor"]
-    rec_widths = [80, 45, 35, 30]
-    for h, w in zip(rec_headers, rec_widths):
-        pdf.cell(w, 7, h, border=1, align="C", fill=True)
-    pdf.ln(7)
-    
-    pdf.set_font("helvetica", "", 8.5)
-    if not receipts_data:
-        pdf.cell(190, 7, "Nenhum recebimento registrado hoje.", border=1, align="C")
-        pdf.ln(7)
-    else:
-        for r in receipts_data:
-            pdf.cell(rec_widths[0], 7, str(r.get('descricao', '')), border=1, align="L")
-            pdf.cell(rec_widths[1], 7, str(r.get('categoria', '')), border=1, align="L")
-            pdf.cell(rec_widths[2], 7, str(r.get('conta', '')), border=1, align="C")
-            pdf.cell(rec_widths[3], 7, f"R$ {r.get('valor', 0.0):,.2f}", border=1, align="R")
-            pdf.ln(7)
-    pdf.ln(8)
-            
-    pdf.set_font("helvetica", "B", 11)
-    pdf.cell(190, 7, "3. Pagamentos Realizados no Dia (Saidas)", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-    
-    pdf.set_font("helvetica", "B", 8.5)
-    pdf.set_fill_color(255, 235, 235)
-    for h, w in zip(rec_headers, rec_widths):
-        pdf.cell(w, 7, h, border=1, align="C", fill=True)
-    pdf.ln(7)
-    
-    pdf.set_font("helvetica", "", 8.5)
-    if not payments_data:
-        pdf.cell(190, 7, "Nenhum pagamento registrado hoje.", border=1, align="C")
-        pdf.ln(7)
-    else:
-        for p in payments_data:
-            pdf.cell(rec_widths[0], 7, str(p.get('descricao', '')), border=1, align="L")
-            pdf.cell(rec_widths[1], 7, str(p.get('categoria', '')), border=1, align="L")
-            pdf.cell(rec_widths[2], 7, str(p.get('conta', '')), border=1, align="C")
-            pdf.cell(rec_widths[3], 7, f"R$ {p.get('valor', 0.0):,.2f}", border=1, align="R")
-            pdf.ln(7)
-            
-    return bytes(pdf.output())
-
-
-
 @st.dialog("Lançamento Direto Bloqueado")
 
 def mostrar_mensagem_bloqueio(username):
@@ -703,233 +579,57 @@ try:
 
             
 
+        # Header area
+
+        st.markdown("### 🏆 Cockpit Financeiro Diário - Empório do Alho")
+
+        
+
+        # 2. TOP ROW CARDS (KPIs): Entra hoje, Sai hoje, Resultado do dia
+
+        # Query planned receivables due today (PENDENTE)
+
+        df_rec_hoje = fetch_all("SELECT SUM(valor) as total FROM contas_a_receber WHERE status='PENDENTE' AND data_vencimento=?", (hoje.strftime("%Y-%m-%d"),))
+
+        entra_hoje_val = float(df_rec_hoje.iloc[0]['total'] or 0.0) if not df_rec_hoje.empty else 0.0
+
+        
+
+        # Query planned payables due today (PENDENTE)
+
+        df_pag_hoje = fetch_all("SELECT SUM(valor) as total FROM contas_a_pagar WHERE status='PENDENTE' AND data_vencimento=?", (hoje.strftime("%Y-%m-%d"),))
+
+        sai_hoje_val = float(df_pag_hoje.iloc[0]['total'] or 0.0) if not df_pag_hoje.empty else 0.0
+
+        
+
+        resultado_dia_val = entra_hoje_val - sai_hoje_val
+
+        
+
+        c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
+
+        
+
         # Format values to BRL
+
         def to_brl(v):
+
             return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-        # 1. Calcula dados de movimentação por conta bancária
-        df_contas_cockpit = fetch_all("SELECT id, nome, saldo_inicial FROM contas_bancarias WHERE status='ATIVO'")
+            
+
+        c_kpi1.metric("Entra hoje", to_brl(entra_hoje_val))
+
+        c_kpi2.metric("Sai hoje", to_brl(sai_hoje_val))
+
+        c_kpi3.metric("Resultado do dia", to_brl(resultado_dia_val), 
+
+                     delta=to_brl(resultado_dia_val) if resultado_dia_val != 0 else None,
+
+                     delta_color="normal" if resultado_dia_val >= 0 else "inverse")
+
         
-        rows_data = []
-        tot_inicial = 0.0
-        tot_entradas = 0.0
-        tot_saidas = 0.0
-        tot_resultado = 0.0
-        tot_final = 0.0
-        
-        for _, acc in df_contas_cockpit.iterrows():
-            acc_id = int(acc['id'])
-            acc_nome = acc['nome']
-            saldo_ini_db = float(acc['saldo_inicial'] or 0.0)
-            
-            # Saldo Inicial do Dia (tudo acumulado até ontem)
-            df_ini = fetch_all("""
-                SELECT SUM(CASE WHEN tipo = 'Entrada' THEN valor ELSE -valor END) as total 
-                FROM fluxo_caixa 
-                WHERE conta_bancaria_id = ? AND data < ?
-            """, (acc_id, hoje.strftime("%Y-%m-%d")))
-            saldo_antes_hoje = float(df_ini.iloc[0]['total'] or 0.0) if not df_ini.empty else 0.0
-            saldo_inicial_dia = saldo_ini_db + saldo_antes_hoje
-            
-            # Entradas de hoje
-            df_ent = fetch_all("""
-                SELECT SUM(valor) as total FROM fluxo_caixa 
-                WHERE conta_bancaria_id = ? AND tipo = 'Entrada' AND data = ?
-            """, (acc_id, hoje.strftime("%Y-%m-%d")))
-            entradas_hoje = float(df_ent.iloc[0]['total'] or 0.0) if not df_ent.empty else 0.0
-            
-            # Saídas de hoje
-            df_sai = fetch_all("""
-                SELECT SUM(valor) as total FROM fluxo_caixa 
-                WHERE conta_bancaria_id = ? AND tipo = 'Saída' AND data = ?
-            """, (acc_id, hoje.strftime("%Y-%m-%d")))
-            saidas_hoje = float(df_sai.iloc[0]['total'] or 0.0) if not df_sai.empty else 0.0
-            
-            resultado_hoje = entradas_hoje - saidas_hoje
-            saldo_final_dia = saldo_inicial_dia + resultado_hoje
-            
-            # Conciliação pendente por conta
-            df_pend = fetch_all("""
-                SELECT COUNT(*) as total FROM fluxo_caixa 
-                WHERE conta_bancaria_id = ? AND (conciliado = FALSE OR conciliado IS NULL)
-            """, (acc_id,))
-            pendentes = int(df_pend.iloc[0]['total'] or 0) if not df_pend.empty else 0
-            status_conc = "Em Dia" if pendentes == 0 else "Pendente"
-            
-            rows_data.append({
-                "Conta": acc_nome,
-                "Saldo Inicial": saldo_inicial_dia,
-                "Entradas (Hoje)": entradas_hoje,
-                "Saídas (Hoje)": saidas_hoje,
-                "Resultado (Hoje)": resultado_hoje,
-                "Saldo Final": saldo_final_dia,
-                "Conciliação": status_conc
-            })
-            
-            tot_inicial += saldo_inicial_dia
-            tot_entradas += entradas_hoje
-            tot_saidas += saidas_hoje
-            tot_resultado += resultado_hoje
-            tot_final += saldo_final_dia
-
-        # Recebimentos e Pagamentos realizados hoje
-        df_rec_dia = fetch_all("""
-            SELECT f.descricao, f.categoria, cb.nome as conta, f.valor
-            FROM fluxo_caixa f
-            LEFT JOIN contas_bancarias cb ON f.conta_bancaria_id = cb.id
-            WHERE f.tipo = 'Entrada' AND f.data = ?
-        """, (hoje.strftime("%Y-%m-%d"),))
-        
-        df_pag_dia = fetch_all("""
-            SELECT f.descricao, f.categoria, cb.nome as conta, f.valor
-            FROM fluxo_caixa f
-            LEFT JOIN contas_bancarias cb ON f.conta_bancaria_id = cb.id
-            WHERE f.tipo = 'Saída' AND f.data = ?
-        """, (hoje.strftime("%Y-%m-%d"),))
-
-        # Cabeçalho do Cockpit e Botão de Impressão PDF
-        col_title, col_print = st.columns([3, 1])
-        with col_title:
-            st.markdown("### 🏆 Cockpit Financeiro Diário - Empório do Alho")
-        with col_print:
-            # Geração do relatório diário em A4 PDF
-            try:
-                receipts_list = df_rec_dia.to_dict('records') if not df_rec_dia.empty else []
-                payments_list = df_pag_dia.to_dict('records') if not df_pag_dia.empty else []
-                pdf_bytes = gerar_pdf_diario_financeiro(hoje, rows_data, receipts_list, payments_list)
-                st.download_button(
-                    label="🖨️ Imprimir Diário (PDF)",
-                    data=pdf_bytes,
-                    file_name=f"diario_financeiro_{hoje.strftime('%Y-%m-%d')}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                    type="primary"
-                )
-            except Exception as e:
-                st.error(f"Erro ao gerar PDF: {e}")
-
-        # Renderizar tabela de saldos por conta (Visual Premium)
-        html_table = """
-        <style>
-        .fin-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'Inter', sans-serif;
-            margin-bottom: 25px;
-        }
-        .fin-table th {
-            background-color: #292d77;
-            color: white;
-            text-align: center;
-            padding: 10px;
-            font-size: 13px;
-            font-weight: 600;
-        }
-        .fin-table td {
-            border: 1px solid #e2e8f0;
-            padding: 8px 10px;
-            font-size: 13px;
-            text-align: right;
-        }
-        .fin-table td.left {
-            text-align: left;
-        }
-        .fin-table td.center {
-            text-align: center;
-        }
-        .fin-table tr.total-row {
-            background-color: #f8fafc;
-            font-weight: bold;
-        }
-        .fin-table tr:hover {
-            background-color: #f8fafc;
-        }
-        </style>
-        <table class="fin-table">
-            <thead>
-                <tr>
-                    <th>Conta</th>
-                    <th>Saldo Inicial (Dia)</th>
-                    <th>Entradas (Hoje)</th>
-                    <th>Saídas (Hoje)</th>
-                    <th>Resultado (Hoje)</th>
-                    <th>Saldo Final (Dia)</th>
-                    <th>Conciliação</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
-        for r in rows_data:
-            badge_icon = "🟢" if r['Conciliação'] == "Em Dia" else "🔴"
-            badge_class = "color: #16a34a; font-weight: bold;" if r['Conciliação'] == "Em Dia" else "color: #dc2626; font-weight: bold;"
-            html_table += f"""
-                <tr>
-                    <td class="left">{r['Conta']}</td>
-                    <td>{to_brl(r['Saldo Inicial'])}</td>
-                    <td>{to_brl(r['Entradas (Hoje)'])}</td>
-                    <td>{to_brl(r['Saídas (Hoje)'])}</td>
-                    <td>{to_brl(r['Resultado (Hoje)'])}</td>
-                    <td>{to_brl(r['Saldo Final'])}</td>
-                    <td class="center" style="{badge_class}">{badge_icon} {r['Conciliação']}</td>
-                </tr>
-            """
-        html_table += f"""
-                <tr class="total-row">
-                    <td class="left">TOTAL GERAL</td>
-                    <td>{to_brl(tot_inicial)}</td>
-                    <td>{to_brl(tot_entradas)}</td>
-                    <td>{to_brl(tot_saidas)}</td>
-                    <td>{to_brl(tot_resultado)}</td>
-                    <td>{to_brl(tot_final)}</td>
-                    <td class="center">-</td>
-                </tr>
-            </tbody>
-        </table>
-        """
-        st.markdown(html_table, unsafe_allow_html=True)
-
-        # Recebimentos e Pagamentos realizados hoje
-        col_rec_dia, col_pag_dia = st.columns(2)
-        with col_rec_dia:
-            st.markdown("#### 📥 Recebimentos Realizados Hoje")
-            if df_rec_dia.empty:
-                st.info("Nenhum recebimento registrado hoje no fluxo de caixa.")
-            else:
-                df_rec_view = df_rec_dia.copy()
-                df_rec_view['valor'] = df_rec_view['valor'].apply(to_brl)
-                df_rec_view.columns = ['Descrição', 'Categoria', 'Conta', 'Valor']
-                st.dataframe(df_rec_view, hide_index=True, use_container_width=True)
-                
-        with col_pag_dia:
-            st.markdown("#### 📤 Pagamentos Realizados Hoje")
-            if df_pag_dia.empty:
-                st.info("Nenhum pagamento registrado hoje no fluxo de caixa.")
-            else:
-                df_pag_view = df_pag_dia.copy()
-                df_pag_view['valor'] = df_pag_view['valor'].apply(to_brl)
-                df_pag_view.columns = ['Descrição', 'Categoria', 'Conta', 'Valor']
-                st.dataframe(df_pag_view, hide_index=True, use_container_width=True)
-
-        # Gráfico de Fluxo de Caixa Realizado (Últimos 15 Dias)
-        data_ini_graf = (hoje - timedelta(days=15)).strftime("%Y-%m-%d")
-        df_fluxo_graf = fetch_all("""
-            SELECT data,
-                   SUM(CASE WHEN tipo = 'Entrada' THEN valor ELSE 0 END) as entradas,
-                   SUM(CASE WHEN tipo = 'Saída' THEN valor ELSE 0 END) as saidas
-            FROM fluxo_caixa
-            WHERE data BETWEEN ? AND ?
-            GROUP BY data
-            ORDER BY data
-        """, (data_ini_graf, hoje.strftime("%Y-%m-%d")))
-        
-        if not df_fluxo_graf.empty:
-            df_fluxo_graf = df_fluxo_graf.set_index('data')
-            idx_range = pd.date_range(start=data_ini_graf, end=hoje.strftime("%Y-%m-%d")).strftime("%Y-%m-%d")
-            df_fluxo_graf = df_fluxo_graf.reindex(idx_range, fill_value=0.0)
-            
-            st.markdown("---")
-            st.markdown("#### 📊 Fluxo de Caixa Realizado (Últimos 15 Dias)")
-            st.bar_chart(df_fluxo_graf[['entradas', 'saidas']])
 
         st.markdown("---")
 
