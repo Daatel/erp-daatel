@@ -35,6 +35,55 @@ def format_brl(val):
         return "R$ 0,00"
     return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+@st.dialog("Visualizar DANFE (PDF)", width="large")
+def modal_visualizar_danfe(numero_nf):
+    from utils_bling import bling_api_request
+    st.write("🔍 Conectando ao Bling para recuperar o link oficial do PDF...")
+    
+    num_padded = str(numero_nf).zfill(6)
+    response = bling_api_request("GET", f"/nfe?numero={num_padded}")
+    
+    if response.status_code == 200:
+        data = response.json()
+        notas = data.get("data", [])
+        if notas:
+            nfe_id = notas[0].get("id")
+            detail_response = bling_api_request("GET", f"/nfe/{nfe_id}")
+            if detail_response.status_code == 200:
+                detail_data = detail_response.json()
+                link = detail_data.get("data", {}).get("linkPDF") or detail_data.get("data", {}).get("linkDanfe")
+                if link:
+                    st.success("✅ Link do DANFE PDF obtido com sucesso!")
+                    st.link_button("📥 Abrir PDF do DANFE (Bling)", link, use_container_width=True)
+                else:
+                    st.error("❌ O Bling não retornou o link do PDF para esta nota fiscal.")
+            else:
+                st.error(f"❌ Erro ao obter detalhes da nota (Status {detail_response.status_code}).")
+        else:
+            st.error(f"❌ Nota fiscal número {numero_nf} não encontrada no Bling. Verifique se ela foi emitida corretamente.")
+    else:
+        st.error(f"❌ Erro ao buscar nota fiscal no Bling (Status {response.status_code}).")
+        
+    if st.button("Fechar", type="secondary", use_container_width=True):
+        st.rerun()
+
+@st.dialog("Imprimir DAV", width="large")
+def modal_impressao_dav_vendas(venda_id):
+    import streamlit.components.v1 as components
+    from utils_dav import buscar_dados_venda, gerar_html_dav
+    
+    st.write("📄 Gerando o documento de venda...")
+    venda_info = buscar_dados_venda(venda_id)
+    if venda_info:
+        html_dav = gerar_html_dav(venda_info)
+        html_dav = html_dav.replace("</body>", "<script>window.print();</script></body>")
+        components.html(html_dav, height=800, scrolling=True)
+    else:
+        st.error("❌ Erro ao gerar dados do DAV.")
+        
+    if st.button("Fechar", type="secondary", use_container_width=True):
+        st.rerun()
+
 # Dialog: Lançar Novo Pedido
 @st.dialog("Lançar Novo Pedido", width="large")
 def modal_lancar_pedido():
@@ -557,14 +606,39 @@ with tab_pedidos:
                 vid_sel = int(row_sel['pedido_id'])
                 status_sel = row_sel['status_pedido']
                 
-                # Botões de Alteração
+                # Botões de Alteração e Reimpressão
+                tipo_doc = row_sel['tipo_documento']
+                num_doc = row_sel['numero_documento']
+                
                 if status_sel == 'APROVADO':
                     if col_act2.button("Editar Pedido", use_container_width=True):
                         modal_editar_pedido(vid_sel)
                     if col_act3.button("Cancelar Pedido", type="primary", use_container_width=True):
                         modal_cancelar_pedido(vid_sel)
+                elif status_sel == 'FATURADO':
+                    if col_act2.button("🖨️ Reimprimir DAV", use_container_width=True):
+                        modal_impressao_dav_vendas(vid_sel)
+                    
+                    if tipo_doc == 'Nota Fiscal (NF)' and num_doc:
+                        if str(num_doc).startswith("Bling #"):
+                            if col_act3.button("🔄 Sincronizar NF-e", type="primary", use_container_width=True):
+                                from utils_bling import sincronizar_nfe_do_bling
+                                bling_id = str(num_doc).replace("Bling #", "").strip()
+                                try:
+                                    num_nfe = sincronizar_nfe_do_bling(bling_id)
+                                    if num_nfe:
+                                        run_query("UPDATE vendas SET numero_documento = ? WHERE id = ?", (num_nfe, vid_sel))
+                                        st.success(f"Nota sincronizada! Nº {num_nfe}")
+                                        import time; time.sleep(1); st.rerun()
+                                    else:
+                                        st.info("A nota fiscal ainda está em processamento no Bling.")
+                                except Exception as e:
+                                    st.error(f"Erro ao sincronizar: {e}")
+                        else:
+                            if col_act3.button("📄 Visualizar DANFE (PDF)", type="primary", use_container_width=True):
+                                modal_visualizar_danfe(num_doc)
                 else:
-                    col_act2.info("Pedidos faturados/cancelados não podem ser editados ou cancelados.")
+                    col_act2.info("Pedidos cancelados não podem ser editados ou faturados.")
                 
                 # --- TIMELINE / HISTÓRICO DO PEDIDO SELECIONADO ---
                 st.markdown("---")
