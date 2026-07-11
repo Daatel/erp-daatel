@@ -19,10 +19,15 @@ st.markdown("""
     padding-top: 1.5rem !important;
     padding-bottom: 1rem !important;
 }
+h1 {
+    font-size: 2.2rem !important;
+    font-weight: 700 !important;
+    margin-top: -15px !important;
+    margin-bottom: 0px !important;
+    color: #1e293b !important;
+}
 </style>
-<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
-Pessoas e Folha de Pagamento
-</h1>
+<h1>Pessoas e Folha de Pagamento</h1>
 """, unsafe_allow_html=True)
 
 df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%'")

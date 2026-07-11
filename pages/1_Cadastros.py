@@ -13,10 +13,15 @@ st.markdown("""
     padding-top: 1.5rem !important;
     padding-bottom: 1rem !important;
 }
+h1 {
+    font-size: 2.2rem !important;
+    font-weight: 700 !important;
+    margin-top: -15px !important;
+    margin-bottom: 0px !important;
+    color: #1e293b !important;
+}
 </style>
-<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
-Cadastros Inteligentes
-</h1>
+<h1>Cadastros Inteligentes</h1>
 """, unsafe_allow_html=True)
 
 tab_empresa, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab_fp, tab_ft = st.tabs([

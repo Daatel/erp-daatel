@@ -20,11 +20,63 @@ st.markdown("""
     padding-top: 1.5rem !important;
     padding-bottom: 1rem !important;
 }
+h1 {
+    font-size: 2.2rem !important;
+    font-weight: 700 !important;
+    margin-top: -15px !important;
+    margin-bottom: 0px !important;
+    color: #1e293b !important;
+}
 </style>
-<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
-Registro de Notas Fiscais de Entrada
-</h1>
+<h1>Compras e XML</h1>
 """, unsafe_allow_html=True)
+
+col_up, _ = st.columns([2, 3])
+with col_up:
+    xml_file = st.file_uploader("Upload de XML", type=["xml"])
+
+xml_nNF = ""
+xml_forn_name = None
+xml_itens = []
+
+if xml_file is not None:
+    try:
+        import xml.etree.ElementTree as ET
+        tree = ET.parse(xml_file)
+        root = tree.getroot()
+        # Namespace strip hack
+        for elem in root.iter():
+            if '}' in elem.tag: elem.tag = elem.tag.split('}', 1)[1]
+            
+        ide = root.find('.//ide')
+        if ide is not None:
+            nNF_elem = ide.find('nNF')
+            if nNF_elem is not None: xml_nNF = nNF_elem.text
+            
+        emit = root.find('.//emit')
+        if emit is not None:
+            xNome_elem = emit.find('xNome')
+            if xNome_elem is not None:
+                xml_forn_name = xNome_elem.text.upper()
+                
+        dets = root.findall('.//det')
+        for det in dets:
+            prod = det.find('prod')
+            if prod is not None:
+                xProd = prod.find('xProd').text if prod.find('xProd') is not None else "Produto Desconhecido"
+                qCom = float(prod.find('qCom').text) if prod.find('qCom') is not None else 1.0
+                vUnCom = float(prod.find('vUnCom').text) if prod.find('vUnCom') is not None else 0.0
+                xml_itens.append({"nome": xProd, "qtd": qCom, "preco": vUnCom})
+                
+        st.success(f"XML lido com sucesso! Nota Fiscal: {xml_nNF} | Fornecedor do XML: {xml_forn_name}")
+        if xml_itens:
+            st.info(f"O XML possui {len(xml_itens)} item(ns). Como as descrições podem ser diferentes do seu cadastro, adicione-os manualmente na Seção 2 usando os valores lidos.")
+            st.dataframe(pd.DataFrame(xml_itens), hide_index=True)
+            
+    except Exception as e:
+        st.error(f"Erro ao ler XML: {e}")
+
+st.markdown("---")
 
 
 # ─── SESSION STATE ────────────────────────────────────────────────────────────
@@ -82,53 +134,7 @@ def parse_prazo(rule_str):
 
 import xml.etree.ElementTree as ET
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# LEITURA PASSIVA (XML NF-e)
-# ═══════════════════════════════════════════════════════════════════════════════
-st.markdown("### ⚡ Entrada Passiva de Dados")
-xml_file = st.file_uploader("Arraste o XML da Nota Fiscal (NF-e) aqui para preencher tudo sozinho", type=["xml"])
 
-xml_nNF = ""
-xml_forn_name = None
-xml_itens = []
-
-if xml_file is not None:
-    try:
-        tree = ET.parse(xml_file)
-        root = tree.getroot()
-        # Namespace strip hack
-        for elem in root.iter():
-            if '}' in elem.tag: elem.tag = elem.tag.split('}', 1)[1]
-            
-        ide = root.find('.//ide')
-        if ide is not None:
-            nNF_elem = ide.find('nNF')
-            if nNF_elem is not None: xml_nNF = nNF_elem.text
-            
-        emit = root.find('.//emit')
-        if emit is not None:
-            xNome_elem = emit.find('xNome')
-            if xNome_elem is not None:
-                xml_forn_name = xNome_elem.text.upper()
-                
-        dets = root.findall('.//det')
-        for det in dets:
-            prod = det.find('prod')
-            if prod is not None:
-                xProd = prod.find('xProd').text if prod.find('xProd') is not None else "Produto Desconhecido"
-                qCom = float(prod.find('qCom').text) if prod.find('qCom') is not None else 1.0
-                vUnCom = float(prod.find('vUnCom').text) if prod.find('vUnCom') is not None else 0.0
-                xml_itens.append({"nome": xProd, "qtd": qCom, "preco": vUnCom})
-                
-        st.success(f"XML lido com sucesso! Nota Fiscal: {xml_nNF} | Fornecedor do XML: {xml_forn_name}")
-        if xml_itens:
-            st.info(f"O XML possui {len(xml_itens)} item(ns). Como as descrições podem ser diferentes do seu cadastro, adicione-os manualmente na Seção 2 usando os valores lidos.")
-            st.dataframe(pd.DataFrame(xml_itens), hide_index=True)
-            
-    except Exception as e:
-        st.error(f"Erro ao ler XML: {e}")
-
-st.markdown("---")
 # ═══════════════════════════════════════════════════════════════════════════════
 # SEÇÃO 1 — CABEÇALHO DA NF
 # ═══════════════════════════════════════════════════════════════════════════════

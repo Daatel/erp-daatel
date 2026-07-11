@@ -430,25 +430,20 @@ carregar_estilo()
 
 
 st.markdown("""
-
 <style>
-
 .block-container {
-
     padding-top: 1.5rem !important;
-
     padding-bottom: 1rem !important;
-
 }
-
+h1 {
+    font-size: 2.2rem !important;
+    font-weight: 700 !important;
+    margin-top: -15px !important;
+    margin-bottom: 0px !important;
+    color: #1e293b !important;
+}
 </style>
-
-<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
-
-Financeiro e Tesouraria
-
-</h1>
-
+<h1>Financeiro e Tesouraria</h1>
 """, unsafe_allow_html=True)
 
 
@@ -634,7 +629,7 @@ try:
             out_of_tolerance = True
             
         if out_of_tolerance:
-            st.error(f"Alerta de segurança: Conciliação financeira pendente! Último registro conciliado: {last_conc_date.strftime('%d/%m/%Y') if last_conc_date else 'nunca'}. A tolerância máxima é de D-1 (ontem). Efetue a conciliação na aba correspondente.")
+            st.error(f"Conciliação financeira pendente. Último registro: {last_conc_date.strftime('%d/%m/%Y') if last_conc_date else 'nunca'}.")
         else:
             st.success(f"Conciliação em dia: Caixa conciliado até {last_conc_date.strftime('%d/%m/%Y') if last_conc_date else 'nunca'}.")
 
