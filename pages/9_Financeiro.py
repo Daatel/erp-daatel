@@ -773,18 +773,17 @@ try:
             with col_atr2:
                 st.markdown(f"Total a Pagar em Atraso: <span style='color:#b45309; font-weight:700;'>{to_brl(total_pag_overdue)}</span>", unsafe_allow_html=True)
                 
-            with st.expander("Detalhar aging de atrasados"):
-                col_ag1, col_ag2 = st.columns(2)
-                with col_ag1:
-                    st.markdown("**Aging a Receber:**")
-                    st.markdown(f"- 0 a 30 dias: {to_brl(rec_aging['0-30'])}")
-                    st.markdown(f"- 31 a 60 dias: {to_brl(rec_aging['31-60'])}")
-                    st.markdown(f"- Mais de 60 dias: {to_brl(rec_aging['60+'])}")
-                with col_ag2:
-                    st.markdown("**Aging a Pagar:**")
-                    st.markdown(f"- 0 a 30 dias: {to_brl(pag_aging['0-30'])}")
-                    st.markdown(f"- 31 a 60 dias: {to_brl(pag_aging['31-60'])}")
-                    st.markdown(f"- Mais de 60 dias: {to_brl(pag_aging['60+'])}")
+            col_ag1, col_ag2 = st.columns(2)
+            with col_ag1:
+                st.markdown("**Aging a Receber:**")
+                st.markdown(f"- 0 a 30 dias: {to_brl(rec_aging['0-30'])}")
+                st.markdown(f"- 31 a 60 dias: {to_brl(rec_aging['31-60'])}")
+                st.markdown(f"- Mais de 60 dias: {to_brl(rec_aging['60+'])}")
+            with col_ag2:
+                st.markdown("**Aging a Pagar:**")
+                st.markdown(f"- 0 a 30 dias: {to_brl(pag_aging['0-30'])}")
+                st.markdown(f"- 31 a 60 dias: {to_brl(pag_aging['31-60'])}")
+                st.markdown(f"- Mais de 60 dias: {to_brl(pag_aging['60+'])}")
 
             st.markdown("---")
 
