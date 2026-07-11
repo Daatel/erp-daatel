@@ -14,7 +14,17 @@ def format_brl(val):
     except:
         return "R$ 0,00"
 
-st.title("🛒 Registro de Notas Fiscais de Entrada")
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+Registro de Notas Fiscais de Entrada
+</h1>
+""", unsafe_allow_html=True)
 st.markdown("Lance NFs com múltiplos itens, cálculo fiscal (Lucro Presumido) e entrada automática no estoque.")
 
 # ─── SESSION STATE ────────────────────────────────────────────────────────────

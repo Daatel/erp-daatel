@@ -12,7 +12,17 @@ st.set_page_config(
 from estilo import carregar_estilo
 carregar_estilo()
 
-st.title("Visão Global")
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+Visão Global
+</h1>
+""", unsafe_allow_html=True)
 
 st.markdown(f"Bem-vindo, **{st.session_state.get('logged_user', 'Usuário')}**. Abaixo está o resumo da operação.")
 

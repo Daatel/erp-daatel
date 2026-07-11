@@ -87,7 +87,17 @@ Fica eleito o foro da sede do COMODANTE para dirimir quaisquer dúvidas."""
 st.set_page_config(page_title="Gestão de Comodatos", page_icon="❄️", layout="wide")
 carregar_estilo()
 
-st.title("❄️ Ativos e Comodatos")
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+Ativos e Comodatos
+</h1>
+""", unsafe_allow_html=True)
 st.markdown("Controle de equipamentos cedidos a clientes, contratos automáticos e análise de ROI/Volume de Vendas.")
 
 # Abas

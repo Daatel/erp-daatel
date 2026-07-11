@@ -138,7 +138,6 @@ elif st.session_state.get('split_dialog_pid'):
 
 st.markdown("""
 <style>
-/* Remove padding do topo da página do Streamlit para subir tudo de forma limpa e sem cortar o texto */
 .block-container {
     padding-top: 1.5rem !important;
     padding-bottom: 1rem !important;

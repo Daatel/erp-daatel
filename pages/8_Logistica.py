@@ -7,7 +7,17 @@ from estilo import carregar_estilo
 st.set_page_config(page_title="Roteirização Logística", page_icon="🚛", layout="wide")
 carregar_estilo()
 
-st.title("🚛 Gestão de Frota e Manifestos de Carga")
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+Gestão de Frota e Manifestos de Carga
+</h1>
+""", unsafe_allow_html=True)
 st.markdown("Crie rotas, embarque faturamentos e rateie o custo do frete nas notas de venda para obter a margem real (CMV Líquido).")
 
 def format_brl(val):

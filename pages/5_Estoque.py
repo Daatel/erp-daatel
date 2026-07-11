@@ -7,7 +7,17 @@ from estilo import carregar_estilo
 st.set_page_config(page_title="Controle de Estoque", page_icon="📦", layout="wide")
 carregar_estilo()
 
-st.title("📦 Controle de Estoque")
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+Controle de Estoque
+</h1>
+""", unsafe_allow_html=True)
 st.markdown("Gestão unificada de Matéria-Prima, Produtos Acabados e Rastreabilidade Contábil.")
 
 # Dicionário de Motivos de Ajuste (Amarrados ao Plano de Contas)

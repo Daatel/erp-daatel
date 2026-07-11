@@ -17,7 +17,17 @@ def format_brl(val):
         return "R$ 0,00"
     return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-st.title("📈 Rentabilidade e DRE por Cliente / Rede (CNPJ)")
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+Rentabilidade e DRE por Cliente / Rede (CNPJ)
+</h1>
+""", unsafe_allow_html=True)
 st.markdown("Audite e rastreie a Margem de Contribuição Líquida real de cada canal de venda, considerando CMV FIFO, bonificações, acordos comerciais, degustações e promotores.")
 
 # ================= SIDEBAR FILTERS =================

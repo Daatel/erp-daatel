@@ -7,7 +7,17 @@ from estilo import carregar_estilo
 st.set_page_config(page_title="PDV Express", page_icon="⚡", layout="wide")
 carregar_estilo()
 
-st.title("⚡ PDV Express (Venda Balcão)")
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+PDV Express (Venda Balcão)
+</h1>
+""", unsafe_allow_html=True)
 st.markdown("Venda Rápida de Balcão JIT (Just in Time) com baixa física automática via FIFO e quitação instantânea do financeiro no caixa.")
 
 def format_brl(val):

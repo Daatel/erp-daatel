@@ -7,7 +7,17 @@ from estilo import carregar_estilo
 st.set_page_config(page_title="Produção e Custeio", page_icon="🏭", layout="wide")
 carregar_estilo()
 
-st.title("🏭 Centro de Comando de Produção")
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+Centro de Comando de Produção
+</h1>
+""", unsafe_allow_html=True)
 st.markdown("Aponte Lotes de Fabricação, controle as perdas da esteira e apure o Custo Real do Produto (Matéria-Prima + Overhead).")
 
 # Inicializa o controle dinâmico (Botão Mágico + Insumos)
