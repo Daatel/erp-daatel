@@ -147,7 +147,7 @@ st.markdown("""
 Faturamento e Expedição
 </h1>
 """, unsafe_allow_html=True)
-st.markdown("Central de liberação de carga. Fature os pedidos aprovados na Venda, bata o estoque e gere arquivos de integração fiscal.")
+
 
 def format_brl(val):
     if pd.isna(val) or val is None:

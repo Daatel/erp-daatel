@@ -18,7 +18,7 @@ st.markdown("""
 Gestão de Frota e Manifestos de Carga
 </h1>
 """, unsafe_allow_html=True)
-st.markdown("Crie rotas, embarque faturamentos e rateie o custo do frete nas notas de venda para obter a margem real (CMV Líquido).")
+
 
 def format_brl(val):
     if pd.isna(val) or val is None: return "R$ 0,00"

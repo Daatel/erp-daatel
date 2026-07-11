@@ -18,7 +18,7 @@ st.markdown("""
 PDV Express (Venda Balcão)
 </h1>
 """, unsafe_allow_html=True)
-st.markdown("Venda Rápida de Balcão JIT (Just in Time) com baixa física automática via FIFO e quitação instantânea do financeiro no caixa.")
+
 
 def format_brl(val):
     if pd.isna(val) or val is None:

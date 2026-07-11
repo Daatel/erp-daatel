@@ -28,7 +28,7 @@ st.markdown("""
 Rentabilidade e DRE por Cliente / Rede (CNPJ)
 </h1>
 """, unsafe_allow_html=True)
-st.markdown("Audite e rastreie a Margem de Contribuição Líquida real de cada canal de venda, considerando CMV FIFO, bonificações, acordos comerciais, degustações e promotores.")
+
 
 # ================= SIDEBAR FILTERS =================
 st.sidebar.header("🎯 Filtros e Parâmetros")

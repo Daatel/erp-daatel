@@ -24,7 +24,7 @@ Visão Global
 </h1>
 """, unsafe_allow_html=True)
 
-st.markdown(f"Bem-vindo, **{st.session_state.get('logged_user', 'Usuário')}**. Abaixo está o resumo da operação.")
+
 
 # KPIs resumidos
 st.subheader("Resumo Geral")

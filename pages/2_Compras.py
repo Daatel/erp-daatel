@@ -25,7 +25,7 @@ st.markdown("""
 Registro de Notas Fiscais de Entrada
 </h1>
 """, unsafe_allow_html=True)
-st.markdown("Lance NFs com múltiplos itens, cálculo fiscal (Lucro Presumido) e entrada automática no estoque.")
+
 
 # ─── SESSION STATE ────────────────────────────────────────────────────────────
 if 'itens_nf' not in st.session_state:

@@ -98,7 +98,7 @@ st.markdown("""
 Ativos e Comodatos
 </h1>
 """, unsafe_allow_html=True)
-st.markdown("Controle de equipamentos cedidos a clientes, contratos automáticos e análise de ROI/Volume de Vendas.")
+
 
 # Abas
 tab1, tab2, tab3 = st.tabs(["🚀 Ativar Novo Comodato", "📋 Painel de Equipamentos Cedidos", "🧊 Cadastro de Freezers/Ativos"])

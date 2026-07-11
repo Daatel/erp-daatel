@@ -18,7 +18,7 @@ st.markdown("""
 Tabelas de Preço
 </h1>
 """, unsafe_allow_html=True)
-st.markdown("Crie regras de preço por Cliente, Grupo ou Rede. O sistema priorizará a regra mais específica na hora da venda.")
+
 
 def format_brl(val):
     if pd.isna(val) or val is None:

@@ -19,7 +19,6 @@ st.markdown("""
 Demonstrativo do Resultado do Exercício (DRE)
 </h1>
 """, unsafe_allow_html=True)
-st.markdown("A Verdade Nua e Crua: Sua fábrica dá lucro ou prejuízo faturando o que fatura hoje?")
 
 def f_br(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -36,7 +35,20 @@ for ano in [hoje.year - 1, hoje.year, hoje.year + 1]:
 default_label = f"{meses_nomes[hoje.month-1]}/{hoje.year}"
 default_idx = opcoes_meses.index(default_label) if default_label in opcoes_meses else len(opcoes_meses) // 2
 
-sel_mes_ano = st.selectbox("Selecione o Mês/Ano de Referência do DRE:", opcoes_meses, index=default_idx)
+# Sync states for DRE tabs selectbox
+if "sel_mes_ano_tab1" not in st.session_state:
+    st.session_state["sel_mes_ano_tab1"] = default_label
+if "sel_mes_ano_tab2" not in st.session_state:
+    st.session_state["sel_mes_ano_tab2"] = default_label
+
+def sync_tab1():
+    st.session_state["sel_mes_ano_tab2"] = st.session_state["sel_mes_ano_tab1"]
+
+def sync_tab2():
+    st.session_state["sel_mes_ano_tab1"] = st.session_state["sel_mes_ano_tab2"]
+
+# Determine current active selection
+sel_mes_ano = st.session_state.get("sel_mes_ano_tab1", default_label)
 
 nome_mes, ano_sel = sel_mes_ano.split("/")
 ano_sel = int(ano_sel)
@@ -197,9 +209,16 @@ break_even = (df_mes_val / (mc_perc / 100)) if mc_perc > 0 else 0.0
 
 # -------- RENDERIZAÇÃO VISUAL ---------
 
-tab1, tab2 = st.tabs(["🗺️ DRE Tático de Fábrica", "📊 Ponto de Equilíbrio (Break-Even)"])
+tab1, tab2 = st.tabs(["DRE Tático de Fábrica", "Ponto de Equilíbrio (Break-Even)"])
 
 with tab1:
+    st.selectbox(
+        "Selecione o Mês/Ano de Referência do DRE:",
+        opcoes_meses,
+        index=opcoes_meses.index(sel_mes_ano) if sel_mes_ano in opcoes_meses else default_idx,
+        key="sel_mes_ano_tab1",
+        on_change=sync_tab1
+    )
     st.subheader("I. Faturamento Bruto (Tração)")
     c1, c2, c3 = st.columns([2, 1, 1])
     c1.markdown(f"**1. Receita Operacional Bruta (Entradas Totais de {sel_mes_ano})**")
@@ -329,6 +348,13 @@ with tab1:
     ct3.markdown(f"### {f_br(lucro_90)}")
 
 with tab2:
+    st.selectbox(
+        "Selecione o Mês/Ano de Referência do DRE:",
+        opcoes_meses,
+        index=opcoes_meses.index(sel_mes_ano) if sel_mes_ano in opcoes_meses else default_idx,
+        key="sel_mes_ano_tab2",
+        on_change=sync_tab2
+    )
     st.subheader("Ponto de Sobrevivência (Break-Even)")
     
     st.markdown(f"> **O que é isso?** É o ponto exato de faturamento onde a sua fábrica zera todas as contas operacionais (EBITDA Zero) e passa a ter fluxo positivo para pagar bancos e lucros. Vender abaixo disso significa tirar dinheiro do próprio bolso para a fábrica abrir as portas.")

@@ -18,7 +18,7 @@ st.markdown("""
 Centro de Comando de Produção
 </h1>
 """, unsafe_allow_html=True)
-st.markdown("Aponte Lotes de Fabricação, controle as perdas da esteira e apure o Custo Real do Produto (Matéria-Prima + Overhead).")
+
 
 # Inicializa o controle dinâmico (Botão Mágico + Insumos)
 if 'num_insumos' not in st.session_state:

@@ -18,7 +18,7 @@ st.markdown("""
 Controle de Estoque
 </h1>
 """, unsafe_allow_html=True)
-st.markdown("Gestão unificada de Matéria-Prima, Produtos Acabados e Rastreabilidade Contábil.")
+
 
 # Dicionário de Motivos de Ajuste (Amarrados ao Plano de Contas)
 MOTIVOS_AJUSTE = {
