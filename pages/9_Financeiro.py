@@ -728,7 +728,7 @@ try:
 
         if visao == "Projeção do Dia":
             # Verification of non-reconciled items from previous days
-            df_non_conc = fetch_all("SELECT COUNT(*) as count FROM fluxo_caixa WHERE data < ? AND (conciliado = FALSE OR conciliado IS NULL OR conciliado = 0)", (hoje.strftime("%Y-%m-%d"),))
+            df_non_conc = fetch_all("SELECT COUNT(*) as count FROM fluxo_caixa WHERE data < ? AND (conciliado = FALSE OR conciliado IS NULL)", (hoje.strftime("%Y-%m-%d"),))
             non_conc_count = int(df_non_conc.iloc[0]['count']) if not df_non_conc.empty else 0
             if non_conc_count > 0:
                 st.warning(f"Relatório Requer Posições Conciliadas. Existem {non_conc_count} lançamentos pendentes de conciliação de dias anteriores.")
