@@ -1488,28 +1488,74 @@ with tab5:
 # ======= CONTAS BANCÁRIAS =======
 with tab6:
     st.subheader("Cadastro de Contas Bancárias")
+    is_fin_or_admin = st.session_state.get('user_role') in ['ADMIN', 'FINANCEIRO']
+    
+    if not is_fin_or_admin:
+        st.info("Apenas usuários do perfil Tesouraria ou Administrador podem cadastrar ou editar contas bancárias.")
+        
     with st.form("form_contas_bancarias", clear_on_submit=True):
         c1, c2, c3 = st.columns(3)
         nome = c1.text_input("Apelido da Conta")
         banco = c2.text_input("Nome do Banco")
         tipo_conta = c3.selectbox("Tipo de Conta", ["Corrente", "Poupança", "Espécie", "Aplicação"])
         
-        c4, c5, c6 = st.columns(3)
+        c4, c5, c6, c7 = st.columns(4)
         agencia = c4.text_input("Agência")
         conta_res = c5.text_input("Conta")
         saldo_inicial = c6.number_input("Saldo Inicial", value=0.0, step=0.01)
+        limite_credito = c7.number_input("Limite de Crédito", min_value=0.0, value=0.0, step=100.0, format="%.2f")
         
-        if st.form_submit_button("Salvar Conta"):
+        if st.form_submit_button("Salvar Conta", disabled=not is_fin_or_admin):
             if nome:
-                run_query("INSERT INTO contas_bancarias (nome, banco, agencia, conta, saldo_inicial, tipo_conta) VALUES (?, ?, ?, ?, ?, ?)",
-                          (nome, banco, agencia, conta_res, saldo_inicial, tipo_conta))
+                run_query("INSERT INTO contas_bancarias (nome, banco, agencia, conta, saldo_inicial, tipo_conta, limite_credito) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                          (nome, banco, agencia, conta_res, saldo_inicial, tipo_conta, limite_credito))
                 st.success("Conta adicionada!")
                 import time; time.sleep(1); st.rerun()
 
     st.markdown("---")
-    df_contas_view = fetch_all("SELECT id, nome as 'Nome/Apelido', banco as 'Banco', agencia as 'Agência', conta as 'Conta', tipo_conta as 'Tipo' FROM contas_bancarias")
+    df_contas_view = fetch_all("SELECT id, nome as 'Nome/Apelido', banco as 'Banco', agencia as 'Agência', conta as 'Conta', tipo_conta as 'Tipo', status as 'Status', limite_credito as 'Limite de Crédito' FROM contas_bancarias")
     if not df_contas_view.empty:
         st.dataframe(df_contas_view, width="stretch", hide_index=True)
+
+    st.markdown("---")
+    st.subheader("Editar Conta Bancária")
+    df_edit_contas = fetch_all("SELECT id, nome, banco, agencia, conta, tipo_conta, status, limite_credito FROM contas_bancarias")
+    if not df_edit_contas.empty:
+        conta_sel = st.selectbox("Selecione a Conta para Editar", [""] + df_edit_contas["nome"].tolist(), key="select_conta_editar")
+        if conta_sel:
+            row = df_edit_contas[df_edit_contas["nome"] == conta_sel].iloc[0]
+            with st.form("form_edicao_conta", clear_on_submit=False):
+                col1, col2, col3 = st.columns(3)
+                ed_nome = col1.text_input("Apelido da Conta", value=row["nome"])
+                ed_banco = col2.text_input("Nome do Banco", value=row["banco"] or "")
+                ed_tipo = col3.selectbox("Tipo de Conta", ["Corrente", "Poupança", "Espécie", "Aplicação"], index=["Corrente", "Poupança", "Espécie", "Aplicação"].index(row["tipo_conta"]) if row["tipo_conta"] in ["Corrente", "Poupança", "Espécie", "Aplicação"] else 0)
+                
+                col4, col5, col6, col7 = st.columns(4)
+                ed_agencia = col4.text_input("Agência", value=row["agencia"] or "")
+                ed_conta = col5.text_input("Conta", value=row["conta"] or "")
+                ed_status = col6.selectbox("Status", ["ATIVO", "INATIVO"], index=0 if row["status"] == "ATIVO" else 1)
+                ed_limite = col7.number_input("Limite de Crédito", min_value=0.0, value=float(row["limite_credito"] or 0.0), step=100.0, format="%.2f")
+                
+                if st.form_submit_button("Salvar Alterações", disabled=not is_fin_or_admin):
+                    if not ed_nome:
+                        st.error("O apelido da conta é obrigatório.")
+                    elif ed_limite < 0:
+                        st.error("O limite de crédito não pode ser negativo.")
+                    else:
+                        prev_limite = float(row["limite_credito"] or 0.0)
+                        run_query(
+                            "UPDATE contas_bancarias SET nome=?, banco=?, agencia=?, conta=?, tipo_conta=?, status=?, limite_credito=? WHERE id=?",
+                            (ed_nome, ed_banco, ed_agencia, ed_conta, ed_tipo, ed_status, ed_limite, int(row["id"]))
+                        )
+                        
+                        # Registrar no log se o limite mudou
+                        if abs(prev_limite - ed_limite) > 0.01:
+                            registrar_log_acesso(
+                                st.session_state.get('user_id'), st.session_state.get('logged_user', ''), st.session_state.get('logged_user', ''),
+                                "ALTERAR_LIMITE_CONTA", f"Conta {ed_nome}: Limite alterado de R$ {prev_limite:,.2f} para R$ {ed_limite:,.2f}"
+                            )
+                        st.success("Conta atualizada com sucesso!")
+                        import time; time.sleep(1); st.rerun()
 
 # ======= MAQUINÁRIO E IMOBILIZADO =======
 with tab7:

@@ -465,13 +465,15 @@ try:
 
     # ----- DADOS BANCÁRIOS BASE -----
 
-    df_bancos = fetch_all("SELECT id, nome, banco, saldo_inicial FROM contas_bancarias WHERE status='ATIVO'")
+    df_bancos = fetch_all("SELECT id, nome, banco, saldo_inicial, limite_credito FROM contas_bancarias WHERE status='ATIVO'")
 
     
 
     opcoes_bancos = {}
 
     saldo_por_banco = {}
+
+    limites_por_banco = {}
 
     
 
@@ -490,6 +492,8 @@ try:
             # Saldo começa com o fixo do sistema
 
             saldo_por_banco[r['id']] = float(r['saldo_inicial'])
+
+            limites_por_banco[r['id']] = float(r['limite_credito'] or 0.0)
 
 
 
@@ -545,434 +549,582 @@ try:
 
     with tab1:
 
+        # Custom CSS for modern visual layout
+
+        st.markdown("""
+
+        <style>
+
+        .card-disponivel {
+
+            padding: 20px;
+
+            border-radius: 8px;
+
+            background-color: #f8fafc;
+
+            margin-bottom: 20px;
+
+        }
+
+        .conta-card {
+
+            background-color: white;
+
+            border: 1px solid #e2e8f0;
+
+            padding: 15px;
+
+            border-radius: 8px;
+
+            margin-bottom: 10px;
+
+        }
+
+        .text-muted {
+
+            color: #64748b;
+
+            font-size: 0.85rem;
+
+        }
+
+        .item-list-row {
+
+            display: flex;
+
+            justify-content: space-between;
+
+            padding: 8px 0;
+
+            border-bottom: 1px solid #f1f5f9;
+
+        }
+
+        .item-list-desc {
+
+            font-weight: 500;
+
+            color: #1e293b;
+
+        }
+
+        .item-list-plano {
+
+            font-size: 0.8rem;
+
+            color: #64748b;
+
+        }
+
+        .item-list-val {
+            font-weight: 600;
+            text-align: right;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
         # 1. Verification of Last Reconciliation (Tolerance D-1)
-
         df_max_conc = fetch_all("SELECT MAX(data) as max_data FROM fluxo_caixa WHERE conciliado = TRUE")
-
         last_conc_date = None
-
         out_of_tolerance = False
-
         if not df_max_conc.empty and pd.notna(df_max_conc.iloc[0]['max_data']):
-
             last_conc_date = pd.to_datetime(df_max_conc.iloc[0]['max_data']).date()
-
             if last_conc_date < hoje - timedelta(days=1):
-
                 out_of_tolerance = True
-
         else:
-
             out_of_tolerance = True
-
             
-
-        # Display dynamic reconciliation status badge using native Streamlit banners
-
         if out_of_tolerance:
-
-            st.error(f"🚨 **ALERTA DE SEGURANÇA:** Conciliação financeira pendente! Último registro conciliado: {last_conc_date.strftime('%d/%m/%Y') if last_conc_date else 'nunca'}. A tolerância máxima é de D-1 (ontem). Efetue a conciliação na aba correspondente.")
-
+            st.error(f"Alerta de segurança: Conciliação financeira pendente! Último registro conciliado: {last_conc_date.strftime('%d/%m/%Y') if last_conc_date else 'nunca'}. A tolerância máxima é de D-1 (ontem). Efetue a conciliação na aba correspondente.")
         else:
+            st.success(f"Conciliação em dia: Caixa conciliado até {last_conc_date.strftime('%d/%m/%Y') if last_conc_date else 'nunca'}.")
 
-            st.success(f"🟢 **CONCILIAÇÃO EM DIA:** Caixa conciliado até {last_conc_date.strftime('%d/%m/%Y') if last_conc_date else 'nunca'}.")
+        # 2. Header and Segmented Control View Toggle
+        col_hdr1, col_hdr2 = st.columns([2, 1])
+        with col_hdr1:
+            st.markdown("### Cockpit Financeiro Diário")
+        with col_hdr2:
+            default_visao = "Projeção do Dia" if datetime.now().hour < 13 else "Fechamento do Dia"
+            visao = st.segmented_control("Visão do Painel", ["Projeção do Dia", "Fechamento do Dia"], default=default_visao, label_visibility="collapsed")
 
-            
-
-        # Header area
-
-        st.markdown("### 🏆 Cockpit Financeiro Diário - Empório do Alho")
-
-        
-
-        # 2. TOP ROW CARDS (KPIs): Entra hoje, Sai hoje, Resultado do dia
-
-        # Query planned receivables due today (PENDENTE)
-
-        df_rec_hoje = fetch_all("SELECT SUM(valor) as total FROM contas_a_receber WHERE status='PENDENTE' AND data_vencimento=?", (hoje.strftime("%Y-%m-%d"),))
-
-        entra_hoje_val = float(df_rec_hoje.iloc[0]['total'] or 0.0) if not df_rec_hoje.empty else 0.0
-
-        
-
-        # Query planned payables due today (PENDENTE)
-
-        df_pag_hoje = fetch_all("SELECT SUM(valor) as total FROM contas_a_pagar WHERE status='PENDENTE' AND data_vencimento=?", (hoje.strftime("%Y-%m-%d"),))
-
-        sai_hoje_val = float(df_pag_hoje.iloc[0]['total'] or 0.0) if not df_pag_hoje.empty else 0.0
-
-        
-
-        resultado_dia_val = entra_hoje_val - sai_hoje_val
-
-        
-
-        c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
-
-        
-
-        # Format values to BRL
+        # 3. KPI Card: Saldo Disponível Hoje (3.1)
+        total_limites = sum(limites_por_banco.values())
+        if saldo_total_empresa >= 0:
+            border_color = "#22c55e" # Green
+            situacao = "Situação Favorável"
+        elif saldo_total_empresa + total_limites >= 0:
+            border_color = "#eab308" # Yellow
+            situacao = "Situação Requer Atenção (Utilizando Limite)"
+        else:
+            border_color = "#ef4444" # Red
+            situacao = "Situação Crítica (Saldo Esgotado)"
 
         def to_brl(v):
-
             return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-            
+        st.markdown(f"""
+        <div style="border-left: 5px solid {border_color}; padding: 15px; background-color: #f8fafc; border-radius: 4px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span style="font-size: 0.85rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Saldo Disponível Hoje</span>
+                    <h2 style="margin: 5px 0 0 0; color: #1e293b; font-size: 2.2rem; font-weight: 700;">{to_brl(saldo_total_empresa + total_limites)}</h2>
+                    <span style="font-size: 0.8rem; color: #64748b; display: block; margin-top: 5px;">Inclui limite de crédito consolidado de {to_brl(total_limites)}</span>
+                </div>
+                <div style="text-align: right;">
+                    <span style="font-weight: 700; color: {border_color}; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em;">{situacao}</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        c_kpi1.metric("Entra hoje", to_brl(entra_hoje_val))
-
-        c_kpi2.metric("Sai hoje", to_brl(sai_hoje_val))
-
-        c_kpi3.metric("Resultado do dia", to_brl(resultado_dia_val), 
-
-                     delta=to_brl(resultado_dia_val) if resultado_dia_val != 0 else None,
-
-                     delta_color="normal" if resultado_dia_val >= 0 else "inverse")
-
-        
+        # 4. Saldos por Conta (3.2)
+        st.markdown("##### Saldos por Conta")
+        cols_bancos = st.columns(len(df_bancos))
+        for idx_b, (_, r_b) in enumerate(df_bancos.iterrows()):
+            bid = r_b['id']
+            saldo_atual = saldo_por_banco[bid]
+            limite = limites_por_banco[bid]
+            with cols_bancos[idx_b]:
+                with st.container(border=True):
+                    st.markdown(f"**{r_b['nome']}** ({r_b['banco'] or 'Banco'})")
+                    st.markdown(f"Saldo: {to_brl(saldo_atual)}")
+                    with st.expander("Detalhes da conta"):
+                        st.markdown(f"<span class='text-muted'>Limite: {to_brl(limite)}</span>", unsafe_allow_html=True)
+                        st.markdown(f"<span class='text-muted'>Saldo com limite: {to_brl(saldo_atual + limite)}</span>", unsafe_allow_html=True)
 
         st.markdown("---")
 
-        
+        # Calculate values for Yesterday vs Today and Tendency
+        df_fluxo_hoje = fetch_all("SELECT tipo, valor FROM fluxo_caixa WHERE data = ?", (hoje.strftime("%Y-%m-%d"),))
+        entradas_hoje = df_fluxo_hoje[df_fluxo_hoje['tipo'] == 'Entrada']['valor'].sum() if not df_fluxo_hoje.empty else 0.0
+        saidas_hoje = df_fluxo_hoje[df_fluxo_hoje['tipo'] == 'Saída']['valor'].sum() if not df_fluxo_hoje.empty else 0.0
+        variacao_hoje = entradas_hoje - saidas_hoje
+        saldo_ontem = saldo_total_empresa - variacao_hoje
 
-        # 3. MIDDLE ROW: A cobrar (vencido) & A pagar (vencido) tables
-
-        c_mid_left, c_mid_right = st.columns(2)
-
-        
-
-        # --- LEFT: A COBRAR (VENCIDO) ---
-
-        with c_mid_left:
-
-            # Query pending overdue receivables
-
-            df_vencidos_rec = fetch_all("""
-
-                SELECT c.valor, c.data_vencimento, cl.nome as cliente_nome
-
-                FROM contas_a_receber c
-
-                JOIN clientes cl ON c.cliente_id = cl.id
-
-                WHERE c.status = 'PENDENTE' AND c.data_vencimento < ?
-
-            """, (hoje.strftime("%Y-%m-%d"),))
-
-            
-
-            total_vencido_rec = 0.0
-
-            df_grouped_rec = pd.DataFrame()
-
-            if not df_vencidos_rec.empty:
-
-                total_vencido_rec = df_vencidos_rec['valor'].sum()
-
-                df_vencidos_rec['dias'] = (hoje - pd.to_datetime(df_vencidos_rec['data_vencimento']).dt.date).apply(lambda x: x.days)
-
-                df_grouped_rec = df_vencidos_rec.groupby('cliente_nome').agg(
-
-                    dias_atraso=('dias', 'max'),
-
-                    total_valor=('valor', 'sum')
-
-                ).reset_index().sort_values('total_valor', ascending=False).head(5)
-
+        # Classification quick dialog helper
+        if st.session_state.get("show_class_dialog"):
+            tabela, item_id, desc, val = st.session_state["show_class_dialog"]
+            @st.dialog("Classificar Lançamento")
+            def dialog_classificar():
+                st.write(f"Descrição: **{desc}**")
+                st.write(f"Valor: **{to_brl(val)}**")
                 
+                planos = fetch_all("SELECT id, codigo, categoria, nome FROM planos_de_contas ORDER BY codigo")
+                opcoes = {f"{r['codigo']} - {r['categoria']} ({r['nome']})": r['id'] for _, r in planos.iterrows()}
+                sel_plano = st.selectbox("Selecione o Plano de Contas", list(opcoes.keys()))
+                
+                col_d1, col_d2 = st.columns(2)
+                if col_d1.button("Cancelar"):
+                    st.session_state["show_class_dialog"] = None
+                    st.rerun()
+                if col_d2.button("Salvar Classificação", type="primary"):
+                    plano_id = opcoes[sel_plano]
+                    run_query(f"UPDATE {tabela} SET plano_conta_id = ? WHERE id = ?", (plano_id, item_id))
+                    st.success("Lançamento classificado com sucesso!")
+                    st.session_state["show_class_dialog"] = None
+                    import time; time.sleep(1); st.rerun()
+            dialog_classificar()
 
-            st.markdown(f"#### 📅 A cobrar (vencido): **<span style='color:#ef4444;'>{to_brl(total_vencido_rec)}</span>**", unsafe_allow_html=True)
+        if visao == "Projeção do Dia":
+            # Verification of non-reconciled items from previous days
+            df_non_conc = fetch_all("SELECT COUNT(*) as count FROM fluxo_caixa WHERE data < ? AND (conciliado = FALSE OR conciliado IS NULL OR conciliado = 0)", (hoje.strftime("%Y-%m-%d"),))
+            non_conc_count = int(df_non_conc.iloc[0]['count']) if not df_non_conc.empty else 0
+            if non_conc_count > 0:
+                st.warning(f"Relatório Requer Posições Conciliadas. Existem {non_conc_count} lançamentos pendentes de conciliação de dias anteriores.")
 
+            # Aging de Atrasados (3.4)
+            df_rec_overdue = fetch_all("SELECT valor, data_vencimento FROM contas_a_receber WHERE status='PENDENTE' AND data_vencimento < ?", (hoje.strftime("%Y-%m-%d"),))
+            df_pag_overdue = fetch_all("SELECT valor, data_vencimento FROM contas_a_pagar WHERE status='PENDENTE' AND data_vencimento < ?", (hoje.strftime("%Y-%m-%d"),))
             
+            total_rec_overdue = 0.0
+            total_pag_overdue = 0.0
+            rec_aging = {"0-30": 0.0, "31-60": 0.0, "60+": 0.0}
+            pag_aging = {"0-30": 0.0, "31-60": 0.0, "60+": 0.0}
+            
+            if not df_rec_overdue.empty:
+                total_rec_overdue = df_rec_overdue['valor'].sum()
+                for _, r in df_rec_overdue.iterrows():
+                    dias = (hoje - pd.to_datetime(r['data_vencimento']).date()).days
+                    val = float(r['valor'])
+                    if dias <= 30:
+                         rec_aging["0-30"] += val
+                    elif dias <= 60:
+                         rec_aging["31-60"] += val
+                    else:
+                         rec_aging["60+"] += val
+                         
+            if not df_pag_overdue.empty:
+                total_pag_overdue = df_pag_overdue['valor'].sum()
+                for _, r in df_pag_overdue.iterrows():
+                    dias = (hoje - pd.to_datetime(r['data_vencimento']).date()).days
+                    val = float(r['valor'])
+                    if dias <= 30:
+                         pag_aging["0-30"] += val
+                    elif dias <= 60:
+                         pag_aging["31-60"] += val
+                    else:
+                         pag_aging["60+"] += val
 
-            if df_grouped_rec.empty:
+            st.markdown("##### Aging de Atrasados")
+            col_atr1, col_atr2 = st.columns(2)
+            with col_atr1:
+                st.markdown(f"Total a Receber em Atraso: <span style='color:#ef4444; font-weight:700;'>{to_brl(total_rec_overdue)}</span>", unsafe_allow_html=True)
+            with col_atr2:
+                st.markdown(f"Total a Pagar em Atraso: <span style='color:#b45309; font-weight:700;'>{to_brl(total_pag_overdue)}</span>", unsafe_allow_html=True)
+                
+            with st.expander("Detalhar aging de atrasados"):
+                col_ag1, col_ag2 = st.columns(2)
+                with col_ag1:
+                    st.markdown("**Aging a Receber:**")
+                    st.markdown(f"- 0 a 30 dias: {to_brl(rec_aging['0-30'])}")
+                    st.markdown(f"- 31 a 60 dias: {to_brl(rec_aging['31-60'])}")
+                    st.markdown(f"- Mais de 60 dias: {to_brl(rec_aging['60+'])}")
+                with col_ag2:
+                    st.markdown("**Aging a Pagar:**")
+                    st.markdown(f"- 0 a 30 dias: {to_brl(pag_aging['0-30'])}")
+                    st.markdown(f"- 31 a 60 dias: {to_brl(pag_aging['31-60'])}")
+                    st.markdown(f"- Mais de 60 dias: {to_brl(pag_aging['60+'])}")
 
-                st.info("Nenhum valor vencido a cobrar. Excelente!")
+            st.markdown("---")
 
+            # Tendência (3.5)
+            if variacao_hoje > 0.01:
+                tend_char = "▲"
+                tend_text = "Alta"
+                tend_color = "#22c55e"
+            elif variacao_hoje < -0.01:
+                tend_char = "▼"
+                tend_text = "Queda"
+                tend_color = "#ef4444"
             else:
-
-                df_grouped_rec_view = df_grouped_rec.copy()
-
-                df_grouped_rec_view['dias_atraso'] = df_grouped_rec_view['dias_atraso'].apply(lambda x: f"{x} dias")
-
-                df_grouped_rec_view['total_valor'] = df_grouped_rec_view['total_valor'].apply(to_brl)
-
-                df_grouped_rec_view.columns = ['Cliente', 'Maior Atraso', 'Saldo Total Devido']
-
-                st.dataframe(df_grouped_rec_view, hide_index=True, use_container_width=True)
-
+                tend_char = "▬"
+                tend_text = "Estável"
+                tend_color = "#64748b"
                 
+            st.markdown(f"Tendência de Caixa: <span style='color:{tend_color}; font-weight:700;'>{tend_char} {tend_text} ({to_brl(abs(variacao_hoje))} em relação a ontem)</span>", unsafe_allow_html=True)
 
-            st.caption("Ver todos os clientes na aba **Contas a Receber (Entrada)**")
+            st.markdown("---")
 
-            
-
-        # --- RIGHT: A PAGAR (VENCIDO) ---
-
-        with c_mid_right:
-
-            # Query pending overdue payables
-
-            df_vencidos_pag = fetch_all("""
-
-                SELECT c.valor, c.data_vencimento, f.nome_fantasia as fornecedor_nome
-
-                FROM contas_a_pagar c
-
-                JOIN fornecedores f ON c.fornecedor_id = f.id
-
-                WHERE c.status = 'PENDENTE' AND c.data_vencimento < ?
-
+            # Compromissos do Dia (3.3)
+            df_rec_today = fetch_all("""
+                SELECT r.id, r.descricao, r.valor, p.codigo, p.categoria
+                FROM contas_a_receber r
+                LEFT JOIN planos_de_contas p ON r.plano_conta_id = p.id
+                WHERE r.status='PENDENTE' AND r.data_vencimento = ?
             """, (hoje.strftime("%Y-%m-%d"),))
-
             
+            df_pag_today = fetch_all("""
+                SELECT p.id, p.descricao, p.valor, pc.codigo, pc.categoria
+                FROM contas_a_pagar p
+                LEFT JOIN planos_de_contas pc ON p.plano_conta_id = pc.id
+                WHERE p.status='PENDENTE' AND p.data_vencimento = ?
+            """, (hoje.strftime("%Y-%m-%d"),))
+            
+            soma_rec_today = df_rec_today['valor'].sum() if not df_rec_today.empty else 0.0
+            soma_pag_today = df_pag_today['valor'].sum() if not df_pag_today.empty else 0.0
 
-            total_vencido_pag = 0.0
+            st.markdown("##### Compromissos do Dia")
+            col_comp1, col_comp2 = st.columns(2)
+            with col_comp1:
+                st.markdown(f"**Entradas Previstas (Hoje):** {to_brl(soma_rec_today)}")
+                if df_rec_today.empty:
+                    st.info("Nenhuma entrada prevista para hoje.")
+                else:
+                    for _, r in df_rec_today.iterrows():
+                        item_id = r['id']
+                        desc = r['descricao']
+                        val = r['valor']
+                        codigo = r['codigo']
+                        cat = r['categoria']
+                        
+                        col_i1, col_i2 = st.columns([3, 1])
+                        with col_i1:
+                            st.markdown(f"<span class='item-list-desc'>{desc}</span>", unsafe_allow_html=True)
+                            if codigo and cat:
+                                st.markdown(f"<span class='item-list-plano'>Plano: {codigo} - {cat}</span>", unsafe_allow_html=True)
+                            else:
+                                st.markdown("<span style='color:#ef4444; font-size:0.8rem; font-weight:600;'>Sem categoria - classificar</span>", unsafe_allow_html=True)
+                                if st.button("Classificar", key=f"class_rec_{item_id}"):
+                                    st.session_state["show_class_dialog"] = ("contas_a_receber", item_id, desc, val)
+                                    st.rerun()
+                        with col_i2:
+                            st.markdown(f"<div class='item-list-val' style='color:#2563eb;'>{to_brl(val)}</div>", unsafe_allow_html=True)
+                        st.markdown("<hr style='margin:4px 0;'/>", unsafe_allow_html=True)
+                        
+            with col_comp2:
+                st.markdown(f"**Saídas Previstas (Hoje):** {to_brl(soma_pag_today)}")
+                if df_pag_today.empty:
+                    st.info("Nenhuma saída prevista para hoje.")
+                else:
+                    for _, r in df_pag_today.iterrows():
+                        item_id = r['id']
+                        desc = r['descricao']
+                        val = r['valor']
+                        codigo = r['codigo']
+                        cat = r['categoria']
+                        
+                        col_i1, col_i2 = st.columns([3, 1])
+                        with col_i1:
+                            st.markdown(f"<span class='item-list-desc'>{desc}</span>", unsafe_allow_html=True)
+                            if codigo and cat:
+                                st.markdown(f"<span class='item-list-plano'>Plano: {codigo} - {cat}</span>", unsafe_allow_html=True)
+                            else:
+                                st.markdown("<span style='color:#ef4444; font-size:0.8rem; font-weight:600;'>Sem categoria - classificar</span>", unsafe_allow_html=True)
+                                if st.button("Classificar", key=f"class_pag_{item_id}"):
+                                    st.session_state["show_class_dialog"] = ("contas_a_pagar", item_id, desc, val)
+                                    st.rerun()
+                        with col_i2:
+                            st.markdown(f"<div class='item-list-val' style='color:#ef4444;'>{to_brl(val)}</div>", unsafe_allow_html=True)
+                        st.markdown("<hr style='margin:4px 0;'/>", unsafe_allow_html=True)
 
-            df_grouped_pag = pd.DataFrame()
+            st.markdown("---")
 
-            if not df_vencidos_pag.empty:
-
-                total_vencido_pag = df_vencidos_pag['valor'].sum()
-
-                df_vencidos_pag['dias'] = (hoje - pd.to_datetime(df_vencidos_pag['data_vencimento']).dt.date).apply(lambda x: x.days)
-
-                df_grouped_pag = df_vencidos_pag.groupby('fornecedor_nome').agg(
-
-                    dias_atraso=('dias', 'max'),
-
-                    total_valor=('valor', 'sum')
-
-                ).reset_index().sort_values('total_valor', ascending=False).head(5)
-
+            # 30-Day Cash Flow Projection Chart
+            st.markdown("##### Painel de Liquidez Projetado (30 Dias)")
+            incluir_atraso = st.checkbox("Considerar contas em atraso no gráfico", value=False, key="inc_atrasados_chk_30d")
+            
+            df_rec_futuro = fetch_all("SELECT valor, data_vencimento FROM contas_a_receber WHERE status='PENDENTE'")
+            df_pag_futuro = fetch_all("SELECT valor, data_vencimento FROM contas_a_pagar WHERE status='PENDENTE'")
+            
+            fluxo_30d = {}
+            for i in range(30):
+                d_alvo = hoje + timedelta(days=i)
+                fluxo_30d[str(d_alvo)] = {"Entradas": 0.0, "Saídas": 0.0}
                 
-
-            st.markdown(f"#### 📅 A pagar (vencido): **<span style='color:#b45309;'>{to_brl(total_vencido_pag)}</span>**", unsafe_allow_html=True)
-
+            if not df_rec_futuro.empty:
+                df_rec_futuro['venc_date'] = pd.to_datetime(df_rec_futuro['data_vencimento']).dt.date
+                for _, r in df_rec_futuro.iterrows():
+                    v_date = r['venc_date']
+                    val = float(r['valor'])
+                    if v_date < hoje and incluir_atraso:
+                        fluxo_30d[str(hoje)]["Entradas"] += val
+                    elif str(v_date) in fluxo_30d:
+                        fluxo_30d[str(v_date)]["Entradas"] += val
+                        
+            if not df_pag_futuro.empty:
+                df_pag_futuro['venc_date'] = pd.to_datetime(df_pag_futuro['data_vencimento']).dt.date
+                for _, r in df_pag_futuro.iterrows():
+                    v_date = r['venc_date']
+                    val = float(r['valor'])
+                    if v_date < hoje and incluir_atraso:
+                        fluxo_30d[str(hoje)]["Saídas"] += val
+                    elif str(v_date) in fluxo_30d:
+                        fluxo_30d[str(v_date)]["Saídas"] += val
+                        
+            datas_30 = []
+            entradas_30 = []
+            saidas_30 = []
+            saldos_30 = []
+            saldo_proj = saldo_total_empresa
             
+            for i in range(30):
+                d_alvo = hoje + timedelta(days=i)
+                ent = fluxo_30d[str(d_alvo)]["Entradas"]
+                sai = fluxo_30d[str(d_alvo)]["Saídas"]
+                saldo_proj = saldo_proj + ent - sai
+                
+                datas_30.append(d_alvo.strftime("%d/%m"))
+                entradas_30.append(ent)
+                saidas_30.append(sai)
+                saldos_30.append(saldo_proj)
+                
+            fig_30 = go.Figure()
+            fig_30.add_trace(go.Bar(
+                x=datas_30, y=entradas_30,
+                name="Entradas Previstas",
+                marker_color='#2563eb'
+            ))
+            fig_30.add_trace(go.Bar(
+                x=datas_30, y=[-s for s in saidas_30],
+                name="Saídas Previstas",
+                marker_color='#ef4444'
+            ))
+            fig_30.add_trace(go.Scatter(
+                x=datas_30, y=saldos_30,
+                name="Saldo Acumulado",
+                line=dict(color='#10b981', width=3),
+                yaxis="y2"
+            ))
+            fig_30.update_layout(
+                barmode='relative',
+                title="Fluxo de Caixa Projetado (Próximos 30 Dias)",
+                xaxis=dict(title="Dia"),
+                yaxis=dict(title="Movimentação Diária (R$)"),
+                yaxis2=dict(
+                    title="Saldo Acumulado (R$)",
+                    overlaying='y',
+                    side='right'
+                ),
+                legend=dict(x=0.01, y=0.99),
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(l=20, r=20, t=40, b=20)
+            )
+            fig_30.update_yaxes(gridcolor='rgba(128,128,128,0.2)', zerolinecolor='rgba(128,128,128,0.5)', zerolinewidth=1)
+            st.plotly_chart(fig_30, use_container_width=True)
 
-            if df_grouped_pag.empty:
+        elif visao == "Fechamento do Dia":
+            # Comparative yesterday vs today cards (3.6)
+            col_cmp1, col_cmp2 = st.columns(2)
+            with col_cmp1:
+                with st.container(border=True):
+                    st.markdown("Saldo de Fechamento de Ontem")
+                    st.markdown(f"### {to_brl(saldo_ontem)}")
+            with col_cmp2:
+                with st.container(border=True):
+                    st.markdown("Saldo de Fechamento de Hoje")
+                    st.markdown(f"### {to_brl(saldo_total_empresa)}")
+                    
+            st.markdown(f"Resultado Real de Hoje: **{to_brl(variacao_hoje)}**")
+            st.markdown("---")
 
-                st.info("Nenhuma conta vencida a pagar. Excelente!")
+            # Fetch today's actual cash flow entries mapped to Plano de Contas
+            q_mov = """
+                SELECT 
+                    f.id,
+                    f.data,
+                    f.tipo,
+                    f.categoria as fc_categoria,
+                    f.descricao,
+                    f.valor,
+                    f.conciliado,
+                    COALESCE(pc_p.codigo, pc_r.codigo) as plano_codigo,
+                    COALESCE(pc_p.categoria, pc_r.categoria) as plano_categoria,
+                    COALESCE(pc_p.nome, pc_r.nome) as plano_nome
+                FROM fluxo_caixa f
+                LEFT JOIN contas_a_pagar cp ON f.tipo = 'Saída' AND f.fonte_id = cp.id AND f.categoria NOT IN ('Transferência', 'Ajuste de saldo')
+                LEFT JOIN planos_de_contas pc_p ON cp.plano_conta_id = pc_p.id
+                LEFT JOIN contas_a_receber cr ON f.tipo = 'Entrada' AND f.fonte_id = cr.id AND f.categoria NOT IN ('Transferência', 'Ajuste de saldo')
+                LEFT JOIN planos_de_contas pc_r ON cr.plano_conta_id = pc_r.id
+                WHERE f.data = ?
+            """
+            df_mov = fetch_all(q_mov, (hoje.strftime("%Y-%m-%d"),))
 
+            st.markdown("##### Movimentações Financeiras Realizadas")
+            if df_mov.empty:
+                st.info("Nenhuma movimentação realizada hoje.")
             else:
+                for _, r in df_mov.iterrows():
+                    tipo = r['tipo']
+                    desc = r['descricao']
+                    val = r['valor']
+                    codigo = r['plano_codigo']
+                    cat = r['plano_categoria']
+                    
+                    col_i1, col_i2 = st.columns([3, 1])
+                    with col_i1:
+                        st.markdown(f"<span class='item-list-desc'>{desc}</span>", unsafe_allow_html=True)
+                        if codigo and cat:
+                            st.markdown(f"<span class='item-list-plano'>Plano: {codigo} - {cat}</span>", unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"<span class='item-list-plano'>Categoria: {r['fc_categoria']}</span>", unsafe_allow_html=True)
+                    with col_i2:
+                        color = "#2563eb" if tipo == "Entrada" else "#ef4444"
+                        st.markdown(f"<div class='item-list-val' style='color:{color};'>{to_brl(val)}</div>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin:4px 0;'/>", unsafe_allow_html=True)
 
-                df_grouped_pag_view = df_grouped_pag.copy()
+            st.markdown("---")
 
-                df_grouped_pag_view['dias_atraso'] = df_grouped_pag_view['dias_atraso'].apply(lambda x: f"{x} dias")
-
-                df_grouped_pag_view['total_valor'] = df_grouped_pag_view['total_valor'].apply(to_brl)
-
-                df_grouped_pag_view.columns = ['Fornecedor', 'Maior Atraso', 'Saldo Total a Pagar']
-
-                st.dataframe(df_grouped_pag_view, hide_index=True, use_container_width=True)
-
+            # Conciliação table (3.6)
+            st.markdown("##### Conciliação de Caixa")
+            if df_mov.empty:
+                st.info("Nenhum lançamento hoje para conciliar.")
+            else:
+                df_editor_input = df_mov[["id", "tipo", "descricao", "valor", "conciliado"]].copy()
+                df_editor_input["conciliado"] = df_editor_input["conciliado"].astype(bool)
                 
+                edited_mov_df = st.data_editor(
+                    df_editor_input,
+                    column_config={
+                        "id": st.column_config.NumberColumn("ID", disabled=True),
+                        "tipo": st.column_config.TextColumn("Tipo", disabled=True),
+                        "descricao": st.column_config.TextColumn("Descrição", disabled=True),
+                        "valor": st.column_config.NumberColumn("Valor", disabled=True, format="R$ %.2f"),
+                        "conciliado": st.column_config.CheckboxColumn("Conciliado", default=False)
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    key="conciliacao_diaria_editor"
+                )
+                
+                if st.button("Salvar Conciliação"):
+                    with st.spinner("Salvando conciliação..."):
+                        for _, r_ed in edited_mov_df.iterrows():
+                            original_row = df_mov[df_mov["id"] == r_ed["id"]].iloc[0]
+                            if bool(r_ed["conciliado"]) != bool(original_row["conciliado"]):
+                                run_query("UPDATE fluxo_caixa SET conciliado = ? WHERE id = ?", (1 if r_ed["conciliado"] else 0, int(r_ed["id"])))
+                    st.success("Conciliação atualizada com sucesso!")
+                    import time; time.sleep(1); st.rerun()
 
-            st.caption("Ver todos os fornecedores na aba **Contas a Pagar (Saída)**")
+            st.markdown("---")
 
-            
+            # Report A4 PDF Generator (3.7)
+            def gerar_pdf_fechamento_diario(df_pdf, s_ontem, s_hoje, var_dia, t_ent, t_sai):
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 16)
+                pdf.cell(0, 10, "EMPORIO DO ALHO - FECHAMENTO FINANCEIRO DIÁRIO", new_x="LMARGIN", new_y="NEXT", align="C")
+                pdf.set_font("Helvetica", "", 10)
+                pdf.cell(0, 6, f"Data do Fechamento: {date.today().strftime('%d/%m/%Y')}", new_x="LMARGIN", new_y="NEXT", align="C")
+                pdf.ln(5)
+                
+                # Resumo Financeiro
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.cell(0, 8, "Resumo do Dia", new_x="LMARGIN", new_y="NEXT")
+                pdf.set_font("Helvetica", "", 10)
+                pdf.cell(90, 6, f"Saldo Inicial (Ontem): {to_brl(s_ontem)}", border=1)
+                pdf.cell(90, 6, f"Saldo Final (Hoje): {to_brl(s_hoje)}", border=1, new_x="LMARGIN", new_y="NEXT")
+                pdf.cell(90, 6, f"Total de Entradas: {to_brl(t_ent)}", border=1)
+                pdf.cell(90, 6, f"Total de Saídas: {to_brl(t_sai)}", border=1, new_x="LMARGIN", new_y="NEXT")
+                pdf.cell(180, 6, f"Resultado Real: {to_brl(var_dia)}", border=1, new_x="LMARGIN", new_y="NEXT")
+                pdf.ln(5)
+                
+                # Movimentações
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.cell(0, 8, "Movimentações Financeiras Realizadas", new_x="LMARGIN", new_y="NEXT")
+                
+                # Table headers
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.cell(20, 6, "Tipo", border=1)
+                pdf.cell(80, 6, "Descrição", border=1)
+                pdf.cell(50, 6, "Categoria", border=1)
+                pdf.cell(30, 6, "Valor", border=1, new_x="LMARGIN", new_y="NEXT")
+                
+                pdf.set_font("Helvetica", "", 8)
+                if df_pdf.empty:
+                    pdf.cell(180, 6, "Nenhuma movimentação registrada hoje.", border=1, align="C", new_x="LMARGIN", new_y="NEXT")
+                else:
+                    for _, r in df_pdf.iterrows():
+                        tipo = r['tipo']
+                        desc = str(r['descricao'])
+                        cat = str(r['plano_categoria'] or r['fc_categoria'] or "Sem categoria")
+                        val = float(r['valor'])
+                        
+                        def clean_str(s):
+                            import unicodedata
+                            return "".join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+                            
+                        pdf.cell(20, 6, clean_str(tipo), border=1)
+                        pdf.cell(80, 6, clean_str(desc)[:45], border=1)
+                        pdf.cell(50, 6, clean_str(cat)[:28], border=1)
+                        pdf.cell(30, 6, to_brl(val), border=1, align="R", new_x="LMARGIN", new_y="NEXT")
+                        
+                pdf.ln(10)
+                pdf.set_font("Helvetica", "I", 8)
+                pdf.cell(0, 6, "Powered by Daatel | Wisdom into Technology", new_x="LMARGIN", new_y="NEXT", align="C")
+                return bytes(pdf.output())
+
+            pdf_bytes = gerar_pdf_fechamento_diario(df_mov, saldo_ontem, saldo_total_empresa, variacao_hoje, entradas_hoje, saidas_hoje)
+            st.download_button(
+                label="Baixar Fechamento em PDF",
+                data=pdf_bytes,
+                file_name=f"fechamento_{hoje.strftime('%Y%m%d')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
 
         st.markdown("---")
-
         
-
-        # 4. CHART SECTION (14-Day Flow chart)
-
-        st.subheader("📊 Painel de Liquidez Projetado (14 Dias)")
-
-        
-
-        # Checkbox to include overdue accounts in today's calculation
-
-        incluir_atraso = st.checkbox("Considerar contas em atraso no gráfico", value=False, key="inc_atrasados_chk")
-
-        
-
-        # Fetch expected receivables and payables for the next 14 days (D0 to D13)
-
-        df_rec_futuro = fetch_all("SELECT valor, data_vencimento FROM contas_a_receber WHERE status='PENDENTE'")
-
-        df_pag_futuro = fetch_all("SELECT valor, data_vencimento FROM contas_a_pagar WHERE status='PENDENTE'")
-
-        
-
-        fluxo_14d = {}
-
-        for i in range(14):
-
-            d_alvo = hoje + timedelta(days=i)
-
-            fluxo_14d[str(d_alvo)] = {"Entradas": 0.0, "Saidas": 0.0}
-
-            
-
-        # Distribute expected receivables (inputs)
-
-        if not df_rec_futuro.empty:
-
-            df_rec_futuro['venc_date'] = pd.to_datetime(df_rec_futuro['data_vencimento']).dt.date
-
-            for _, r in df_rec_futuro.iterrows():
-
-                v_date = r['venc_date']
-
-                if v_date < hoje and incluir_atraso:
-
-                    # Overdue added to D0 (today)
-
-                    fluxo_14d[str(hoje)]["Entradas"] += float(r['valor'])
-
-                elif str(v_date) in fluxo_14d:
-
-                    fluxo_14d[str(v_date)]["Entradas"] += float(r['valor'])
-
-                    
-
-        # Distribute expected payables (outputs)
-
-        if not df_pag_futuro.empty:
-
-            df_pag_futuro['venc_date'] = pd.to_datetime(df_pag_futuro['data_vencimento']).dt.date
-
-            for _, r in df_pag_futuro.iterrows():
-
-                v_date = r['venc_date']
-
-                if v_date < hoje and incluir_atraso:
-
-                    # Overdue added to D0 (today)
-
-                    fluxo_14d[str(hoje)]["Saidas"] += float(r['valor'])
-
-                elif str(v_date) in fluxo_14d:
-
-                    fluxo_14d[str(v_date)]["Saidas"] += float(r['valor'])
-
-                    
-
-        # Prepare Plotly chart data
-
-        datas_14 = []
-
-        entradas_14 = []
-
-        saidas_14 = []
-
-        saldos_14 = []
-
-        
-
-        saldo_proj = saldo_total_empresa
-
-        
-
-        for i in range(14):
-
-            d_alvo = hoje + timedelta(days=i)
-
-            d_str = "Hoje" if i == 0 else f"D+{i}"
-
-            
-
-            ent = fluxo_14d[str(d_alvo)]["Entradas"]
-
-            sai = fluxo_14d[str(d_alvo)]["Saidas"]
-
-            
-
-            saldo_proj = saldo_proj + ent - sai
-
-            
-
-            datas_14.append(d_str)
-
-            entradas_14.append(ent)
-
-            saidas_14.append(sai)
-
-            saldos_14.append(saldo_proj)
-
-            
-
-        fig_14 = go.Figure()
-
-        
-
-        # Receivables (positive columns)
-
-        fig_14.add_trace(go.Bar(
-
-            x=datas_14, y=entradas_14,
-
-            name="Entradas Previstas",
-
-            marker_color='#2563eb' # Royal Blue
-
-        ))
-
-        
-
-        # Payables (negative columns)
-
-        fig_14.add_trace(go.Bar(
-
-            x=datas_14, y=[-s for s in saidas_14],
-
-            name="Saídas Previstas",
-
-            marker_color='#ef4444' # Red
-
-        ))
-
-        
-
-        # Cumulative Cash line
-
-        fig_14.add_trace(go.Scatter(
-
-            x=datas_14, y=saldos_14,
-
-            mode='lines+markers',
-
-            name="💰 Saldo Acumulado",
-
-            line=dict(color='#10b981', width=3, shape='spline'), # Emerald Green
-
-            marker=dict(size=8, color='white', line=dict(width=2, color='#10b981'))
-
-        ))
-
-        
-
-        fig_14.update_layout(
-
-            xaxis_title="Período de Projeção",
-
-            yaxis_title="R$ Valor",
-
-            barmode='relative',
-
-            hovermode="x unified",
-
-            height=450,
-
-            plot_bgcolor='rgba(0,0,0,0)',
-
-            margin=dict(l=20, r=20, t=20, b=20)
-
-        )
-
-        fig_14.update_yaxes(gridcolor='rgba(128,128,128,0.2)', zerolinecolor='rgba(128,128,128,0.5)', zerolinewidth=1)
-
-        st.plotly_chart(fig_14, width="stretch")
-
-        
-
-        st.markdown("---")
-
-        
-
         # 5. BOTTOM SECTION: Gerador de Relatórios
 
         st.subheader("📋 Gerador de Relatórios de Clientes e Fornecedores")
