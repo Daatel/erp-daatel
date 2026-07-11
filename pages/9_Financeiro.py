@@ -787,24 +787,6 @@ try:
 
             st.markdown("---")
 
-            # Tendência (3.5)
-            if variacao_hoje > 0.01:
-                tend_char = "▲"
-                tend_text = "Alta"
-                tend_color = "#22c55e"
-            elif variacao_hoje < -0.01:
-                tend_char = "▼"
-                tend_text = "Queda"
-                tend_color = "#ef4444"
-            else:
-                tend_char = "▬"
-                tend_text = "Estável"
-                tend_color = "#64748b"
-                
-            st.markdown(f"Tendência de Caixa: <span style='color:{tend_color}; font-weight:700;'>{tend_char} {tend_text} ({to_brl(abs(variacao_hoje))} em relação a ontem)</span>", unsafe_allow_html=True)
-
-            st.markdown("---")
-
             # Compromissos do Dia (3.3)
             df_rec_today = fetch_all("""
                 SELECT r.id, r.descricao, r.valor, p.codigo, p.categoria
