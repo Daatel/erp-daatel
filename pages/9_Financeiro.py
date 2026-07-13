@@ -149,58 +149,27 @@ def gerar_pdf_financeiro(df_pdf, dt_ini, dt_fim, t_ent, t_sai, s_liq, banco_filt
 
     return bytes(pdf.output())
 
-
-
 @st.dialog("Consolidação de Lançamentos")
-def dialog_confirmar_consolidacao(modificacoes, opcoes_bancos):
-    st.warning("⚠️ **Atenção:** Após a consolidação, os lançamentos selecionados serão fechados e **não será mais possível estorná-los ou alterá-los**.")
-    st.write(f"Você está consolidando/alterando **{len(modificacoes)}** lançamento(s).")
-    st.markdown("**Deseja realmente confirmar a consolidação e atualizações selecionadas?**")
+def dialog_confirmar_consolidacao(modificacoes):
+    st.warning("⚠️ **Atenção:** Após a consolidação, os lançamentos selecionados serão fechados e **não será mais possível revertê-los ou alterá-los**.")
+    st.write(f"Você está consolidando **{len(modificacoes)}** lançamento(s).")
+    st.markdown("**Deseja realmente confirmar a consolidação definitiva dos lançamentos selecionados?**")
     
     col_c1, col_c2 = st.columns(2)
     if col_c1.button("Sim, Confirmar", type="primary", use_container_width=True):
-        for id_mov, dados in modificacoes.items():
-            if 'conciliado' in dados:
-                run_query("UPDATE fluxo_caixa SET conciliado = ? WHERE id = ?", (1 if dados['conciliado'] else 0, id_mov))
-            
-            # Se mudou banco
-            if 'banco_id' in dados:
-                run_query("UPDATE fluxo_caixa SET conta_bancaria_id = ? WHERE id = ?", (dados['banco_id'], id_mov))
-                # Também atualiza na duplicata de origem se houver
-                df_origem = fetch_all("SELECT tipo, fonte_id FROM fluxo_caixa WHERE id = ?", (id_mov,))
-                if not df_origem.empty:
-                    tipo_origem = df_origem.iloc[0]['tipo']
-                    fonte_id = df_origem.iloc[0]['fonte_id']
-                    if pd.notna(fonte_id):
-                        tabela = 'contas_a_pagar' if tipo_origem == 'Saída' else 'contas_a_receber'
-                        run_query(f"UPDATE {tabela} SET conta_bancaria_id = ? WHERE id = ?", (dados['banco_id'], int(fonte_id)))
-            
-            # Se mudou categoria
-            if 'categoria' in dados:
-                run_query("UPDATE fluxo_caixa SET categoria = ? WHERE id = ?", (dados['categoria'], id_mov))
-                # Tenta sincronizar com o plano de contas da duplicata original
-                df_origem = fetch_all("SELECT tipo, fonte_id FROM fluxo_caixa WHERE id = ?", (id_mov,))
-                if not df_origem.empty:
-                    tipo_origem = df_origem.iloc[0]['tipo']
-                    fonte_id = df_origem.iloc[0]['fonte_id']
-                    if pd.notna(fonte_id):
-                        tabela = 'contas_a_pagar' if tipo_origem == 'Saída' else 'contas_a_receber'
-                        # Acha o id do plano de contas que tem esse nome
-                        df_pc = fetch_all("SELECT id FROM planos_de_contas WHERE nome = ? LIMIT 1", (dados['categoria'],))
-                        if not df_pc.empty:
-                            pc_id = int(df_pc.iloc[0]['id'])
-                            run_query(f"UPDATE {tabela} SET plano_conta_id = ? WHERE id = ?", (pc_id, int(fonte_id)))
+        for id_mov in modificacoes:
+            run_query("UPDATE fluxo_caixa SET conciliado = TRUE WHERE id = ?", (id_mov,))
         
-        st.success("Lançamentos consolidados e atualizados com sucesso!")
+        st.success("Lançamentos consolidados com sucesso!")
         import time; time.sleep(1.5); st.rerun()
         
     if col_c2.button("Não, Cancelar", use_container_width=True):
         st.rerun()
 
 
-def executar_estorno_fluxo_caixa(id_estorno):
+def executar_reversao_baixa(id_mov):
     # Resgata o tipo e fonte_id do fluxo de caixa
-    df_fc = fetch_all("SELECT tipo, fonte_id, descricao, valor FROM fluxo_caixa WHERE id = ?", (id_estorno,))
+    df_fc = fetch_all("SELECT tipo, fonte_id, descricao, valor FROM fluxo_caixa WHERE id = ?", (id_mov,))
     if not df_fc.empty:
         tipo = df_fc.iloc[0]['tipo']
         fonte_id = df_fc.iloc[0]['fonte_id']
@@ -213,17 +182,17 @@ def executar_estorno_fluxo_caixa(id_estorno):
             if tipo == 'Saída':
                 # Reverte contas a pagar
                 run_query("UPDATE contas_a_pagar SET status = 'PENDENTE', data_pagamento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
-                st.success(f"✔️ Lançamento estornado! Contas a Pagar ID {fonte_id} voltou ao status PENDENTE.")
+                st.success(f"✔️ Baixa revertida! O Contas a Pagar ID {fonte_id} voltou ao status PENDENTE.")
             elif tipo == 'Entrada':
                 # Reverte contas a receber
                 run_query("UPDATE contas_a_receber SET status = 'PENDENTE', data_recebimento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
-                st.success(f"✔️ Lançamento estornado! Contas a Receber ID {fonte_id} voltou ao status PENDENTE.")
+                st.success(f"✔️ Baixa revertida! O Contas a Receber ID {fonte_id} voltou ao status PENDENTE.")
         else:
             # Lançamento manual ou transferência sem fonte_id
-            st.success(f"✔️ Lançamento avulso '{descricao}' ({to_brl(valor)}) estornado.")
+            st.success(f"✔️ Lançamento avulso '{descricao}' ({to_brl(valor)}) removido.")
             
         # Deleta a linha do fluxo de caixa
-        run_query("DELETE FROM fluxo_caixa WHERE id = ?", (id_estorno,))
+        run_query("DELETE FROM fluxo_caixa WHERE id = ?", (id_mov,))
         import time; time.sleep(1.5); st.rerun()
 
 
@@ -2606,7 +2575,7 @@ try:
             edited_df = st.data_editor(
                 df_display[['id', 'Revisado', 'Data', 'Banco', 'Histórico', 'Entrada', 'Saída', 'Saldo Após Linha', 'Categoria']],
                 hide_index=True,
-                disabled=["id", "Data", "Histórico", "Entrada", "Saída", "Saldo Após Linha"],
+                disabled=["id", "Data", "Banco", "Histórico", "Entrada", "Saída", "Saldo Após Linha", "Categoria"],
                 width="stretch",
                 column_config={
                     "id": None, # Oculta a coluna ID
@@ -2620,101 +2589,53 @@ try:
                 }
             )
 
-            # Lógica de detecção de modificações para lançamentos abertos
-            modificacoes = {}
+            # Lógica de detecção de consolidações para lançamentos abertos
+            itens_a_consolidar = []
             for _, row in edited_df.iterrows():
                 id_mov = int(row['id'])
                 original_row = df_ext[df_ext['id'] == id_mov].iloc[0]
                 was_revisado = bool(original_row['Revisado'])
                 
                 if was_revisado:
-                    # Se era consolidado e o usuário tentou desmarcar, mudar banco ou mudar categoria
-                    if (bool(row['Revisado']) is False or 
-                        row['Banco'] != original_row['Banco'] or 
-                        row['Categoria'] != original_row['Categoria']):
-                        st.error("⚠️ Lançamentos já consolidados não podem ser desmarcados ou alterados.")
+                    # Se era consolidado e o usuário tentou desmarcar
+                    if bool(row['Revisado']) is False:
+                        st.error("⚠️ Lançamentos já consolidados não podem ser desmarcados.")
                         st.stop()
                     continue
                 
-                dados_linha = {}
-                # 1. Se marcou o Ok para consolidar
+                # Se marcou o Ok para consolidar
                 if bool(row['Revisado']) is True:
-                    dados_linha['conciliado'] = True
-                # 2. Se mudou banco
-                if row['Banco'] != original_row['Banco'] and row['Banco'] in opcoes_bancos:
-                    dados_linha['banco_id'] = opcoes_bancos[row['Banco']]
-                # 3. Se mudou categoria
-                if row['Categoria'] != original_row['Categoria']:
-                    dados_linha['categoria'] = row['Categoria']
-                    
-                if dados_linha:
-                    modificacoes[id_mov] = dados_linha
+                    itens_a_consolidar.append(id_mov)
 
-            # Botão de salvar alterações da conciliação
-            if st.button("Salvar Ajustes e Consolidações", type="primary", use_container_width=True):
-                if modificacoes:
-                    # Verifica se há alguma consolidação (marcação de Ok) ativa nas modificações
-                    tem_consolidacao = any('conciliado' in dados for dados in modificacoes.values())
-                    
-                    if tem_consolidacao:
-                        # Se há novos itens para consolidar, abre o diálogo de alerta
-                        dialog_confirmar_consolidacao(modificacoes, opcoes_bancos)
-                    else:
-                        # Se são apenas ajustes simples de Banco ou Categoria, grava silenciosamente
-                        for id_mov, dados in modificacoes.items():
-                            # Se mudou banco
-                            if 'banco_id' in dados:
-                                run_query("UPDATE fluxo_caixa SET conta_bancaria_id = ? WHERE id = ?", (dados['banco_id'], id_mov))
-                                # Também atualiza na duplicata de origem se houver
-                                df_origem = fetch_all("SELECT tipo, fonte_id FROM fluxo_caixa WHERE id = ?", (id_mov,))
-                                if not df_origem.empty:
-                                    tipo_origem = df_origem.iloc[0]['tipo']
-                                    fonte_id = df_origem.iloc[0]['fonte_id']
-                                    if pd.notna(fonte_id):
-                                        tabela = 'contas_a_pagar' if tipo_origem == 'Saída' else 'contas_a_receber'
-                                        run_query(f"UPDATE {tabela} SET conta_bancaria_id = ? WHERE id = ?", (dados['banco_id'], int(fonte_id)))
-                            # Se mudou categoria
-                            if 'categoria' in dados:
-                                run_query("UPDATE fluxo_caixa SET categoria = ? WHERE id = ?", (dados['categoria'], id_mov))
-                                # Também atualiza na duplicata de origem se houver
-                                df_origem = fetch_all("SELECT tipo, fonte_id FROM fluxo_caixa WHERE id = ?", (id_mov,))
-                                if not df_origem.empty:
-                                    tipo_origem = df_origem.iloc[0]['tipo']
-                                    fonte_id = df_origem.iloc[0]['fonte_id']
-                                    if pd.notna(fonte_id):
-                                        tabela = 'contas_a_pagar' if tipo_origem == 'Saída' else 'contas_a_receber'
-                                        # Acha o id do plano de contas que tem esse nome
-                                        df_pc = fetch_all("SELECT id FROM planos_de_contas WHERE nome = ? LIMIT 1", (dados['categoria'],))
-                                        if not df_pc.empty:
-                                            pc_id = int(df_pc.iloc[0]['id'])
-                                            run_query(f"UPDATE {tabela} SET plano_conta_id = ? WHERE id = ?", (pc_id, int(fonte_id)))
-                        st.success("Ajustes de Conta/Categoria salvos com sucesso!")
-                        import time; time.sleep(1); st.rerun()
+            # Botão de consolidação definitiva
+            if st.button("Consolidar Lançamentos", type="primary", use_container_width=True):
+                if itens_a_consolidar:
+                    dialog_confirmar_consolidacao(itens_a_consolidar)
                 else:
-                    st.info("Nenhuma modificação pendente para salvar.")
+                    st.info("Nenhum lançamento selecionado para consolidar.")
 
-            # Seção de Estorno de Lançamento
+            # Seção de Reversão de Baixa
             df_nao_consolidado = df_display[df_display['Revisado'] == False]
             if not df_nao_consolidado.empty:
                 st.markdown("---")
-                st.markdown("##### Estornar Lançamento Aberto")
-                st.markdown("Selecione um lançamento ainda não consolidado para excluí-lo e restaurar o título de origem para pendente.")
+                st.markdown("##### Reverter Baixa de Lançamento")
+                st.markdown("Selecione um lançamento ainda não consolidado para desfazer a baixa e retornar o título original para pendente.")
                 
-                opcoes_estorno = {}
+                opcoes_reversao = {}
                 for _, r in df_nao_consolidado.iterrows():
                     label = f"{r['Data']} - {r['Banco']} - {r['Histórico']} ({to_brl(r['Valor'])})"
-                    opcoes_estorno[label] = int(r['id'])
+                    opcoes_reversao[label] = int(r['id'])
                     
-                sel_estorno = st.selectbox(
-                    "Lançamento para Estornar:", 
-                    ["-- Selecione o lançamento --"] + list(opcoes_estorno.keys()),
-                    key="sel_estorno_lancamento"
+                sel_reversao = st.selectbox(
+                    "Lançamento para Reverter Baixa:", 
+                    ["-- Selecione o lançamento --"] + list(opcoes_reversao.keys()),
+                    key="sel_reversao_lancamento"
                 )
                 
-                if sel_estorno != "-- Selecione o lançamento --":
-                    id_estorno = opcoes_estorno[sel_estorno]
-                    if st.button("Estornar Lançamento Inteiro", type="secondary", use_container_width=True):
-                        executar_estorno_fluxo_caixa(id_estorno)
+                if sel_reversao != "-- Selecione o lançamento --":
+                    id_reversao = opcoes_reversao[sel_reversao]
+                    if st.button("Reverter Baixa", type="secondary", use_container_width=True):
+                        executar_reversao_baixa(id_reversao)
 
 
 
