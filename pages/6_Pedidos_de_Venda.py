@@ -102,6 +102,8 @@ def modal_lancar_pedido():
         st.session_state['carrinho_data'] = None
     if 'carrinho_fp_id' not in st.session_state:
         st.session_state['carrinho_fp_id'] = None
+    if 'carrinho_obs_val' not in st.session_state:
+        st.session_state['carrinho_obs_val'] = ""
 
     if df_clientes.empty or df_vendedores.empty or df_produtos.empty:
         st.warning("Cadastre Clientes, Vendedores e Produtos antes de iniciar as vendas!")
@@ -291,7 +293,9 @@ def modal_lancar_pedido():
         total_pedido = sum(item['valor_total'] for item in st.session_state['carrinho_venda'])
         st.markdown(f"**Total do Pedido: {format_brl(total_pedido)}**")
         
-        obs_pedido = st.text_area("Observações do Pedido (NF / DAV)", key="carrinho_obs")
+        obs_val_init = st.session_state.get('carrinho_obs_val', '')
+        obs_pedido = st.text_area("Observações do Pedido (NF / DAV)", value=obs_val_init)
+        st.session_state['carrinho_obs_val'] = obs_pedido
         
         col_action1, col_action2 = st.columns(2)
         if col_action1.button("Limpar Tudo", use_container_width=True):
@@ -300,8 +304,7 @@ def modal_lancar_pedido():
             st.session_state['carrinho_vendedor_nome'] = None
             st.session_state['carrinho_data'] = None
             st.session_state['carrinho_fp_id'] = None
-            if 'carrinho_obs' in st.session_state:
-                st.session_state['carrinho_obs'] = ""
+            st.session_state['carrinho_obs_val'] = ""
             st.rerun()
             
         if col_action2.button("Aprovar e Gravar Pedido", type="primary", use_container_width=True):
@@ -309,7 +312,7 @@ def modal_lancar_pedido():
             ven = v_opts[st.session_state['carrinho_vendedor_nome']]
             data_v = st.session_state['carrinho_data']
             fp_id_val = st.session_state['carrinho_fp_id']
-            obs_val = st.session_state.get('carrinho_obs', '').strip()
+            obs_val = st.session_state.get('carrinho_obs_val', '').strip()
             
             df_max = fetch_all("SELECT MAX(id) as max_id FROM vendas")
             next_group_id = int(df_max.iloc[0]['max_id']) + 1 if not df_max.empty and pd.notna(df_max.iloc[0]['max_id']) else 1
@@ -334,8 +337,7 @@ def modal_lancar_pedido():
             st.session_state['carrinho_vendedor_nome'] = None
             st.session_state['carrinho_data'] = None
             st.session_state['carrinho_fp_id'] = None
-            if 'carrinho_obs' in st.session_state:
-                st.session_state['carrinho_obs'] = ""
+            st.session_state['carrinho_obs_val'] = ""
             st.toast("Pedido gravado com sucesso!", icon="✅")
             st.rerun()
 
