@@ -1686,6 +1686,8 @@ try:
                 return desc.split(" - VT - ")[-1].strip()
             if " - VR - " in desc:
                 return desc.split(" - VR - ")[-1].strip()
+            if " - Salário - " in desc:
+                return desc.split(" - Salário - ")[-1].strip()
             if "Repasse de Comissão Consolidada - " in desc:
                 try:
                     return desc.split("Repasse de Comissão Consolidada - ")[1].split(" - ")[0].strip()
