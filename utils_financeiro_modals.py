@@ -212,7 +212,7 @@ def dialog_confirmar_baixa_lote_pagar(ids_selecionados, df_all_contas, opcoes_ba
             run_query("UPDATE contas_a_pagar SET status='PAGO', data_pagamento=?, conta_bancaria_id=?, valor=? WHERE id=?", 
                       (d_pgto.strftime("%Y-%m-%d"), conta_id, val_efetivo, c_id))
             
-            run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado, cliente_id) VALUES (?, 'Saída', ?, ?, ?, ?, ?, TRUE, ?)",
+            run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado, cliente_id) VALUES (?, 'Saída', ?, ?, ?, ?, ?, FALSE, ?)",
                       (d_pgto.strftime("%Y-%m-%d"), plant, f"PGTO Credor: {credor} - Fat: {fat}", val_efetivo, c_id, conta_id, cap_cli_id))
                       
         st.success(f"✔️ {len(df_selecionadas)} contas liquidadas e debitadas do banco {conta_saida} com sucesso!")
@@ -697,7 +697,7 @@ def dialog_confirmar_baixa_lote_receber(ids_selecionados, df_receber, opcoes_ban
                 gerar_comissao_se_necessario(vid, 'LIQUIDAÇÃO', cli)
                 
             desc_final = f"REC. Cliente {cli}: {fat}"
-            run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, TRUE)",
+            run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, FALSE)",
                       (dt_rec.strftime("%Y-%m-%d"), desc_final, val_efetivo, rr_id, bCid))
                       
         st.success(f"✔️ {len(df_selecionadas)} recebimentos injetados no Fluxo do banco {banco_destino}!")
