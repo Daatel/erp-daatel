@@ -151,8 +151,83 @@ def gerar_pdf_financeiro(df_pdf, dt_ini, dt_fim, t_ent, t_sai, s_liq, banco_filt
 
 
 
-@st.dialog("Lançamento Direto Bloqueado")
+@st.dialog("Consolidação de Lançamentos")
+def dialog_confirmar_consolidacao(modificacoes, opcoes_bancos):
+    st.warning("⚠️ **Atenção:** Após a consolidação, os lançamentos selecionados serão fechados e **não será mais possível estorná-los ou alterá-los**.")
+    st.write(f"Você está consolidando/alterando **{len(modificacoes)}** lançamento(s).")
+    st.markdown("**Deseja realmente confirmar a consolidação e atualizações selecionadas?**")
+    
+    col_c1, col_c2 = st.columns(2)
+    if col_c1.button("Sim, Confirmar", type="primary", use_container_width=True):
+        for id_mov, dados in modificacoes.items():
+            if 'conciliado' in dados:
+                run_query("UPDATE fluxo_caixa SET conciliado = ? WHERE id = ?", (1 if dados['conciliado'] else 0, id_mov))
+            
+            # Se mudou banco
+            if 'banco_id' in dados:
+                run_query("UPDATE fluxo_caixa SET conta_bancaria_id = ? WHERE id = ?", (dados['banco_id'], id_mov))
+                # Também atualiza na duplicata de origem se houver
+                df_origem = fetch_all("SELECT tipo, fonte_id FROM fluxo_caixa WHERE id = ?", (id_mov,))
+                if not df_origem.empty:
+                    tipo_origem = df_origem.iloc[0]['tipo']
+                    fonte_id = df_origem.iloc[0]['fonte_id']
+                    if pd.notna(fonte_id):
+                        tabela = 'contas_a_pagar' if tipo_origem == 'Saída' else 'contas_a_receber'
+                        run_query(f"UPDATE {tabela} SET conta_bancaria_id = ? WHERE id = ?", (dados['banco_id'], int(fonte_id)))
+            
+            # Se mudou categoria
+            if 'categoria' in dados:
+                run_query("UPDATE fluxo_caixa SET categoria = ? WHERE id = ?", (dados['categoria'], id_mov))
+                # Tenta sincronizar com o plano de contas da duplicata original
+                df_origem = fetch_all("SELECT tipo, fonte_id FROM fluxo_caixa WHERE id = ?", (id_mov,))
+                if not df_origem.empty:
+                    tipo_origem = df_origem.iloc[0]['tipo']
+                    fonte_id = df_origem.iloc[0]['fonte_id']
+                    if pd.notna(fonte_id):
+                        tabela = 'contas_a_pagar' if tipo_origem == 'Saída' else 'contas_a_receber'
+                        # Acha o id do plano de contas que tem esse nome
+                        df_pc = fetch_all("SELECT id FROM planos_de_contas WHERE nome = ? LIMIT 1", (dados['categoria'],))
+                        if not df_pc.empty:
+                            pc_id = int(df_pc.iloc[0]['id'])
+                            run_query(f"UPDATE {tabela} SET plano_conta_id = ? WHERE id = ?", (pc_id, int(fonte_id)))
+        
+        st.success("Lançamentos consolidados e atualizados com sucesso!")
+        import time; time.sleep(1.5); st.rerun()
+        
+    if col_c2.button("Não, Cancelar", use_container_width=True):
+        st.rerun()
 
+
+def executar_estorno_fluxo_caixa(id_estorno):
+    # Resgata o tipo e fonte_id do fluxo de caixa
+    df_fc = fetch_all("SELECT tipo, fonte_id, descricao, valor FROM fluxo_caixa WHERE id = ?", (id_estorno,))
+    if not df_fc.empty:
+        tipo = df_fc.iloc[0]['tipo']
+        fonte_id = df_fc.iloc[0]['fonte_id']
+        descricao = df_fc.iloc[0]['descricao']
+        valor = df_fc.iloc[0]['valor']
+        
+        # Se for um título baixado
+        if pd.notna(fonte_id):
+            fonte_id = int(fonte_id)
+            if tipo == 'Saída':
+                # Reverte contas a pagar
+                run_query("UPDATE contas_a_pagar SET status = 'PENDENTE', data_pagamento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
+                st.success(f"✔️ Lançamento estornado! Contas a Pagar ID {fonte_id} voltou ao status PENDENTE.")
+            elif tipo == 'Entrada':
+                # Reverte contas a receber
+                run_query("UPDATE contas_a_receber SET status = 'PENDENTE', data_recebimento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
+                st.success(f"✔️ Lançamento estornado! Contas a Receber ID {fonte_id} voltou ao status PENDENTE.")
+        else:
+            # Lançamento manual ou transferência sem fonte_id
+            st.success(f"✔️ Lançamento avulso '{descricao}' ({to_brl(valor)}) estornado.")
+            
+        # Deleta a linha do fluxo de caixa
+        run_query("DELETE FROM fluxo_caixa WHERE id = ?", (id_estorno,))
+        import time; time.sleep(1.5); st.rerun()
+
+
+@st.dialog("Lançamento Direto Bloqueado")
 def mostrar_mensagem_bloqueio(username):
 
     st.markdown(f"""
@@ -2546,58 +2621,88 @@ try:
             # Exibir mais novos primeiro para visualização confortável
 
             df_display = df_ext.sort_values(by=['data_parsed', 'id'], ascending=[False, False]).copy()
-
             df_display['Data'] = pd.to_datetime(df_display['Data']).dt.strftime('%d/%m/%Y')
-
             df_display['Revisado'] = df_display['Revisado'].astype(bool)
-
             
+            # Buscar categorias do plano de contas
+            df_pc_lista = fetch_all("SELECT DISTINCT nome FROM planos_de_contas ORDER BY nome")
+            lista_categorias_planos = df_pc_lista['nome'].tolist() if not df_pc_lista.empty else []
 
             edited_df = st.data_editor(
-
                 df_display[['id', 'Revisado', 'Data', 'Banco', 'Histórico', 'Entrada', 'Saída', 'Saldo Após Linha', 'Categoria']],
-
                 hide_index=True,
-
-                disabled=["id", "Data", "Banco", "Histórico", "Entrada", "Saída", "Saldo Após Linha", "Categoria"],
-
+                disabled=["id", "Data", "Histórico", "Entrada", "Saída", "Saldo Após Linha"],
                 width="stretch",
-
                 column_config={
-
                     "id": None, # Oculta a coluna ID
-
                     "Revisado": st.column_config.CheckboxColumn("Ok", help="Marque se confirmou na conta do banco.", default=False),
-
+                    "Banco": st.column_config.SelectboxColumn("Banco", options=list(opcoes_bancos.keys())),
+                    "Categoria": st.column_config.SelectboxColumn("Categoria", options=lista_categorias_planos),
                     "Entrada": st.column_config.NumberColumn("Entrada (R$)", format="R$ %.2f"),
-
                     "Saída": st.column_config.NumberColumn("Saída (R$)", format="R$ %.2f"),
-
                     "Saldo Após Linha": st.column_config.NumberColumn("Saldo Acumulado (R$)", format="R$ %.2f")
-
                 }
-
             )
 
-            
+            # Lógica de detecção de modificações para lançamentos abertos
+            modificacoes = {}
+            for _, row in edited_df.iterrows():
+                id_mov = int(row['id'])
+                original_row = df_ext[df_ext['id'] == id_mov].iloc[0]
+                was_revisado = bool(original_row['Revisado'])
+                
+                if was_revisado:
+                    # Se era consolidado e o usuário tentou desmarcar, mudar banco ou mudar categoria
+                    if (bool(row['Revisado']) is False or 
+                        row['Banco'] != original_row['Banco'] or 
+                        row['Categoria'] != original_row['Categoria']):
+                        st.error("⚠️ Lançamentos já consolidados não podem ser desmarcados ou alterados.")
+                        st.stop()
+                    continue
+                
+                dados_linha = {}
+                # 1. Se marcou o Ok para consolidar
+                if bool(row['Revisado']) is True:
+                    dados_linha['conciliado'] = True
+                # 2. Se mudou banco
+                if row['Banco'] != original_row['Banco'] and row['Banco'] in opcoes_bancos:
+                    dados_linha['banco_id'] = opcoes_bancos[row['Banco']]
+                # 3. Se mudou categoria
+                if row['Categoria'] != original_row['Categoria']:
+                    dados_linha['categoria'] = row['Categoria']
+                    
+                if dados_linha:
+                    modificacoes[id_mov] = dados_linha
 
             # Botão de salvar alterações da conciliação
+            if st.button("Consolidação de Lançamentos", type="primary", use_container_width=True):
+                if modificacoes:
+                    dialog_confirmar_consolidacao(modificacoes, opcoes_bancos)
+                else:
+                    st.info("Nenhuma modificação ou nova consolidação selecionada para salvar.")
 
-            if st.button("Salvar Modificações de Conciliação", type="primary", use_container_width=True):
-
-                for _, row in edited_df.iterrows():
-
-                    n_c = bool(row['Revisado'])
-
-                    db_c = bool(df_ext[df_ext['id'] == row['id']].iloc[0]['Revisado'])
-
-                    if n_c != db_c:
-
-                        run_query("UPDATE fluxo_caixa SET conciliado=? WHERE id=?", (n_c, row['id']))
-
-                st.success("Extrato Oficializado pela Gerência!")
-
-                import time; time.sleep(1); st.rerun()
+            # Seção de Estorno de Lançamento
+            df_nao_consolidado = df_display[df_display['Revisado'] == False]
+            if not df_nao_consolidado.empty:
+                st.markdown("---")
+                st.markdown("##### Estornar Lançamento Aberto")
+                st.markdown("Selecione um lançamento ainda não consolidado para excluí-lo e restaurar o título de origem para pendente.")
+                
+                opcoes_estorno = {}
+                for _, r in df_nao_consolidado.iterrows():
+                    label = f"{r['Data']} - {r['Banco']} - {r['Histórico']} ({to_brl(r['Valor'])})"
+                    opcoes_estorno[label] = int(r['id'])
+                    
+                sel_estorno = st.selectbox(
+                    "Lançamento para Estornar:", 
+                    ["-- Selecione o lançamento --"] + list(opcoes_estorno.keys()),
+                    key="sel_estorno_lancamento"
+                )
+                
+                if sel_estorno != "-- Selecione o lançamento --":
+                    id_estorno = opcoes_estorno[sel_estorno]
+                    if st.button("Estornar Lançamento Inteiro", type="secondary", use_container_width=True):
+                        executar_estorno_fluxo_caixa(id_estorno)
 
 
 
