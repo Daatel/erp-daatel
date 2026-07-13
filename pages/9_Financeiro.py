@@ -167,33 +167,31 @@ def dialog_confirmar_consolidacao(modificacoes):
         st.rerun()
 
 
-def executar_reversao_baixa(id_mov):
-    # Resgata o tipo e fonte_id do fluxo de caixa
-    df_fc = fetch_all("SELECT tipo, fonte_id, descricao, valor FROM fluxo_caixa WHERE id = ?", (id_mov,))
-    if not df_fc.empty:
-        tipo = df_fc.iloc[0]['tipo']
-        fonte_id = df_fc.iloc[0]['fonte_id']
-        descricao = df_fc.iloc[0]['descricao']
-        valor = df_fc.iloc[0]['valor']
-        
-        # Se for um título baixado
-        if pd.notna(fonte_id):
-            fonte_id = int(fonte_id)
-            if tipo == 'Saída':
-                # Reverte contas a pagar
-                run_query("UPDATE contas_a_pagar SET status = 'PENDENTE', data_pagamento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
-                st.success(f"✔️ Baixa revertida! O Contas a Pagar ID {fonte_id} voltou ao status PENDENTE.")
-            elif tipo == 'Entrada':
-                # Reverte contas a receber
-                run_query("UPDATE contas_a_receber SET status = 'PENDENTE', data_recebimento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
-                st.success(f"✔️ Baixa revertida! O Contas a Receber ID {fonte_id} voltou ao status PENDENTE.")
-        else:
-            # Lançamento manual ou transferência sem fonte_id
-            st.success(f"✔️ Lançamento avulso '{descricao}' ({to_brl(valor)}) removido.")
+def executar_reversao_baixa(lista_ids):
+    for id_mov in lista_ids:
+        # Resgata o tipo e fonte_id do fluxo de caixa
+        df_fc = fetch_all("SELECT tipo, fonte_id, descricao, valor FROM fluxo_caixa WHERE id = ?", (id_mov,))
+        if not df_fc.empty:
+            tipo = df_fc.iloc[0]['tipo']
+            fonte_id = df_fc.iloc[0]['fonte_id']
+            descricao = df_fc.iloc[0]['descricao']
+            valor = df_fc.iloc[0]['valor']
             
-        # Deleta a linha do fluxo de caixa
-        run_query("DELETE FROM fluxo_caixa WHERE id = ?", (id_mov,))
-        import time; time.sleep(1.5); st.rerun()
+            # Se for um título baixado
+            if pd.notna(fonte_id):
+                fonte_id = int(fonte_id)
+                if tipo == 'Saída':
+                    # Reverte contas a pagar
+                    run_query("UPDATE contas_a_pagar SET status = 'PENDENTE', data_pagamento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
+                elif tipo == 'Entrada':
+                    # Reverte contas a receber
+                    run_query("UPDATE contas_a_receber SET status = 'PENDENTE', data_recebimento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
+                
+            # Deleta a linha do fluxo de caixa
+            run_query("DELETE FROM fluxo_caixa WHERE id = ?", (id_mov,))
+            
+    st.success(f"✔️ {len(lista_ids)} baixa(s) revertida(s) com sucesso!")
+    import time; time.sleep(1.5); st.rerun()
 
 
 @st.dialog("Lançamento Direto Bloqueado")
@@ -2607,35 +2605,20 @@ try:
                 if bool(row['Revisado']) is True:
                     itens_a_consolidar.append(id_mov)
 
-            # Botão de consolidação definitiva
-            if st.button("Consolidar Lançamentos", type="primary", use_container_width=True):
-                if itens_a_consolidar:
-                    dialog_confirmar_consolidacao(itens_a_consolidar)
-                else:
-                    st.info("Nenhum lançamento selecionado para consolidar.")
-
-            # Seção de Reversão de Baixa
-            df_nao_consolidado = df_display[df_display['Revisado'] == False]
-            if not df_nao_consolidado.empty:
-                st.markdown("---")
-                st.markdown("##### Reverter Baixa de Lançamento")
-                st.markdown("Selecione um lançamento ainda não consolidado para desfazer a baixa e retornar o título original para pendente.")
-                
-                opcoes_reversao = {}
-                for _, r in df_nao_consolidado.iterrows():
-                    label = f"{r['Data']} - {r['Banco']} - {r['Histórico']} ({to_brl(r['Valor'])})"
-                    opcoes_reversao[label] = int(r['id'])
-                    
-                sel_reversao = st.selectbox(
-                    "Lançamento para Reverter Baixa:", 
-                    ["-- Selecione o lançamento --"] + list(opcoes_reversao.keys()),
-                    key="sel_reversao_lancamento"
-                )
-                
-                if sel_reversao != "-- Selecione o lançamento --":
-                    id_reversao = opcoes_reversao[sel_reversao]
-                    if st.button("Reverter Baixa", type="secondary", use_container_width=True):
-                        executar_reversao_baixa(id_reversao)
+            # Botões de ação lado a lado (Consolidar e Reverter Baixa)
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("Consolidar Lançamentos", type="primary", use_container_width=True):
+                    if itens_a_consolidar:
+                        dialog_confirmar_consolidacao(itens_a_consolidar)
+                    else:
+                        st.info("Marque o checkbox de um ou mais lançamentos para consolidar.")
+            with col_b2:
+                if st.button("Reverter Baixa", type="secondary", use_container_width=True):
+                    if itens_a_consolidar:
+                        executar_reversao_baixa(itens_a_consolidar)
+                    else:
+                        st.info("Marque o checkbox de um ou mais lançamentos para reverter a baixa.")
 
 
 
