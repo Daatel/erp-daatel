@@ -534,9 +534,9 @@ try:
     # ----- DADOS BANCÁRIOS BASE -----
 
     df_bancos = fetch_all("SELECT id, nome, banco, saldo_inicial, limite_credito FROM contas_bancarias WHERE status='ATIVO'")
-
+    if not df_bancos.empty:
+        df_bancos['nome'] = df_bancos['nome'].str.strip()
     
-
     opcoes_bancos = {}
 
     saldo_por_banco = {}
@@ -2422,6 +2422,9 @@ try:
         """
 
         df_ext = fetch_all(query_con)
+        if not df_ext.empty:
+            df_ext['Banco'] = df_ext['Banco'].str.strip()
+            df_ext['Categoria'] = df_ext['Categoria'].str.strip()
 
         
 
@@ -2592,6 +2595,13 @@ try:
             # Buscar categorias do plano de contas
             df_pc_lista = fetch_all("SELECT DISTINCT nome FROM planos_de_contas ORDER BY nome")
             lista_categorias_planos = df_pc_lista['nome'].tolist() if not df_pc_lista.empty else []
+            
+            # Evita células vazias mesclando opções do banco com strings reais do dataframe
+            categorias_existentes = df_display['Categoria'].dropna().unique().tolist()
+            opcoes_categoria_selectbox = sorted(list(set(lista_categorias_planos + categorias_existentes)))
+
+            bancos_existentes = df_display['Banco'].dropna().unique().tolist()
+            opcoes_bancos_selectbox = sorted(list(set(list(opcoes_bancos.keys()) + bancos_existentes)))
 
             edited_df = st.data_editor(
                 df_display[['id', 'Revisado', 'Data', 'Banco', 'Histórico', 'Entrada', 'Saída', 'Saldo Após Linha', 'Categoria']],
@@ -2601,8 +2611,9 @@ try:
                 column_config={
                     "id": None, # Oculta a coluna ID
                     "Revisado": st.column_config.CheckboxColumn("Ok", help="Marque se confirmou na conta do banco.", default=False),
-                    "Banco": st.column_config.SelectboxColumn("Banco", options=list(opcoes_bancos.keys())),
-                    "Categoria": st.column_config.SelectboxColumn("Categoria", options=lista_categorias_planos),
+                    "Data": st.column_config.TextColumn("Data Baixa", disabled=True),
+                    "Banco": st.column_config.SelectboxColumn("Conta", options=opcoes_bancos_selectbox),
+                    "Categoria": st.column_config.SelectboxColumn("Categoria", options=opcoes_categoria_selectbox),
                     "Entrada": st.column_config.NumberColumn("Entrada (R$)", format="R$ %.2f"),
                     "Saída": st.column_config.NumberColumn("Saída (R$)", format="R$ %.2f"),
                     "Saldo Após Linha": st.column_config.NumberColumn("Saldo Acumulado (R$)", format="R$ %.2f")
