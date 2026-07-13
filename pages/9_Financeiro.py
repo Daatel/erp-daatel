@@ -2651,11 +2651,47 @@ try:
                     modificacoes[id_mov] = dados_linha
 
             # Botão de salvar alterações da conciliação
-            if st.button("Consolidação de Lançamentos", type="primary", use_container_width=True):
+            if st.button("Salvar Ajustes e Consolidações", type="primary", use_container_width=True):
                 if modificacoes:
-                    dialog_confirmar_consolidacao(modificacoes, opcoes_bancos)
+                    # Verifica se há alguma consolidação (marcação de Ok) ativa nas modificações
+                    tem_consolidacao = any('conciliado' in dados for dados in modificacoes.values())
+                    
+                    if tem_consolidacao:
+                        # Se há novos itens para consolidar, abre o diálogo de alerta
+                        dialog_confirmar_consolidacao(modificacoes, opcoes_bancos)
+                    else:
+                        # Se são apenas ajustes simples de Banco ou Categoria, grava silenciosamente
+                        for id_mov, dados in modificacoes.items():
+                            # Se mudou banco
+                            if 'banco_id' in dados:
+                                run_query("UPDATE fluxo_caixa SET conta_bancaria_id = ? WHERE id = ?", (dados['banco_id'], id_mov))
+                                # Também atualiza na duplicata de origem se houver
+                                df_origem = fetch_all("SELECT tipo, fonte_id FROM fluxo_caixa WHERE id = ?", (id_mov,))
+                                if not df_origem.empty:
+                                    tipo_origem = df_origem.iloc[0]['tipo']
+                                    fonte_id = df_origem.iloc[0]['fonte_id']
+                                    if pd.notna(fonte_id):
+                                        tabela = 'contas_a_pagar' if tipo_origem == 'Saída' else 'contas_a_receber'
+                                        run_query(f"UPDATE {tabela} SET conta_bancaria_id = ? WHERE id = ?", (dados['banco_id'], int(fonte_id)))
+                            # Se mudou categoria
+                            if 'categoria' in dados:
+                                run_query("UPDATE fluxo_caixa SET categoria = ? WHERE id = ?", (dados['categoria'], id_mov))
+                                # Também atualiza na duplicata de origem se houver
+                                df_origem = fetch_all("SELECT tipo, fonte_id FROM fluxo_caixa WHERE id = ?", (id_mov,))
+                                if not df_origem.empty:
+                                    tipo_origem = df_origem.iloc[0]['tipo']
+                                    fonte_id = df_origem.iloc[0]['fonte_id']
+                                    if pd.notna(fonte_id):
+                                        tabela = 'contas_a_pagar' if tipo_origem == 'Saída' else 'contas_a_receber'
+                                        # Acha o id do plano de contas que tem esse nome
+                                        df_pc = fetch_all("SELECT id FROM planos_de_contas WHERE nome = ? LIMIT 1", (dados['categoria'],))
+                                        if not df_pc.empty:
+                                            pc_id = int(df_pc.iloc[0]['id'])
+                                            run_query(f"UPDATE {tabela} SET plano_conta_id = ? WHERE id = ?", (pc_id, int(fonte_id)))
+                        st.success("Ajustes de Conta/Categoria salvos com sucesso!")
+                        import time; time.sleep(1); st.rerun()
                 else:
-                    st.info("Nenhuma modificação ou nova consolidação selecionada para salvar.")
+                    st.info("Nenhuma modificação pendente para salvar.")
 
             # Seção de Estorno de Lançamento
             df_nao_consolidado = df_display[df_display['Revisado'] == False]
