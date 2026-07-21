@@ -16,22 +16,26 @@ carregar_estilo()
 # Modais de Impressão imediata de DAV
 @st.dialog("Imprimir Documento Auxiliar de Venda (DAV)")
 def modal_perguntar_impressao(vendas_ids):
+    # Limpa a chave do estado imediatamente para evitar repetição caso feche no "X"
+    if 'pedidos_dav_faturados' in st.session_state:
+        del st.session_state['pedidos_dav_faturados']
+        
     st.write("O faturamento foi concluído com sucesso!")
     st.write("Deseja abrir a tela de impressão do(s) DAV(s) agora?")
     
     col1, col2 = st.columns(2)
     if col1.button("Sim, Imprimir", type="primary", use_container_width=True):
         st.session_state['disparar_impressao_davs'] = vendas_ids
-        if 'pedidos_dav_faturados' in st.session_state:
-            del st.session_state['pedidos_dav_faturados']
         st.rerun()
     if col2.button("Não", use_container_width=True):
-        if 'pedidos_dav_faturados' in st.session_state:
-            del st.session_state['pedidos_dav_faturados']
         st.rerun()
 
 @st.dialog("Imprimir DAV", width="large")
 def modal_impressao_dav(vendas_ids):
+    # Limpa a chave do estado imediatamente para evitar repetição caso feche no "X"
+    if 'disparar_impressao_davs' in st.session_state:
+        del st.session_state['disparar_impressao_davs']
+        
     import streamlit.components.v1 as components
     from utils_dav import buscar_dados_venda, gerar_html_dav
     
@@ -45,8 +49,6 @@ def modal_impressao_dav(vendas_ids):
             components.html(html_dav, height=800, scrolling=True)
             
     if st.button("Fechar", type="primary", use_container_width=True):
-        if 'disparar_impressao_davs' in st.session_state:
-            del st.session_state['disparar_impressao_davs']
         st.rerun()
 
 @st.dialog("Faturamento Parcial / Fracionar Pedido")
