@@ -1628,7 +1628,7 @@ try:
     with tab2:
 
         df_all_contas = fetch_all("""
-            SELECT c.id, f.nome_fantasia as 'Fornecedor', cl.nome as 'Cliente', c.numero_documento as 'N. Doc', p.nome as 'Planta de Custo', 
+            SELECT c.id, f.nome_fantasia as 'Fornecedor', cl.nome as 'Cliente', c.numero_documento as 'N. Doc', p.nome as 'Plano de Contas', 
                    c.descricao as 'Histórico', c.data_vencimento as 'Vencimento', 
                    c.valor as 'Valor', c.status as 'Status', c.data_pagamento as 'Data PGTO',
                    c.comprovante_url as 'Comprovante', c.cliente_id, cb.nome as 'Conta'
@@ -1899,12 +1899,12 @@ try:
 
                 
 
-                is_disabled_p = ["id", "Credor", "Planta de Custo", "Histórico", "Vencimento", "Valor", "Status", "Data PGTO", "Conta"]
+                is_disabled_p = ["id", "Credor", "Plano de Contas", "Histórico", "Vencimento", "Valor", "Status", "Data PGTO", "Conta"]
                 if status_filter_p == "PAGO":
                     is_disabled_p.append("Pagar?")
                     
                 edited_df_p = st.data_editor(
-                    df_view_p[['Pagar?', 'id', 'Credor', 'N. Doc', 'Vencimento', 'Valor', 'Histórico', 'Status', 'Data PGTO', 'Conta']],
+                    df_view_p[['Pagar?', 'id', 'Credor', 'N. Doc', 'Vencimento', 'Valor', 'Plano de Contas', 'Histórico', 'Status', 'Data PGTO', 'Conta']],
                     hide_index=True,
                     disabled=is_disabled_p,
                     width="stretch",
@@ -1943,11 +1943,12 @@ try:
     with tab3:
 
         df_receber = fetch_all("""
-            SELECT c.id, cl.nome as 'Cliente', c.numero_documento as 'N. Doc', c.descricao as 'Histórico', 
+            SELECT c.id, cl.nome as 'Cliente', c.numero_documento as 'N. Doc', p.nome as 'Plano de Contas', c.descricao as 'Histórico', 
                    c.data_vencimento as 'Vencimento', c.valor as 'Valor', 
                    c.status as 'Status', c.data_recebimento as 'Recebido Em', cb.nome as 'Conta'
             FROM contas_a_receber c
             LEFT JOIN clientes cl ON c.cliente_id = cl.id
+            LEFT JOIN planos_de_contas p ON c.plano_conta_id = p.id
             LEFT JOIN contas_bancarias cb ON c.conta_bancaria_id = cb.id
             ORDER BY c.data_vencimento ASC
         """)
@@ -2157,12 +2158,12 @@ try:
 
                 
 
-                is_disabled_r = ["id", "Cliente", "Histórico", "Vencimento", "Valor", "Status", "Recebido Em", "Conta"]
+                is_disabled_r = ["id", "Cliente", "Plano de Contas", "Histórico", "Vencimento", "Valor", "Status", "Recebido Em", "Conta"]
                 if status_filter_r == "RECEBIDO":
                     is_disabled_r.append("Receber?")
                     
                 edited_df_r = st.data_editor(
-                    df_view_r[['Receber?', 'id', 'Cliente', 'N. Doc', 'Vencimento', 'Valor', 'Histórico', 'Status', 'Recebido Em', 'Conta']],
+                    df_view_r[['Receber?', 'id', 'Cliente', 'N. Doc', 'Vencimento', 'Valor', 'Plano de Contas', 'Histórico', 'Status', 'Recebido Em', 'Conta']],
                     hide_index=True,
                     disabled=is_disabled_r,
                     width="stretch",
@@ -2644,7 +2645,7 @@ try:
 
         df_all_contas = fetch_all("""
 
-            SELECT c.id, f.nome_fantasia as 'Fornecedor', c.numero_documento as 'N. Doc', p.nome as 'Planta de Custo', 
+            SELECT c.id, f.nome_fantasia as 'Fornecedor', c.numero_documento as 'N. Doc', p.nome as 'Plano de Contas', 
 
                    c.descricao as 'Histórico', c.data_vencimento as 'Vencimento', 
 
