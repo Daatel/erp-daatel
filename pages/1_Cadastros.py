@@ -325,6 +325,7 @@ with tab2:
             st.session_state["cli_chave_pix"] = cb.get("chave_pix") or ""
             st.session_state["cli_forma_pagamento_id"] = cb.get("forma_pagamento_id")
             st.session_state["cli_representante_id"] = cb.get("representante_id")
+            st.session_state["cli_plano_conta_id"] = cb.get("plano_conta_id")
             st.session_state["cli_observacoes"] = cb.get("observacoes") or ""
             st.session_state["cli_taxa_descarga"] = float(cb.get("taxa_descarga") or 0.0)
             st.session_state["cli_regras_descarga"] = cb.get("regras_descarga") or ""
@@ -361,7 +362,7 @@ with tab2:
                c.cidade as 'Cidade', c.uf as 'UF', f.nome as 'Representante', c.nome as 'Razão Social', 
                c.cnpj_cpf as 'CNPJ/CPF', COALESCE(fp.nome, c.prazo_pagamento) as 'Forma Pagto',
                c.status as 'Status', c.telefone as 'Telefone', c.limite_credito, c.limite_ilimitado, c.contatos_json,
-               c.taxa_descarga, c.regras_descarga, c.chave_pix
+               c.taxa_descarga, c.regras_descarga, c.chave_pix, c.plano_conta_id
         FROM clientes c
         LEFT JOIN funcionarios f ON c.representante_id = f.id
         LEFT JOIN formas_pagamento fp ON c.forma_pagamento_id = fp.id
@@ -690,8 +691,8 @@ with tab2:
                                         query_insert = """INSERT INTO clientes 
                                                    (nome, telefone, endereco, nome_fantasia, cnpj_cpf, inscricao_estadual, 
                                                     bairro, cep, cidade, uf, email, observacoes, status, rede_clientes, 
-                                                    grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix, forma_pagamento_id, limite_credito, limite_ilimitado) 
-                                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 1)"""
+                                                    grupo_lojas, prazo_pagamento, representante_id, data_nascimento, prazo_pagamento_dias, taxa_descarga, regras_descarga, chave_pix, forma_pagamento_id, limite_credito, limite_ilimitado, plano_conta_id) 
+                                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 1, NULL)"""
                                         
                                         run_query(query_insert, (
                                             razao, telefone, endereco, nome_fantasia, cnpj, insc_estadual,
@@ -817,8 +818,8 @@ with tab2:
                         break
             fp_selecionada = st.selectbox("Forma de Pagamento Padrão *", fp_keys, index=curr_index)
 
-        # 5. Representante Responsável e Observações
-        col_rp1, col_rp2 = st.columns([1, 2])
+        # 5. Representante Responsável, Plano de Contas e Observações
+        col_rp1, col_rp2, col_rp3 = st.columns([1.5, 1.5, 2.0])
         with col_rp1:
             df_reps = fetch_all("SELECT id, nome FROM funcionarios WHERE cargo LIKE '%Representante%' OR cargo LIKE '%Vendedor%'")
             rep_dict = dict(zip(df_reps['nome'], df_reps['id'])) if not df_reps.empty else {}
@@ -834,6 +835,24 @@ with tab2:
             rep_selecionado = st.selectbox("Representante Responsável *", rep_keys, index=curr_rep_index)
             
         with col_rp2:
+            df_planos_cli = fetch_all("SELECT id, codigo, nome FROM planos_de_contas WHERE categoria IN ('RECEITA', 'RECEITA_NAO_OP') ORDER BY codigo")
+            planos_cli_opts = {}
+            if not df_planos_cli.empty:
+                for _, r in df_planos_cli.iterrows():
+                    planos_cli_opts[f"{r['codigo']} - {r['nome']}"] = r['id']
+            
+            planos_cli_keys = ["-- SELECIONE --"] + list(planos_cli_opts.keys())
+            curr_cli_pc_id = st.session_state.get("cli_plano_conta_id")
+            curr_cli_pc_index = 0
+            if curr_cli_pc_id:
+                for idx, k in enumerate(planos_cli_keys):
+                    if k != "-- SELECIONE --" and planos_cli_opts[k] == curr_cli_pc_id:
+                        curr_cli_pc_index = idx
+                        break
+            plan_cli_selecionado = st.selectbox("Plano de Contas Padrão *", planos_cli_keys, index=curr_cli_pc_index)
+            plan_cli_id_val = planos_cli_opts.get(plan_cli_selecionado, None) if plan_cli_selecionado != "-- SELECIONE --" else None
+            
+        with col_rp3:
             observacoes_val = st.text_input("Observações Gerais do Cliente", key="cli_observacoes")
 
         # 6. Logística e Descarga
@@ -882,6 +901,8 @@ with tab2:
                 st.error("Por favor, selecione a Forma de Pagamento Padrão.")
             elif rep_selecionado == "-- SELECIONE --":
                 st.error("Por favor, selecione o Representante Responsável.")
+            elif plan_cli_selecionado == "-- SELECIONE --":
+                st.error("Por favor, selecione o Plano de Contas Padrão.")
             else:
                 # Validar duplicados
                 if edit_id:
@@ -940,13 +961,13 @@ with tab2:
                                 telefone=?, email=?, endereco=?, bairro=?, cidade=?, uf=?, cep=?, rede_clientes=?, grupo_lojas=?,
                                 status=?, chave_pix=?, prazo_pagamento=?, prazo_pagamento_dias=?, representante_id=?,
                                 observacoes=?, taxa_descarga=?, regras_descarga=?, forma_pagamento_id=?,
-                                limite_credito=?, limite_ilimitado=?, contatos_json=?
+                                limite_credito=?, limite_ilimitado=?, contatos_json=?, plano_conta_id=?
                             WHERE id=?
                         """, (nome_val, nome_fantasia_val, cnpj_val, nasc_str, inscricao_estadual_val,
                               telefone_val, email_val, endereco_val, bairro_val, cidade_val, uf_val, cep_val, r_val, g_val,
                               status_val, chave_pix_val, fp_selecionada, first_day, rep_id_val,
                               observacoes_val, taxa_descarga_val, regras_descarga_val, fp_id_val,
-                              limit_cred, limit_ilimit, contatos_json_val, edit_id))
+                              limit_cred, limit_ilimit, contatos_json_val, plan_cli_id_val, edit_id))
                         st.success("Cadastro do cliente atualizado com sucesso!")
                     else:
                         # INSERT
@@ -956,13 +977,13 @@ with tab2:
                              telefone, email, endereco, bairro, cidade, uf, cep, rede_clientes, grupo_lojas,
                              status, chave_pix, prazo_pagamento, prazo_pagamento_dias, representante_id,
                              observacoes, taxa_descarga, regras_descarga, forma_pagamento_id,
-                             limite_credito, limite_ilimitado, contatos_json) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             limite_credito, limite_ilimitado, contatos_json, plano_conta_id) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, (nome_val, nome_fantasia_val, cnpj_val, nasc_str, inscricao_estadual_val,
                               telefone_val, email_val, endereco_val, bairro_val, cidade_val, uf_val, cep_val, r_val, g_val,
                               status_val, chave_pix_val, fp_selecionada, first_day, rep_id_val,
                               observacoes_val, taxa_descarga_val, regras_descarga_val, fp_id_val,
-                              limit_cred, limit_ilimit, contatos_json_val))
+                              limit_cred, limit_ilimit, contatos_json_val, plan_cli_id_val))
                         st.success("Cliente cadastrado com sucesso!")
                         
                     limpar_dados_formulario()

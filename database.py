@@ -316,6 +316,7 @@ def _create_tables_internal(conn):
         limite_credito REAL DEFAULT 0.0,
         limite_ilimitado INTEGER DEFAULT 1,
         contatos_json TEXT,
+        plano_conta_id INTEGER,
         FOREIGN KEY(representante_id) REFERENCES funcionarios(id)
     )
     ''')
@@ -964,7 +965,8 @@ def _create_tables_internal(conn):
         "ALTER TABLE fornecedores ADD COLUMN observacoes TEXT",
         "ALTER TABLE fornecedores ADD COLUMN nome_fantasia TEXT",
         "ALTER TABLE vendas ADD COLUMN observacoes TEXT",
-        "ALTER TABLE contas_bancarias ADD COLUMN limite_credito REAL DEFAULT 0.0"
+        "ALTER TABLE contas_bancarias ADD COLUMN limite_credito REAL DEFAULT 0.0",
+        "ALTER TABLE clientes ADD COLUMN plano_conta_id INTEGER"
     ]
     
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)

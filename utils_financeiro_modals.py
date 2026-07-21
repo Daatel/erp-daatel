@@ -19,11 +19,13 @@ def add_months(sourcedate, months):
 
 @st.dialog("Lançar uma Duplicata a Pagar (Despesa / Passivo)", width="large")
 def dialog_lancar_pagar():
-    df_forn = fetch_all("SELECT id, nome_fantasia FROM fornecedores ORDER BY nome_fantasia")
+    df_forn = fetch_all("SELECT id, nome_fantasia, plano_conta_id FROM fornecedores ORDER BY nome_fantasia")
     op_forn = {"-- SELECIONE O FORNECEDOR --": None}
+    forn_pc_map = {}
     if not df_forn.empty:
         for _, r in df_forn.iterrows():
             op_forn[f"{r['nome_fantasia']}"] = r['id']
+            forn_pc_map[r['id']] = r['plano_conta_id']
     
     df_pc = fetch_all("SELECT id, codigo, nome FROM planos_de_contas WHERE categoria NOT IN ('RECEITA', 'RECEITA_NAO_OP') ORDER BY codigo")
     op_pc = {"-- SELECIONE O PLANO DE CONTAS --": (None, None)}
@@ -57,7 +59,24 @@ def dialog_lancar_pagar():
         st.session_state["cap_num_parcelas"] = 1
         st.session_state["cap_periodicidade"] = "Mensal (Mesmo dia do mês)"
         st.session_state["cap_dias_intervalo"] = 30
+        st.session_state["cap_prev_forn"] = list(op_forn.keys())[0]
         st.session_state["cap_limpar_formulario"] = False
+
+    if "cap_prev_forn" not in st.session_state:
+        st.session_state["cap_prev_forn"] = list(op_forn.keys())[0]
+
+    # Detect change of supplier to auto-fill Plano de Contas
+    if st.session_state.get("cap_forn_sel") != st.session_state["cap_prev_forn"]:
+        st.session_state["cap_prev_forn"] = st.session_state.get("cap_forn_sel")
+        forn_name = st.session_state.get("cap_forn_sel")
+        forn_id_val = op_forn.get(forn_name)
+        if forn_id_val:
+            pc_id_default = forn_pc_map.get(forn_id_val)
+            if pc_id_default:
+                for pc_key, (pc_val_id, _) in op_pc.items():
+                    if pc_val_id == pc_id_default:
+                        st.session_state["cap_pc_sel"] = pc_key
+                        break
 
     col_m1, col_m2 = st.columns(2)
     forn_sel = col_m1.selectbox("Fornecedor", list(op_forn.keys()), key="cap_forn_sel")
@@ -441,26 +460,59 @@ def dialog_editar_pagar(id_selecionado):
 
 @st.dialog("Lançar uma Duplicata a Receber", width="large")
 def dialog_lancar_receber():
-    df_cli = fetch_all("SELECT id, nome FROM clientes ORDER BY nome")
+    df_cli = fetch_all("SELECT id, nome, plano_conta_id FROM clientes ORDER BY nome")
     op_cli = {"-- SELECIONE O CLIENTE --": "placeholder", "Genérico / Não Cadastrado": None}
+    cli_pc_map = {}
     if not df_cli.empty:
-        for _,r in df_cli.iterrows(): op_cli[r['nome']] = r['id']
+        for _, r in df_cli.iterrows():
+            op_cli[r['nome']] = r['id']
+            cli_pc_map[r['id']] = r['plano_conta_id']
         
     df_planos = fetch_all("SELECT id, codigo, nome FROM planos_de_contas WHERE categoria IN ('RECEITA', 'RECEITA_NAO_OP') ORDER BY codigo")
     op_plan = {"-- SELECIONE O PLANO DE CONTAS --": None}
     if not df_planos.empty:
-        for _,r in df_planos.iterrows():
+        for _, r in df_planos.iterrows():
             op_plan[f"{r['codigo']} - {r['nome']}"] = r['id']
+            
+    if st.session_state.get("car_limpar_formulario", False):
+        st.session_state["car_cli_sel"] = list(op_cli.keys())[0]
+        st.session_state["car_pc_sel"] = list(op_plan.keys())[0]
+        st.session_state["car_num_doc_r"] = ""
+        st.session_state["car_desc"] = ""
+        st.session_state["car_val_r"] = 0.01
+        st.session_state["car_venc"] = date.today() + timedelta(days=15)
+        st.session_state["car_prev_cli"] = list(op_cli.keys())[0]
+        st.session_state["car_limpar_formulario"] = False
+
+    if "car_cli_sel" not in st.session_state:
+        st.session_state["car_cli_sel"] = list(op_cli.keys())[0]
+    if "car_pc_sel" not in st.session_state:
+        st.session_state["car_pc_sel"] = list(op_plan.keys())[0]
+    if "car_prev_cli" not in st.session_state:
+        st.session_state["car_prev_cli"] = list(op_cli.keys())[0]
+
+    # Detect change of client to auto-fill Plano de Contas
+    if st.session_state.get("car_cli_sel") != st.session_state["car_prev_cli"]:
+        st.session_state["car_prev_cli"] = st.session_state.get("car_cli_sel")
+        cli_name = st.session_state.get("car_cli_sel")
+        cli_id_val = op_cli.get(cli_name)
+        if cli_id_val and cli_id_val != "placeholder":
+            pc_id_default = cli_pc_map.get(cli_id_val)
+            if pc_id_default:
+                for pc_key, pc_val_id in op_plan.items():
+                    if pc_val_id == pc_id_default:
+                        st.session_state["car_pc_sel"] = pc_key
+                        break
         
     c1, c2, c3 = st.columns(3)
-    cli_nome = c1.selectbox("Cliente", list(op_cli.keys()))
-    plan_sel = c2.selectbox("Plano de Contas", list(op_plan.keys()))
-    venc = c3.date_input("Vencimento", date.today() + timedelta(days=15))
+    cli_nome = c1.selectbox("Cliente", list(op_cli.keys()), key="car_cli_sel")
+    plan_sel = c2.selectbox("Plano de Contas", list(op_plan.keys()), key="car_pc_sel")
+    venc = c3.date_input("Vencimento", value=st.session_state.get("car_venc", date.today() + timedelta(days=15)), key="car_venc")
     
     c4, c5, c6 = st.columns([1, 2, 1])
-    num_doc_r = c4.text_input("Nº Documento (Opcional)")
-    desc = c5.text_input("Fatura (Referência)")
-    val_r = c6.number_input("Valor da Fatura (R$)", min_value=0.01)
+    num_doc_r = c4.text_input("Nº Documento (Opcional)", value=st.session_state.get("car_num_doc_r", ""), key="car_num_doc_r")
+    desc = c5.text_input("Fatura (Referência)", value=st.session_state.get("car_desc", ""), key="car_desc")
+    val_r = c6.number_input("Valor da Fatura (R$)", min_value=0.01, value=st.session_state.get("car_val_r", 0.01), key="car_val_r")
     
     if st.button("Lançar Promessa de Faturamento", type="primary", use_container_width=True):
         if cli_nome == "-- SELECIONE O CLIENTE --":
@@ -473,6 +525,7 @@ def dialog_lancar_receber():
             with st.spinner("Registrando recebível..."):
                 run_query("INSERT INTO contas_a_receber (cliente_id, plano_conta_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
                           (op_cli[cli_nome], op_plan[plan_sel], num_doc_r, desc, val_r, venc.strftime("%Y-%m-%d")))
+            st.session_state["car_limpar_formulario"] = True
             st.success("Boleto emitido (pendente)")
             import time; time.sleep(1); st.rerun()
 
