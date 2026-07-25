@@ -87,3 +87,10 @@ Abaixo está o mapeamento dos locais e respectivos emojis que foram removidos da
   6. **Gráfico de Fluxo de Caixa Projetado:** Linha de saldo futuro acumulado e barras de entradas/saídas projetadas para os próximos 30 dias (em vez de histórico passado).
   7. **Fechamento Diário em PDF:** Botão na visão de Fechamento para emitir um relatório A4 corporativo limpo do dia realizado.
 - **Status:** Planejado para futura implementação baseando-se nas especificações de `spec_mvp_financeiro.md` e `MD_Painel_Financeiro.md`.
+
+---
+
+## 📷 Importação de Folha Fotografada via Gemini Vision (OCR)
+- **Objetivo:** Permitir que a operadora fotografe a folha diária de pesagem preenchida à mão e importe os dados automaticamente para a mesa de seleção.
+- **Detalhamento Técnico:** Uso da API Gemini Vision (`gemini-1.5-flash`) para extração de JSON estruturado contendo as pesagens individuais e os volumes do lote (alho nobre, segunda linha/bombona e descarte/lixo), realizando match fuzzy de nomes com a equipe presente no dia para evitar digitação manual.
+- **Status:** Planejado para futura implementação.
