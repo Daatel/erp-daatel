@@ -12,7 +12,7 @@ SELECT
     COALESCE(mn.meta_kg_dia, 70.0) as meta_kg_dia
 FROM funcionarios f
 LEFT JOIN selecao_metas_nivel mn ON mn.nivel = COALESCE(f.nivel_classificacao, 'B')
-WHERE (f.cargo LIKE '%Selecionador%' OR f.cargo LIKE '%Catador%' OR f.cargo LIKE '%Operário%' OR f.cargo LIKE '%Operario%')
+WHERE f.cargo = 'Selecionador(a)'
   AND (f.status = 'ATIVO' OR f.status IS NULL)
 ORDER BY f.nome;
 """

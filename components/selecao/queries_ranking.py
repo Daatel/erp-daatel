@@ -16,7 +16,7 @@ WITH periodo AS (
   FROM funcionarios f
   LEFT JOIN selecao_metas_nivel mn ON mn.nivel = COALESCE(f.nivel_classificacao, 'B')
   LEFT JOIN selecao_pesagens_diarias pd ON pd.selecionadora_id = f.id AND pd.data >= ? AND pd.data <= ?
-  WHERE (f.cargo LIKE '%Selecionador%' OR f.cargo LIKE '%Catador%' OR f.cargo LIKE '%Operário%' OR f.cargo LIKE '%Operario%')
+  WHERE f.cargo = 'Selecionador(a)'
     AND (f.status = 'ATIVO' OR f.status IS NULL)
   GROUP BY f.id, f.nome, f.regime_contratacao, f.nivel_classificacao, mn.meta_kg_dia
 ),
