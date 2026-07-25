@@ -1,5 +1,6 @@
 # components/selecao/queries.py
 # Queries SQL centralizadas do Módulo de Seleção (Empório do Alho)
+# Padrão ANSI SQL 100% compatível com PostgreSQL (Supabase) e SQLite
 
 # 1. Lista de selecionadoras ativas
 SQL_SELECIONADORAS_ATIVAS = """
@@ -12,7 +13,7 @@ SELECT
 FROM funcionarios f
 LEFT JOIN selecao_metas_nivel mn ON mn.nivel = COALESCE(f.nivel_classificacao, 'B')
 WHERE (f.cargo LIKE '%Selecionador%' OR f.cargo LIKE '%Catador%' OR f.cargo LIKE '%Operário%' OR f.cargo LIKE '%Operario%')
-  AND f.status = 'ATIVO'
+  AND (f.status = 'ATIVO' OR f.status IS NULL)
 ORDER BY f.nome;
 """
 
@@ -36,7 +37,7 @@ ON CONFLICT (nivel) DO UPDATE SET
 SQL_PARAMETROS_MES = """
 SELECT id, mes_ano, meta_diaria_casa_kg, dias_uteis_calculados, dias_uteis_efetivos
 FROM selecao_parametros
-WHERE strftime('%Y-%m-01', mes_ano) = strftime('%Y-%m-01', ?) OR mes_ano = ?;
+WHERE mes_ano = ?;
 """
 
 SQL_UPSERT_PARAMETROS = """
@@ -128,7 +129,7 @@ FROM selecao_aproveitamento_diario
 WHERE data = ?;
 """
 
-# 8. Produção diária do mês para o BI
+# 8. Produção diária do mês para o BI (ANSI SQL por intervalo de datas)
 SQL_BI_PRODUCAO_MES = """
 SELECT 
     pd.data,
@@ -136,7 +137,7 @@ SELECT
     COUNT(DISTINCT pd.selecionadora_id) as n_presentes,
     AVG(pd.peso_kg) as media_por_selecionadora_kg
 FROM selecao_pesagens_diarias pd
-WHERE strftime('%Y-%m', pd.data) = ? OR pd.data LIKE ?
+WHERE pd.data >= ? AND pd.data < ?
 GROUP BY pd.data
 ORDER BY pd.data;
 """

@@ -48,7 +48,7 @@ def render_mesa_selecao():
 
     # 1. Carrega parâmetros do mês
     str_mes = hoje.strftime("%Y-%m-01")
-    df_params = fetch_all(SQL_PARAMETROS_MES, (str_mes, str_mes))
+    df_params = fetch_all(SQL_PARAMETROS_MES, (str_mes,))
     meta_casa_kg = float(df_params.iloc[0]['meta_diaria_casa_kg']) if not df_params.empty else 500.0
 
     # Presenças salvas do dia
@@ -63,7 +63,7 @@ def render_mesa_selecao():
             })
 
     # Cabeçalho da ação com Botão PDF no topo
-    col_tit, col_pdf = st.columns([3, 1])
+    col_tit, col_pdf = st.columns([3, 1.2])
     with col_tit:
         st.markdown(f"**Data de Hoje:** `{hoje.strftime('%d/%m/%Y')}`")
     
@@ -83,7 +83,7 @@ def render_mesa_selecao():
     st.divider()
 
     # -------------------------------------------------------------------------
-    # PASSO 1: CONFIRMAÇÃO DE PRESENÇAS DO DIA
+    # PASSO 1: CONFIRMAÇÃO DE PRESENÇAS DO DIA (CARD COMPACTO)
     # -------------------------------------------------------------------------
     st.markdown("##### Passo 1 — Quem está presente hoje?")
 
@@ -110,7 +110,7 @@ def render_mesa_selecao():
         "Selecione as selecionadoras presentes:",
         options=list(opts_map.keys()),
         default=default_selected,
-        placeholder="Clique para selecionar...",
+        placeholder="Clique para selecionar selecionadoras...",
         key="ms_presenca_multiselect"
     )
 
@@ -118,26 +118,27 @@ def render_mesa_selecao():
         rows_presentes = [opts_map[lbl] for lbl in selecionadas_lbl]
         cap_total = sum(r['meta_kg_dia'] for r in rows_presentes)
 
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns([1.5, 2, 2, 2.5])
         c1.metric("Presentes Hoje", f"{len(selecionadas_lbl)}")
         c2.metric("Capacidade do Dia", f"{cap_total:,.0f} kg")
         c3.metric("Meta Mínima da Casa", f"{meta_casa_kg:,.0f} kg")
-
-        if st.button("Confirmar Presenças do Dia", type="primary", key="btn_salvar_presencas"):
-            try:
-                with db_transaction() as conn:
-                    run_query(SQL_LIMPAR_PRESENCA_DIA, (hoje.strftime("%Y-%m-%d"),))
-                    for r in rows_presentes:
-                        run_query(SQL_INSERIR_PRESENCA, (hoje.strftime("%Y-%m-%d"), int(r['id']), uid))
-                st.success("Presenças do dia salvas.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao salvar presenças: {e}")
+        with c4:
+            st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
+            if st.button("Confirmar Presenças do Dia", type="primary", use_container_width=True, key="btn_salvar_presencas"):
+                try:
+                    with db_transaction() as conn:
+                        run_query(SQL_LIMPAR_PRESENCA_DIA, (hoje.strftime("%Y-%m-%d"),))
+                        for r in rows_presentes:
+                            run_query(SQL_INSERIR_PRESENCA, (hoje.strftime("%Y-%m-%d"), int(r['id']), uid))
+                    st.success("Presenças do dia salvas.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao salvar presenças: {e}")
 
     st.divider()
 
     # -------------------------------------------------------------------------
-    # PASSO 2: PESAGEM INDIVIDUAL & BALANÇO DE RESÍDUOS
+    # PASSO 2: PESAGEM INDIVIDUAL & BALANÇO DE RESÍDUOS (GRID EM 3 COLUNAS)
     # -------------------------------------------------------------------------
     if not df_presencas_salvas.empty:
         st.markdown("##### Passo 2 — Pesagem Individual & Balanço de Resíduos")
@@ -152,9 +153,10 @@ def render_mesa_selecao():
             st.markdown("###### 1. Pesagem Individual (kg)")
             
             novas_pesagens = {}
-            cols = st.columns(2)
+            # Grid em 3 colunas compactas para melhor aproveitamento visual
+            cols = st.columns(3)
             for idx, r in enumerate(presentes_list):
-                col = cols[idx % 2]
+                col = cols[idx % 3]
                 sid = r['id']
                 p_nome = obter_primeiro_nome(r['nome'])
                 val_atual = pesagens_dict.get(sid, 0.0)

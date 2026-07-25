@@ -19,16 +19,20 @@ def render_painel_bi():
     mes_ano = date(str_mes_sel.year, str_mes_sel.month, 1)
     str_mes_db = mes_ano.strftime("%Y-%m")
     str_mes_01 = mes_ano.strftime("%Y-%m-01")
+    if mes_ano.month == 12:
+        prox_mes_01 = date(mes_ano.year + 1, 1, 1).strftime("%Y-%m-01")
+    else:
+        prox_mes_01 = date(mes_ano.year, mes_ano.month + 1, 1).strftime("%Y-%m-01")
 
     # 1. Carrega parâmetros do mês
-    df_params = fetch_all(SQL_PARAMETROS_MES, (str_mes_01, str_mes_01))
+    df_params = fetch_all(SQL_PARAMETROS_MES, (str_mes_01,))
     meta_casa_diaria = float(df_params.iloc[0]['meta_diaria_casa_kg']) if not df_params.empty else 500.0
     dias_efetivos = int(df_params.iloc[0]['dias_uteis_efetivos']) if not df_params.empty else 22
 
     meta_total_mes = meta_casa_diaria * dias_efetivos
 
-    # 2. Carrega produção diária do mês
-    df_prod = fetch_all(SQL_BI_PRODUCAO_MES, (str_mes_db, f"{str_mes_db}%"))
+    # 2. Carrega produção diária do mês (busca ANSI por intervalo de datas)
+    df_prod = fetch_all(SQL_BI_PRODUCAO_MES, (str_mes_01, prox_mes_01))
 
     realizado_mes = float(df_prod['producao_total_kg'].sum()) if not df_prod.empty else 0.0
     dias_trabalhados = len(df_prod) if not df_prod.empty else 0

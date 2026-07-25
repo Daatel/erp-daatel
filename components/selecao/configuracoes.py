@@ -27,7 +27,6 @@ def _dias_uteis_mes(mes_ano: date, excecoes_df) -> tuple[int, int]:
     _, n_dias = calendar.monthrange(mes_ano.year, mes_ano.month)
     todas = [date(mes_ano.year, mes_ano.month, d) for d in range(1, n_dias + 1)]
 
-    # Dias calculados: de segunda a sexta
     dias_calc = sum(1 for d in todas if d.weekday() < 5)
 
     remover = 0
@@ -56,7 +55,7 @@ def render_configuracoes():
     str_mes = mes_ano.strftime("%Y-%m-01")
 
     # -------------------------------------------------------------------------
-    # 1. METAS POR NÍVEL
+    # 1. METAS POR NÍVEL DE SELECIONADORA (CARD COMPACTO)
     # -------------------------------------------------------------------------
     st.markdown("##### Metas por Nível de Selecionadora")
 
@@ -69,19 +68,30 @@ def render_configuracoes():
                 nv = r['nivel']
                 meta_val = float(r['meta_kg_dia'])
                 desc_val = r['descricao']
-                c1, c2, c3 = st.columns([1, 3, 2])
-                c1.markdown(f"**Nível {nv}**")
-                c2.caption(desc_val)
-                val = c3.number_input(f"Meta kg/dia ({nv})", min_value=1.0, value=meta_val, step=5.0, format="%.0f", label_visibility="collapsed")
-                novas_metas[nv] = (val, desc_val)
+                
+                badge_class = "badge-nivel-a" if nv == "A" else ("badge-nivel-b" if nv == "B" else "badge-nivel-teste")
+                
+                c1, c2, c3 = st.columns([1.5, 3.5, 2.0])
+                with c1:
+                    st.markdown(f"<span class='{badge_class}'>Nível {nv}</span>", unsafe_allow_html=True)
+                with c2:
+                    st.caption(desc_val)
+                with c3:
+                    val = st.number_input(f"Meta ({nv})", min_value=1.0, value=meta_val, step=5.0, format="%.0f", label_visibility="collapsed")
+                    novas_metas[nv] = (val, desc_val)
         else:
             for nv, desc_val in NIVEL_DESC.items():
                 meta_default = 90.0 if nv == 'A' else (70.0 if nv == 'B' else 50.0)
-                c1, c2, c3 = st.columns([1, 3, 2])
-                c1.markdown(f"**Nível {nv}**")
-                c2.caption(desc_val)
-                val = c3.number_input(f"Meta kg/dia ({nv})", min_value=1.0, value=meta_default, step=5.0, format="%.0f", label_visibility="collapsed")
-                novas_metas[nv] = (val, desc_val)
+                badge_class = "badge-nivel-a" if nv == "A" else ("badge-nivel-b" if nv == "B" else "badge-nivel-teste")
+                
+                c1, c2, c3 = st.columns([1.5, 3.5, 2.0])
+                with c1:
+                    st.markdown(f"<span class='{badge_class}'>Nível {nv}</span>", unsafe_allow_html=True)
+                with c2:
+                    st.caption(desc_val)
+                with c3:
+                    val = st.number_input(f"Meta ({nv})", min_value=1.0, value=meta_default, step=5.0, format="%.0f", label_visibility="collapsed")
+                    novas_metas[nv] = (val, desc_val)
 
         salvar_metas = st.form_submit_button("Salvar Metas por Nível", type="primary")
 
@@ -98,16 +108,16 @@ def render_configuracoes():
     st.divider()
 
     # -------------------------------------------------------------------------
-    # 2. META MÍNIMA DA CASA
+    # 2. META MÍNIMA DA CASA (CARD COMPACTO)
     # -------------------------------------------------------------------------
     st.markdown("##### Meta Mínima da Casa")
-    df_params = fetch_all(SQL_PARAMETROS_MES, (str_mes, str_mes))
+    df_params = fetch_all(SQL_PARAMETROS_MES, (str_mes,))
     meta_casa_atual = float(df_params.iloc[0]['meta_diaria_casa_kg']) if not df_params.empty else 500.0
 
     with st.form("form_meta_casa"):
-        col_m1, col_m2 = st.columns([2, 3])
-        nova_meta_casa = col_m1.number_input("Meta Mínima Diária da Fábrica (kg/dia)", min_value=1.0, value=meta_casa_atual, step=50.0, format="%.0f")
-        col_m2.caption("Produção mínima diária para cobrir custos fixos.")
+        col_m1, col_m2 = st.columns([2, 4])
+        nova_meta_casa = col_m1.number_input("Meta Diária da Casa (kg/dia)", min_value=1.0, value=meta_casa_atual, step=50.0, format="%.0f")
+        col_m2.caption("Produção mínima diária para cobertura de custos fixos da fábrica.")
         salvar_casa = st.form_submit_button("Salvar Meta da Casa", type="primary")
 
     df_excecoes = fetch_all(SQL_EXCECOES_MES)
@@ -125,18 +135,17 @@ def render_configuracoes():
     st.divider()
 
     # -------------------------------------------------------------------------
-    # 3. CALENDÁRIO E EXCEÇÕES DO MÊS
+    # 3. CALENDÁRIO DO MÊS E EXCEÇÕES (CARD COMPACTO)
     # -------------------------------------------------------------------------
     st.markdown(f"##### Calendário do Mês — {mes_ano.strftime('%m/%Y')}")
-    st.markdown(f"**Dias úteis calculados:** `{dias_calc} dias` *(segunda a sexta)*")
-
-    st.markdown("###### Exceções do Mês (Feriados / Sábados Trabalhados)")
+    st.caption(f"Dias úteis base calculados: {dias_calc} dias (segunda a sexta)")
 
     if not df_excecoes.empty:
+        st.markdown("###### Exceções Lançadas no Mês")
         for _, r in df_excecoes.iterrows():
             exc_id = r['id']
             dt_str = pd.to_datetime(r['data']).strftime('%d/%m/%Y')
-            t_icon = "Feriado / Folga" if r['tipo'] == 'REMOVER' else "Sábado Trabalhado"
+            t_icon = "Feriado / Folga (-1 dia)" if r['tipo'] == 'REMOVER' else "Sábado Trabalhado (+1 dia)"
             
             cx1, cx2 = st.columns([4, 1])
             cx1.markdown(f"• `{dt_str}` — **{t_icon}** ({r['descricao'] or 'Sem descrição'})")
@@ -145,7 +154,7 @@ def render_configuracoes():
                 st.rerun()
 
     with st.form("form_nova_excecao"):
-        col_e1, col_e2, col_e3 = st.columns(3)
+        col_e1, col_e2, col_e3 = st.columns([2, 2, 3])
         dt_exc_in = col_e1.date_input("Data da Exceção", value=hoje)
         tipo_exc_in = col_e2.selectbox("Tipo", ["Remover dia (Feriado)", "Adicionar dia (Sábado trabalhado)"])
         desc_exc_in = col_e3.text_input("Descrição", placeholder="Ex: Feriado Municipal")
@@ -164,4 +173,10 @@ def render_configuracoes():
             st.error(f"Erro ao salvar exceção: {e}")
 
     meta_total_mes = nova_meta_casa * dias_efetivos
-    st.info(f"Dias úteis efetivos no mês: {dias_efetivos} dias | Meta Total do Mês: {meta_total_mes:,.0f} kg")
+    
+    st.markdown(f"""
+    <div style='background-color:#e0f2fe; border:1px solid #bae6fd; border-radius:10px; padding:12px 18px; margin-top:15px;'>
+        <span style='color:#0369a1; font-weight:700; font-size:14px;'>Dias Úteis Efetivos no Mês: {dias_efetivos} dias</span>
+        <span style='color:#0284c7; font-size:13px; float:right;'>Meta Total Acumulada: <b>{meta_total_mes:,.0f} kg</b></span>
+    </div>
+    """, unsafe_allow_html=True)

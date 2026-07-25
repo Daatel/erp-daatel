@@ -260,6 +260,64 @@ def carregar_estilo():
         div[data-baseweb="calendar"] [role="columnheader"] {
             color: #ffffff !important;
         }
+
+        /* --- COMPACT DESIGN SYSTEM (CARDS, BADGES & TIGHT INPUTS) --- */
+        div[data-baseweb="input"] > div {
+            min-height: 38px !important;
+            height: 38px !important;
+            border-radius: 8px !important;
+        }
+        div[data-baseweb="input"] input {
+            font-size: 14px !important;
+            font-weight: 500 !important;
+            padding: 4px 10px !important;
+        }
+        div[data-testid="stNumberInputStepDown"], div[data-testid="stNumberInputStepUp"] {
+            height: 36px !important;
+            width: 36px !important;
+        }
+        div[data-testid="stForm"] {
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 12px !important;
+            padding: 18px 22px !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+        }
+        .badge-nivel-a {
+            background-color: #dcfce7 !important;
+            color: #15803d !important;
+            font-weight: 700 !important;
+            font-size: 11px !important;
+            padding: 3px 10px !important;
+            border-radius: 12px !important;
+            display: inline-block !important;
+        }
+        .badge-nivel-b {
+            background-color: #e0f2fe !important;
+            color: #0369a1 !important;
+            font-weight: 700 !important;
+            font-size: 11px !important;
+            padding: 3px 10px !important;
+            border-radius: 12px !important;
+            display: inline-block !important;
+        }
+        .badge-nivel-teste {
+            background-color: #fef3c7 !important;
+            color: #b45309 !important;
+            font-weight: 700 !important;
+            font-size: 11px !important;
+            padding: 3px 10px !important;
+            border-radius: 12px !important;
+            display: inline-block !important;
+        }
+        .card-container {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
     </style>
     </div>
     """, unsafe_allow_html=True)
