@@ -126,10 +126,12 @@ with tab_cadastro:
 
             # Expander 4: Dados Contratuais
             with st.expander("👔 Bloco 4: Dados Contratuais e Jornada", expanded=False):
-                col1, col2, col3 = st.columns(3)
-                cargo = col1.selectbox("Cargo / Função", ["Operário", "Vendedor", "Gerente", "Administrativo", "Representante Comercial"], key="reg_cargo")
+                col1, col2, col3, col_niv = st.columns(4)
+                cargo_opts = ["Selecionador(a)", "Operário", "Vendedor", "Gerente", "Administrativo", "Representante Comercial"]
+                cargo = col1.selectbox("Cargo / Função", cargo_opts, key="reg_cargo")
                 departamento = col2.text_input("Departamento / Área", key="reg_dept")
                 regime = col3.selectbox("Regime de Contratação", ["CLT", "PJ", "Estágio", "Autônomo", "Diarista", "Outro"], key="reg_regime")
+                nivel_class = col_niv.selectbox("Nível Seleção (A/B/Teste)", ["B", "A", "Teste"], key="reg_nivel")
                 col4, col5, col6 = st.columns(3)
                 modelo_trabalho = col4.selectbox("Modelo de Trabalho", ["Presencial", "Híbrido", "Remoto"], key="reg_mt")
                 admissao = col5.date_input("Data de Admissão", value=date.today(), format="DD/MM/YYYY", key="reg_adm")
@@ -186,12 +188,12 @@ with tab_cadastro:
                            (nome, cargo, salario_base, regime_contratacao, data_admissao, data_nascimento, ajuda_custo, status, data_termino, cnpj_cpf, telefone, email, valor_transporte, valor_refeicao,
                             genero, estado_civil, nacionalidade_naturalidade, nome_mae, nome_pai, endereco, bairro, cidade_uf, cep, contato_emergencia, rg, pis_pasep, ctps, titulo_eleitor, cnh,
                             dados_bancarios, tipo_conta, chave_pix, dependente1, dependente2, departamento, modelo_trabalho, carga_horaria_semanal, horario_trabalho, escala_trabalho,
-                            adicionais_legais, comissionamento, comissao_regra, gatilho_pagamento_comissao, bonus_premiacao, politica_adiantamento, vt_desconto, vr_desconto, equipamentos_fornecidos, aceite_lgpd) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, 'ATIVO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            adicionais_legais, comissionamento, comissao_regra, gatilho_pagamento_comissao, bonus_premiacao, politica_adiantamento, vt_desconto, vr_desconto, equipamentos_fornecidos, aceite_lgpd, nivel_classificacao) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, 'ATIVO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (nome, cargo, salario, regime, admissao, nascimento, ajuda_custo, termino, cnpj_cpf, telefone, email, val_transp, val_refei,
                          genero, estado_civil, nacionalidade, nome_mae, nome_pai, endereco, bairro, cidade_uf, cep, contato_emergencia, rg, pis_pasep, ctps, titulo_eleitor, cnh,
                          dados_bancarios, tipo_conta, chave_pix, dependente1, dependente2, departamento, modelo_trabalho, carga_horaria, horario_trabalho, escala,
-                         adicionais_str, comiss_int, comissao_regra, gatilho_com, bonus, adiantamento, vt_desc, vr_desc, equipamentos_str, aceite_int)
+                         adicionais_str, comiss_int, comissao_regra, gatilho_com, bonus, adiantamento, vt_desc, vr_desc, equipamentos_str, aceite_int, nivel_class)
                     )
                     st.success(f"Colaborador {nome} cadastrado com sucesso!")
                     import time; time.sleep(1); st.rerun()
@@ -272,14 +274,19 @@ with tab_cadastro:
 
                     # Expander 4: Dados Contratuais
                     with st.expander("👔 Bloco 4: Dados Contratuais e Jornada", expanded=False):
-                        col1, col2, col3 = st.columns(3)
-                        c_lst = ["Operário", "Vendedor", "Gerente", "Administrativo", "Representante Comercial"]
+                        col1, col2, col3, col_niv = st.columns(4)
+                        c_lst = ["Selecionador(a)", "Operário", "Vendedor", "Gerente", "Administrativo", "Representante Comercial"]
                         ef_cargo = col1.selectbox("Cargo / Função", c_lst, index=c_lst.index(f_data['cargo']) if f_data['cargo'] in c_lst else 0)
                         ef_dept = col2.text_input("Departamento / Área", f_data.get('departamento', '') or '')
                         reg_opts = ["CLT", "PJ", "Estágio", "Autônomo", "Diarista", "Outro"]
                         db_reg = f_data.get('regime_contratacao', 'CLT')
                         if db_reg not in reg_opts: db_reg = "CLT"
                         ef_regime = col3.selectbox("Regime de Contratação", reg_opts, index=reg_opts.index(db_reg))
+                        
+                        niv_opts = ["B", "A", "Teste"]
+                        db_niv = f_data.get('nivel_classificacao', 'B') or 'B'
+                        if db_niv not in niv_opts: db_niv = "B"
+                        ef_nivel = col_niv.selectbox("Nível Seleção (A/B/Teste)", niv_opts, index=niv_opts.index(db_niv))
                         
                         col4, col5, col6 = st.columns(3)
                         mt_opts = ["Presencial", "Híbrido", "Remoto"]
@@ -359,12 +366,12 @@ with tab_cadastro:
                                    nome=?, cargo=?, salario_base=?, regime_contratacao=?, data_admissao=?, data_nascimento=?, ajuda_custo=?, status=?, data_termino=?, cnpj_cpf=?, telefone=?, email=?, valor_transporte=?, valor_refeicao=?,
                                    genero=?, estado_civil=?, nacionalidade_naturalidade=?, nome_mae=?, nome_pai=?, endereco=?, bairro=?, cidade_uf=?, cep=?, contato_emergencia=?, rg=?, pis_pasep=?, ctps=?, titulo_eleitor=?, cnh=?,
                                    dados_bancarios=?, tipo_conta=?, chave_pix=?, dependente1=?, dependente2=?, departamento=?, modelo_trabalho=?, carga_horaria_semanal=?, horario_trabalho=?, escala_trabalho=?,
-                                   adicionais_legais=?, comissionamento=?, comissao_regra=?, gatilho_pagamento_comissao=?, bonus_premiacao=?, politica_adiantamento=?, vt_desconto=?, vr_desconto=?, equipamentos_fornecidos=?
+                                   adicionais_legais=?, comissionamento=?, comissao_regra=?, gatilho_pagamento_comissao=?, bonus_premiacao=?, politica_adiantamento=?, vt_desconto=?, vr_desconto=?, equipamentos_fornecidos=?, nivel_classificacao=?
                                    WHERE id=?""",
                                 (ef_nome, ef_cargo, ef_salario, ef_regime, ef_admissao, ef_nascimento, ef_ajuda, ef_status, ef_termino, ef_cnpj, ef_telefone, ef_email, ef_val_transp, ef_val_refei,
                                  ef_genero, ef_estado_civil, ef_nacionalidade, ef_nome_mae, ef_nome_pai, ef_endereco, ef_bairro, ef_cidade_uf, ef_cep, ef_emergencia, ef_rg, ef_pis, ef_ctps, ef_titulo, ef_cnh,
                                  ef_banco, ef_tipo_conta, ef_pix, ef_dep1, ef_dep2, ef_dept, ef_modelo, ef_carga, ef_horario, ef_escala,
-                                 ef_adicionais_str, comiss_int, ef_comiss_regra, ef_gatilho, ef_bonus, ef_adiant, ef_vt_desc, ef_vr_desc, ef_equip_str, f_id)
+                                 ef_adicionais_str, comiss_int, ef_comiss_regra, ef_gatilho, ef_bonus, ef_adiant, ef_vt_desc, ef_vr_desc, ef_equip_str, ef_nivel, f_id)
                             )
                             st.success("Modificações salvas com sucesso!")
                             import time; time.sleep(1); st.rerun()
