@@ -1018,7 +1018,7 @@ def _create_tables_internal(conn):
         "ALTER TABLE funcionarios ADD COLUMN dependente2 TEXT",
         "ALTER TABLE funcionarios ADD COLUMN departamento TEXT",
         "ALTER TABLE funcionarios ADD COLUMN modelo_trabalho TEXT",
-        "ALTER TABLE funcionarios ADD COLUMN nivel_classificacao VARCHAR(10) DEFAULT 'B'",
+        "ALTER TABLE funcionarios ADD COLUMN nivel_classificacao TEXT DEFAULT 'B'",
         "ALTER TABLE selecao_metas_nivel ADD COLUMN atualizado_por INTEGER",
         "ALTER TABLE funcionarios ADD COLUMN carga_horaria_semanal TEXT",
         "ALTER TABLE funcionarios ADD COLUMN horario_trabalho TEXT",

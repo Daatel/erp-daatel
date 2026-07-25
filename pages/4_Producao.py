@@ -29,7 +29,7 @@ Produção
 # ROTEAMENTO NAS ABAS DA PRODUÇÃO
 # -------------------------------------------------------------------------
 tab_bi, tab_mesa, tab_ranking, tab_config, tab_lotes, tab_hist = st.tabs([
-    "Painel de Seleção",
+    "Painel de Produção",
     "Mesa de Seleção",
     "Ranking",
     "Configurações",
