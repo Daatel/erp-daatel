@@ -1,5 +1,5 @@
 # components/selecao/painel_bi.py
-# Aba 1 — Painel de Produção (BI Executivo)
+# Aba 1 — Painel de Seleção (BI Executivo)
 
 import streamlit as st
 import pandas as pd
@@ -11,14 +11,11 @@ from .queries import SQL_BI_PRODUCAO_MES, SQL_PARAMETROS_MES, SQL_EXCECOES_MES
 
 
 def render_painel_bi():
-    st.markdown("### 📊 Painel de Produção & Rendimento da Seleção")
-    st.caption("Acompanhamento mensal da produção da mesa de seleção vs metas estabelecidas.")
-
     hoje = date.today()
 
-    # Seletor de Mês/Ano
+    # Seletor de Mês/Ano (sem subtítulos poluídos, sem emojis)
     col_mes, col_esp = st.columns([2, 4])
-    str_mes_sel = col_mes.date_input("Mês de Referência", value=date(hoje.year, hoje.month, 1), format="MM/YYYY")
+    str_mes_sel = col_mes.date_input("Mês de Referência", value=date(hoje.year, hoje.month, 1), format="DD/MM/YYYY")
     mes_ano = date(str_mes_sel.year, str_mes_sel.month, 1)
     str_mes_db = mes_ano.strftime("%Y-%m")
     str_mes_01 = mes_ano.strftime("%Y-%m-01")
@@ -92,14 +89,13 @@ def render_painel_bi():
     # -------------------------------------------------------------------------
     # GRÁFICO DE BARRAS: PRODUÇÃO DIÁRIA VS META
     # -------------------------------------------------------------------------
-    st.markdown(f"##### 📈 Produção Diária vs Meta — {mes_ano.strftime('%B/%Y').title()}")
+    st.markdown("##### Produção Diária vs Meta")
 
     if not df_prod.empty:
         df_prod['data_dt'] = pd.to_datetime(df_prod['data'])
         df_prod['data_fmt'] = df_prod['data_dt'].dt.strftime('%d/%m')
 
-        # Definição das Cores Corporativas (Alinhadas a estilo.py / DAATEL)
-        # Verde #01743d (Acima da Meta), Vermelho #dc2626 (Abaixo da Meta)
+        # Cores Corporativas (Alinhadas a estilo.py / DAATEL)
         cores_barras = [
             "#01743d" if val >= meta_casa_diaria else "#dc2626"
             for val in df_prod['producao_total_kg']
@@ -143,12 +139,12 @@ def render_painel_bi():
             xaxis=dict(title="Dia do Mês", showgrid=False),
             yaxis=dict(title="Produção (kg)", showgrid=True, gridcolor="#e2e8f0"),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            height=380
+            height=360
         )
 
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("💡 Nenhuma pesagem gravada no mês selecionado.")
+        st.info("Nenhuma pesagem gravada no mês selecionado.")
 
     st.divider()
 

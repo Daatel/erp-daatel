@@ -9,21 +9,30 @@ from components.selecao.painel_bi import render_painel_bi
 from components.selecao.mesa import render_mesa_selecao
 from components.selecao.configuracoes import render_configuracoes
 
-st.set_page_config(page_title="Centro de Comando de Produção", page_icon="🏭", layout="wide")
+st.set_page_config(page_title="Produção", layout="wide")
 carregar_estilo()
 
-st.title("🏭 Centro de Comando de Produção & Seleção")
-st.markdown("Gestão de Seleção Manual, Metas por Nível, Balanço de Rendimento (Alho Nobre / Bombona / Lixo) e Lotes Embalados.")
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
+}
+</style>
+<h1 style='font-size: 2.2rem; font-weight: 700; margin-top: -15px; margin-bottom: 20px; color: #1e293b;'>
+Produção
+</h1>
+""", unsafe_allow_html=True)
 
 # -------------------------------------------------------------------------
 # ROTEAMENTO NAS 5 ABAS DA PRODUÇÃO
 # -------------------------------------------------------------------------
 tab_bi, tab_mesa, tab_config, tab_lotes, tab_hist = st.tabs([
-    "📊 Painel de Seleção",
-    "🧺 Mesa de Seleção",
-    "⚙️ Configurações",
-    "🏭 Apontamento de Lote Embalado",
-    "📜 Histórico de Produção"
+    "Painel de Seleção",
+    "Mesa de Seleção",
+    "Configurações",
+    "Apontamento de Lote",
+    "Histórico de Produção"
 ])
 
 # =========================================================
@@ -55,12 +64,11 @@ with tab_lotes:
     if df_produtos.empty:
         st.warning("Cadastre produtos primeiro na aba de Cadastros.")
     else:
-        # Produtos marcados como matéria-prima ou todos para insumos
         df_mp = df_produtos[df_produtos['is_materia_prima'] == 1]
         df_pf = df_produtos
 
         if df_mp.empty or df_pf.empty:
-            st.error("Sem Insumos ou Produtos cadastrados.")
+            st.error("Sem insumos ou produtos cadastrados.")
         else:
             mp_dict = {row['nome']: row for _, row in df_mp.iterrows()}
             pf_dict = {row['nome']: row for _, row in df_pf.iterrows()}
@@ -68,31 +76,30 @@ with tab_lotes:
             opcoes_insumo = ["(Nenhum Insumo)"] + list(mp_dict.keys())
 
             with st.form("form_producao", clear_on_submit=True):
-                st.subheader("⏱️ 1. Setup de Lote e Temporalidade")
-                st.markdown("A duração da máquina ligada definirá o rateio de custo de Overhead (Energia, Salários, etc).")
+                st.subheader("1. Setup de Lote e Temporalidade")
                 
                 col1, col2, col3, col_val = st.columns(4)
                 data_prod = col1.date_input("Data Oficial da Produção", value=date.today())
-                hr_ini = col2.time_input("Que Horas a Linha Começou?", value=datetime.strptime("08:00", "%H:%M").time())
-                hr_fim = col3.time_input("Que Horas a Linha Parou?", value=datetime.strptime("17:00", "%H:%M").time())
+                hr_ini = col2.time_input("Horário de Início", value=datetime.strptime("08:00", "%H:%M").time())
+                hr_fim = col3.time_input("Horário de Término", value=datetime.strptime("17:00", "%H:%M").time())
                 data_validade = col_val.date_input("Data de Validade (Lote)", value=date.today() + timedelta(days=90))
                 
                 custo_fixo_mensal = 20000.0
                 
                 st.markdown("---")
-                st.subheader("🎁 2. O Que Vamos Produzir?")
+                st.subheader("2. Produto Final")
                 col5, col6 = st.columns(2)
                 pf_options = ["-- SELECIONE O PRODUTO --"] + list(pf_dict.keys())
-                produto_gerado = col5.selectbox("Produto Final Embalado e Pronto", pf_options)
-                pf_gerado_qtd = col6.number_input("Volume a Produzir (unidades do produto)", min_value=0.0, step=1.0, format="%.3f")
+                produto_gerado = col5.selectbox("Produto Embalado", pf_options)
+                pf_gerado_qtd = col6.number_input("Volume a Produzir (unidades)", min_value=0.0, step=1.0, format="%.3f")
                 
-                perdas_kg = st.number_input("Perda Física Declarada da Esteira (Ex: Cascas, Sujeira - em Kg)", min_value=0.0, step=0.1)
-                observacoes = st.text_area("Diário de Bordo (Ocorrências do Lote)")
+                perdas_kg = st.number_input("Perda Física Declarada (Kg)", min_value=0.0, step=0.1)
+                observacoes = st.text_area("Diário de Bordo / Ocorrências")
 
-                submitted = st.form_submit_button("🏁 Cravar Lote e Calcular Custos", type="primary", use_container_width=True)
+                submitted = st.form_submit_button("Salvar Lote e Calcular Custos", type="primary", use_container_width=True)
 
             st.markdown("---")
-            st.subheader("🧪 3. A Receita (Ingredientes consumidos)")
+            st.subheader("3. Receita e Consumo de Insumos")
 
             pf_id_prod = int(pf_dict[produto_gerado]['id']) if (produto_gerado and produto_gerado != "-- SELECIONE O PRODUTO --") else None
 
@@ -116,36 +123,35 @@ with tab_lotes:
 
                 if not df_itens_prod.empty and pf_gerado_qtd > 0:
                     st.info(
-                        f"📋 Ficha Técnica carregada para **{produto_gerado}** "
+                        f"Ficha Técnica para {produto_gerado} "
                         f"(Rendimento: {rend_prod:.1f}%). "
-                        f"Quantidades sugeridas para **{pf_gerado_qtd:.0f} unidades**:"
+                        f"Sugestão para {pf_gerado_qtd:.0f} unidades:"
                     )
                     for _, it_prod in df_itens_prod.iterrows():
                         qtd_sug = it_prod['quantidade_por_unidade'] * pf_gerado_qtd
-                        emoji   = "🌾" if it_prod['tipo'] == "MP" else "📦"
                         st.markdown(
-                            f"  {emoji} **{it_prod['insumo_nome']}**: "
+                            f"  * **{it_prod['insumo_nome']}**: "
                             f"`{qtd_sug:.3f} {it_prod['unidade']}`  "
-                            f"*(ficha: {it_prod['quantidade_por_unidade']:.4f} por unidade)*"
+                            f"*(ficha: {it_prod['quantidade_por_unidade']:.4f}/un)*"
                         )
             else:
                 if produto_gerado and produto_gerado != "-- SELECIONE O PRODUTO --":
-                    st.warning(f"⚠️ **{produto_gerado}** ainda não tem Ficha Técnica cadastrada.")
+                    st.warning(f"{produto_gerado} não possui Ficha Técnica cadastrada.")
 
-            st.markdown("##### Informe os insumos realmente consumidos:")
+            st.markdown("##### Insumos consumidos:")
             insumos_selecionados = []
             qtds_selecionadas = []
 
             for i in range(st.session_state['num_insumos']):
                 ci1, ci2, ci3 = st.columns([2, 1, 1])
-                ins = ci1.selectbox(f"📦 Slot Insumo {i+1}", opcoes_insumo, key=f"insumo_slot_{i}")
+                ins = ci1.selectbox(f"Insumo {i+1}", opcoes_insumo, key=f"insumo_slot_{i}")
                 qtd_puxada = ci2.number_input(f"Qtd Puxada {i+1}", min_value=0.0, step=1.0, format="%.3f", key=f"qtd_pux_slot_{i}")
-                sobra = ci3.number_input(f"Sobra Intacta (Retorno) {i+1}", min_value=0.0, step=1.0, format="%.3f", key=f"sobra_slot_{i}")
+                sobra = ci3.number_input(f"Sobra (Retorno) {i+1}", min_value=0.0, step=1.0, format="%.3f", key=f"sobra_slot_{i}")
                 
                 insumos_selecionados.append(ins)
                 qtds_selecionadas.append((qtd_puxada, sobra))
 
-            if st.button("➕ Adicionar mais um Ingrediente na Receita", key="btn_add_insumo_lote"):
+            if st.button("Adicionar Ingrediente", key="btn_add_insumo_lote"):
                 st.session_state['num_insumos'] += 1
                 st.rerun()
                 
@@ -155,16 +161,16 @@ with tab_lotes:
                     qt_consumida = qt_puxada - sobra
                     if item != "(Nenhum Insumo)" and qt_puxada > 0:
                         if qt_consumida < 0:
-                            st.error(f"🛑 Erro: A sobra do insumo {item} não pode ser maior que a quantidade puxada.")
+                            st.error(f"Erro: A sobra do insumo {item} não pode ser maior que a quantidade puxada.")
                             st.stop()
                         insumos_usados.append((item, qt_puxada, sobra, qt_consumida))
                         
                 if produto_gerado == "-- SELECIONE O PRODUTO --":
-                    st.error("🛑 Erro: Por favor, selecione o Produto Final Embalado e Pronto.")
+                    st.error("Por favor, selecione o Produto Final.")
                 elif not insumos_usados:
-                    st.error("🛑 Erro: A máquina precisa consumir pelo menos 1 Insumo/Matéria-Prima.")
+                    st.error("Selecione ao menos 1 insumo consumido.")
                 elif pf_gerado_qtd <= 0:
-                    st.error("🛑 Erro: O Volume Útil Gerado de produto pronto deve ser maior que zero.")
+                    st.error("O volume produzido deve ser maior que zero.")
                 else:
                     pf_id = int(pf_dict[produto_gerado]['id'])
                     
@@ -233,11 +239,11 @@ with tab_lotes:
                                       
                             run_query_tx(cursor, "UPDATE produtos SET custo_unidade = ? WHERE id = ?", (custo_unit_pf, pf_id))
                             
-                            st.success(f"✔️ Lote Físico #{lote_id} gravado e Estoques atualizados!")
+                            st.success(f"Lote #{lote_id} gravado e estoques atualizados.")
                     except Exception as e:
-                        st.error(f"🛑 Erro ao salvar o lote de produção: {str(e)}")          
+                        st.error(f"Erro ao salvar o lote de produção: {str(e)}")          
                     
-                    st.markdown("### 📊 Raio-X de Produção deste Lote")
+                    st.markdown("### Resumo do Lote")
                     rx1, rx2 = st.columns(2)
                     rx1.metric("Duração da Linha", f"{duracao_horas:.2f} hrs")
                     rx2.metric("Volume Gerado", f"{pf_gerado_qtd:.2f}")
@@ -248,7 +254,7 @@ with tab_lotes:
 # ABA 5: HISTÓRICO DE PRODUÇÃO (LOTES EMBALADOS)
 # =========================================================
 with tab_hist:
-    st.subheader("Visualizador de Histórico de Lotes e Custos Embalados")
+    st.subheader("Histórico de Lotes e Custos")
     
     query_prod = '''
         SELECT 

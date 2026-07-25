@@ -2,6 +2,7 @@
 # Aba 3 — Configurações (Restrito ao perfil ADMIN)
 
 import streamlit as st
+import pandas as pd
 from datetime import date
 import calendar
 from database import fetch_all, run_query, db_transaction
@@ -47,22 +48,17 @@ def _dias_uteis_mes(mes_ano: date, excecoes_df) -> tuple[int, int]:
 def render_configuracoes():
     user_role = st.session_state.get("user_role", "OPERADOR")
     if user_role != "ADMIN":
-        st.warning("🔒 Acesso Restrito: Apenas administradores podem alterar as configurações de metas e calendário.")
-        st.info("Entre em contato com o suporte ou solicite um perfil ADMIN para alterar estes parâmetros.")
+        st.warning("Acesso Restrito: Apenas administradores podem alterar as configurações de metas e calendário.")
         return
 
     hoje = date.today()
     mes_ano = date(hoje.year, hoje.month, 1)
     str_mes = mes_ano.strftime("%Y-%m-01")
 
-    st.markdown("### ⚙️ Configurações de Produção <span style='font-size:12px; background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:10px;'>Somente Admin</span>", unsafe_allow_html=True)
-    st.caption("Alterações aqui afetam os cálculos de meta e capacidade em todo o módulo.")
-    st.divider()
-
     # -------------------------------------------------------------------------
     # 1. METAS POR NÍVEL
     # -------------------------------------------------------------------------
-    st.markdown("##### 🎯 Metas por Nível de Selecionadora")
+    st.markdown("##### Metas por Nível de Selecionadora")
 
     df_metas = fetch_all(SQL_METAS_NIVEL)
     novas_metas = {}
@@ -94,7 +90,7 @@ def render_configuracoes():
             with db_transaction() as conn:
                 for nv, (val, desc_val) in novas_metas.items():
                     run_query(SQL_UPSERT_META_NIVEL, (nv, val, desc_val))
-            st.success("✔️ Metas por nível salvas com sucesso!")
+            st.success("Metas por nível salvas.")
             st.rerun()
         except Exception as e:
             st.error(f"Erro ao salvar metas: {e}")
@@ -104,14 +100,14 @@ def render_configuracoes():
     # -------------------------------------------------------------------------
     # 2. META MÍNIMA DA CASA
     # -------------------------------------------------------------------------
-    st.markdown("##### 🏠 Meta Mínima da Casa")
+    st.markdown("##### Meta Mínima da Casa")
     df_params = fetch_all(SQL_PARAMETROS_MES, (str_mes, str_mes))
     meta_casa_atual = float(df_params.iloc[0]['meta_diaria_casa_kg']) if not df_params.empty else 500.0
 
     with st.form("form_meta_casa"):
         col_m1, col_m2 = st.columns([2, 3])
         nova_meta_casa = col_m1.number_input("Meta Mínima Diária da Fábrica (kg/dia)", min_value=1.0, value=meta_casa_atual, step=50.0, format="%.0f")
-        col_m2.caption("Produção mínima diária necessária para cobrir os custos fixos operacionais da planta.")
+        col_m2.caption("Produção mínima diária para cobrir custos fixos.")
         salvar_casa = st.form_submit_button("Salvar Meta da Casa", type="primary")
 
     df_excecoes = fetch_all(SQL_EXCECOES_MES)
@@ -121,7 +117,7 @@ def render_configuracoes():
         try:
             with db_transaction() as conn:
                 run_query(SQL_UPSERT_PARAMETROS, (str_mes, nova_meta_casa, dias_calc, dias_efetivos))
-            st.success("✔️ Meta da Casa salva com sucesso!")
+            st.success("Meta da casa salva.")
             st.rerun()
         except Exception as e:
             st.error(f"Erro ao salvar meta da casa: {e}")
@@ -131,8 +127,8 @@ def render_configuracoes():
     # -------------------------------------------------------------------------
     # 3. CALENDÁRIO E EXCEÇÕES DO MÊS
     # -------------------------------------------------------------------------
-    st.markdown(f"##### 📅 Calendário do Mês — {mes_ano.strftime('%m/%Y')}")
-    st.markdown(f"**Dias úteis calculados automaticamente:** `{dias_calc} dias` *(descontando sábados e domingos)*")
+    st.markdown(f"##### Calendário do Mês — {mes_ano.strftime('%m/%Y')}")
+    st.markdown(f"**Dias úteis calculados:** `{dias_calc} dias` *(segunda a sexta)*")
 
     st.markdown("###### Exceções do Mês (Feriados / Sábados Trabalhados)")
 
@@ -140,7 +136,7 @@ def render_configuracoes():
         for _, r in df_excecoes.iterrows():
             exc_id = r['id']
             dt_str = pd.to_datetime(r['data']).strftime('%d/%m/%Y')
-            t_icon = "➖ Feriado / Folga" if r['tipo'] == 'REMOVER' else "➕ Sábado Trabalhado"
+            t_icon = "Feriado / Folga" if r['tipo'] == 'REMOVER' else "Sábado Trabalhado"
             
             cx1, cx2 = st.columns([4, 1])
             cx1.markdown(f"• `{dt_str}` — **{t_icon}** ({r['descricao'] or 'Sem descrição'})")
@@ -153,20 +149,19 @@ def render_configuracoes():
         dt_exc_in = col_e1.date_input("Data da Exceção", value=hoje)
         tipo_exc_in = col_e2.selectbox("Tipo", ["Remover dia (Feriado)", "Adicionar dia (Sábado trabalhado)"])
         desc_exc_in = col_e3.text_input("Descrição", placeholder="Ex: Feriado Municipal")
-        add_exc_btn = st.form_submit_button("➕ Adicionar Exceção ao Calendário")
+        add_exc_btn = st.form_submit_button("Adicionar Exceção")
 
     if add_exc_btn:
         t_code = "REMOVER" if "Remover" in tipo_exc_in else "ADICIONAR"
         try:
             run_query(SQL_INSERIR_EXCECAO, (dt_exc_in.strftime("%Y-%m-%d"), t_code, desc_exc_in))
-            # Recalcula dias efetivos
             df_excecoes_upd = fetch_all(SQL_EXCECOES_MES)
             d_c, d_e = _dias_uteis_mes(mes_ano, df_excecoes_upd)
             run_query(SQL_UPSERT_PARAMETROS, (str_mes, nova_meta_casa, d_c, d_e))
-            st.success("✔️ Exceção adicionada com sucesso!")
+            st.success("Exceção adicionada.")
             st.rerun()
         except Exception as e:
             st.error(f"Erro ao salvar exceção: {e}")
 
     meta_total_mes = nova_meta_casa * dias_efetivos
-    st.info(f"📊 **Dias úteis efetivos no mês:** `{dias_efetivos} dias` | **Meta Total do Mês:** `{meta_total_mes:,.0f} kg`")
+    st.info(f"Dias úteis efetivos no mês: {dias_efetivos} dias | Meta Total do Mês: {meta_total_mes:,.0f} kg")

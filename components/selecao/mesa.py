@@ -16,7 +16,7 @@ from .queries import (
     SQL_APROVEITAMENTO_DO_DIA,
     SQL_PARAMETROS_MES,
 )
-from .pdf_folha import gerar_pdf_folha, obter_primeiro_nome
+from .pdf_folha import gerar_pdf_folha, obter_primeiro_nome, REPORTLAB_AVAILABLE
 
 
 def _garantir_produtos_subprodutos(conn=None):
@@ -46,17 +46,12 @@ def render_mesa_selecao():
     hoje = date.today()
     uid = st.session_state.get("user_id", 1)
 
-    # 1. Carrega parâmetros do mês para obter a meta da casa
+    # 1. Carrega parâmetros do mês
     str_mes = hoje.strftime("%Y-%m-01")
     df_params = fetch_all(SQL_PARAMETROS_MES, (str_mes, str_mes))
     meta_casa_kg = float(df_params.iloc[0]['meta_diaria_casa_kg']) if not df_params.empty else 500.0
 
-    # -- Cabeçalho com Botão de 1-Click PDF --
-    col_tit, col_pdf = st.columns([3, 1])
-    with col_tit:
-        st.markdown(f"### 🧺 Mesa de Seleção — <span style='color:#01743d'>{hoje.strftime('%d/%m/%Y')}</span>", unsafe_allow_html=True)
-    
-    # Carrega presenças gravadas do dia para habilitar o PDF
+    # Presenças salvas do dia
     df_presencas_salvas = fetch_all(SQL_PRESENCAS_DO_DIA, (hoje.strftime("%Y-%m-%d"),))
     presentes_list = []
     if not df_presencas_salvas.empty:
@@ -67,11 +62,16 @@ def render_mesa_selecao():
                 "meta_kg_dia": float(r['meta_kg_dia'])
             })
 
+    # Cabeçalho da ação com Botão PDF no topo
+    col_tit, col_pdf = st.columns([3, 1])
+    with col_tit:
+        st.markdown(f"**Data de Hoje:** `{hoje.strftime('%d/%m/%Y')}`")
+    
     with col_pdf:
-        if presentes_list:
+        if presentes_list and REPORTLAB_AVAILABLE:
             pdf_bytes = gerar_pdf_folha(hoje, presentes_list, meta_casa_kg)
             st.download_button(
-                label="📄 Baixar Folha do Dia (PDF)",
+                label="Gerar Folha do Dia (PDF)",
                 data=pdf_bytes,
                 file_name=f"folha_selecao_{hoje.strftime('%Y%m%d')}.pdf",
                 mime="application/pdf",
@@ -85,22 +85,20 @@ def render_mesa_selecao():
     # -------------------------------------------------------------------------
     # PASSO 1: CONFIRMAÇÃO DE PRESENÇAS DO DIA
     # -------------------------------------------------------------------------
-    st.markdown("##### 👥 Passo 1 — Quem está presente hoje?")
+    st.markdown("##### Passo 1 — Quem está presente hoje?")
 
     df_sel = fetch_all(SQL_SELECIONADORAS_ATIVAS)
 
     if df_sel.empty:
-        st.warning("⚠️ Nenhuma selecionadora ativa cadastrada no módulo de Pessoas/RH.")
+        st.warning("Nenhuma selecionadora ativa cadastrada no RH.")
         return
 
-    # Dicionário mapeando nome exibido (apenas Primeiro Nome + ID) -> ID real
     opts_map = {}
     for _, r in df_sel.iterrows():
         p_nome = obter_primeiro_nome(r['nome'])
-        label = f"{p_nome} (Nível {r['nivel_classificacao']} • {r['meta_kg_dia']:.0f} kg/dia)"
+        label = f"{p_nome} (Nível {r['nivel_classificacao']} - {r['meta_kg_dia']:.0f} kg/dia)"
         opts_map[label] = r
 
-    # Selecionadas previamente gravadas ou escolha atual
     default_selected = []
     if not df_presencas_salvas.empty:
         pres_ids = set(df_presencas_salvas['selecionadora_id'].tolist())
@@ -109,7 +107,7 @@ def render_mesa_selecao():
                 default_selected.append(lbl)
 
     selecionadas_lbl = st.multiselect(
-        "Selecione as selecionadoras presentes na mesa:",
+        "Selecione as selecionadoras presentes:",
         options=list(opts_map.keys()),
         default=default_selected,
         placeholder="Clique para selecionar...",
@@ -121,19 +119,17 @@ def render_mesa_selecao():
         cap_total = sum(r['meta_kg_dia'] for r in rows_presentes)
 
         c1, c2, c3 = st.columns(3)
-        c1.metric("Selecionadoras Presentes", f"{len(selecionadas_lbl)}")
+        c1.metric("Presentes Hoje", f"{len(selecionadas_lbl)}")
         c2.metric("Capacidade do Dia", f"{cap_total:,.0f} kg")
         c3.metric("Meta Mínima da Casa", f"{meta_casa_kg:,.0f} kg")
 
-        if st.button("✅ Confirmar / Salvar Presenças do Dia", type="primary", key="btn_salvar_presencas"):
+        if st.button("Confirmar Presenças do Dia", type="primary", key="btn_salvar_presencas"):
             try:
                 with db_transaction() as conn:
-                    cursor = conn.cursor()
-                    # Limpa anteriores e insere atuais
                     run_query(SQL_LIMPAR_PRESENCA_DIA, (hoje.strftime("%Y-%m-%d"),))
                     for r in rows_presentes:
                         run_query(SQL_INSERIR_PRESENCA, (hoje.strftime("%Y-%m-%d"), int(r['id']), uid))
-                st.success("✔️ Presenças do dia gravadas com sucesso!")
+                st.success("Presenças do dia salvas.")
                 st.rerun()
             except Exception as e:
                 st.error(f"Erro ao salvar presenças: {e}")
@@ -144,9 +140,8 @@ def render_mesa_selecao():
     # PASSO 2: PESAGEM INDIVIDUAL & BALANÇO DE RESÍDUOS
     # -------------------------------------------------------------------------
     if not df_presencas_salvas.empty:
-        st.markdown("##### ⚖️ Passo 2 — Pesagem Individual & Balanço de Resíduos")
+        st.markdown("##### Passo 2 — Pesagem Individual & Balanço de Resíduos")
         
-        # Carrega pesagens gravadas do dia
         df_pesagens_salvas = fetch_all(SQL_PESAGENS_DO_DIA, (hoje.strftime("%Y-%m-%d"),))
         pesagens_dict = {}
         if not df_pesagens_salvas.empty:
@@ -154,7 +149,7 @@ def render_mesa_selecao():
                 pesagens_dict[r['selecionadora_id']] = float(r['peso_kg'])
 
         with st.form("form_pesagem_mesa"):
-            st.markdown("###### 1. Produção Individual por Selecionadora (kg)")
+            st.markdown("###### 1. Pesagem Individual (kg)")
             
             novas_pesagens = {}
             cols = st.columns(2)
@@ -164,7 +159,7 @@ def render_mesa_selecao():
                 p_nome = obter_primeiro_nome(r['nome'])
                 val_atual = pesagens_dict.get(sid, 0.0)
                 peso_in = col.number_input(
-                    f"👩‍🌾 {p_nome} (Meta: {r['meta_kg_dia']:.0f} kg)",
+                    f"{p_nome} (Meta: {r['meta_kg_dia']:.0f} kg)",
                     min_value=0.0,
                     value=val_atual,
                     step=1.0,
@@ -174,33 +169,29 @@ def render_mesa_selecao():
                 novas_pesagens[sid] = (peso_in, r['meta_kg_dia'])
 
             st.markdown("---")
-            st.markdown("###### 2. Balanço do Lote (Alho Nobre, Bombona 2ª Linha e Lixo)")
+            st.markdown("###### 2. Balanço do Lote (kg)")
             
-            # Carrega aproveitamento gravado
             df_aprov_salvo = fetch_all(SQL_APROVEITAMENTO_DO_DIA, (hoje.strftime("%Y-%m-%d"),))
             nobre_salvo = float(df_aprov_salvo.iloc[0]['peso_nobre_kg']) if not df_aprov_salvo.empty else 0.0
             bombona_salva = float(df_aprov_salvo.iloc[0]['peso_segunda_linha_kg']) if not df_aprov_salvo.empty else 0.0
             lixo_salvo = float(df_aprov_salvo.iloc[0]['peso_descarte_kg']) if not df_aprov_salvo.empty else 0.0
 
             ca1, ca2, ca3 = st.columns(3)
-            peso_nobre = ca1.number_input("✨ Alho Nobre (kg)", min_value=0.0, value=nobre_salvo, step=1.0, format="%.1f")
-            peso_bombona = ca2.number_input("🛢️ Alho 2ª Linha - Bombona (kg)", min_value=0.0, value=bombona_salva, step=1.0, format="%.1f")
-            peso_lixo = ca3.number_input("🗑️ Descarte / Lixo (kg)", min_value=0.0, value=lixo_salvo, step=1.0, format="%.1f")
+            peso_nobre = ca1.number_input("Alho Nobre (kg)", min_value=0.0, value=nobre_salvo, step=1.0, format="%.1f")
+            peso_bombona = ca2.number_input("Alho 2ª Linha Bombona (kg)", min_value=0.0, value=bombona_salva, step=1.0, format="%.1f")
+            peso_lixo = ca3.number_input("Descarte / Lixo (kg)", min_value=0.0, value=lixo_salvo, step=1.0, format="%.1f")
 
-            submit_lote = st.form_submit_button("💾 Cravar Pesagens e Balanço do Dia", type="primary", use_container_width=True)
+            submit_lote = st.form_submit_button("Salvar Pesagens e Balanço", type="primary", use_container_width=True)
 
         if submit_lote:
             try:
                 str_hoje = hoje.strftime("%Y-%m-%d")
                 with db_transaction() as conn:
-                    # 1. Grava pesagens individuais
                     for sid, (peso, meta_exp) in novas_pesagens.items():
                         run_query(SQL_UPSERT_PESAGEM, (str_hoje, sid, peso, meta_exp, uid))
                     
-                    # 2. Grava balanço de aproveitamento
                     run_query(SQL_UPSERT_APROVEITAMENTO, (str_hoje, peso_nobre, peso_bombona, peso_lixo, uid))
 
-                    # 3. Dá entrada no Estoque de Alho Nobre e Bombona
                     id_nobre, id_bombona = _garantir_produtos_subprodutos()
                     ref_doc = f"Mesa Seleção {hoje.strftime('%d/%m/%Y')}"
 
@@ -216,9 +207,9 @@ def render_mesa_selecao():
                             VALUES (?, ?, 'Entrada', ?, 'Seleção_Mesa_Nobre', ?)
                         """, (str_hoje, id_nobre, peso_nobre, ref_doc))
 
-                st.success("✔️ Pesagens e Balanço gravados! Estoque de Alho Nobre e Bombona atualizados.")
+                st.success("Pesagens e Balanço gravados com sucesso.")
                 st.rerun()
             except Exception as e:
                 st.error(f"Erro ao salvar balanço do lote: {e}")
     else:
-        st.info("💡 Selecione e confirme as selecionadoras presentes acima para liberar o lançamento de pesagens do dia.")
+        st.info("Selecione e confirme as selecionadoras presentes acima para habilitar as pesagens.")
