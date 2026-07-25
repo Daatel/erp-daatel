@@ -12,28 +12,8 @@ from components.selecao.configuracoes import render_configuracoes
 st.set_page_config(page_title="Centro de Comando de Produção", page_icon="🏭", layout="wide")
 carregar_estilo()
 
-<<<<<<< HEAD
-st.markdown("""
-<style>
-.block-container {
-    padding-top: 1.5rem !important;
-    padding-bottom: 1rem !important;
-}
-h1 {
-    font-size: 2.2rem !important;
-    font-weight: 700 !important;
-    margin-top: -15px !important;
-    margin-bottom: 0px !important;
-    color: #1e293b !important;
-}
-</style>
-<h1>Centro de Comando de Produção</h1>
-""", unsafe_allow_html=True)
-
-=======
 st.title("🏭 Centro de Comando de Produção & Seleção")
 st.markdown("Gestão de Seleção Manual, Metas por Nível, Balanço de Rendimento (Alho Nobre / Bombona / Lixo) e Lotes Embalados.")
->>>>>>> 07e9c96 (feat(producao): implementa modulo completo de selecao, metas e rendimento de alho com 5 abas integradas)
 
 # -------------------------------------------------------------------------
 # ROTEAMENTO NAS 5 ABAS DA PRODUÇÃO
