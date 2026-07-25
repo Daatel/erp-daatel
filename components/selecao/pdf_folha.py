@@ -3,37 +3,43 @@
 
 import io
 from datetime import date
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
-from reportlab.lib.colors import HexColor
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-)
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib.colors import HexColor
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    )
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+    SimpleDocTemplate = None
 
 # Cores Corporativas alinhadas ao ERP
-GREEN_PRIMARY = HexColor("#01743d")
-GRAY_DARK     = HexColor("#1e293b")
-GRAY_MID      = HexColor("#64748b")
-GRAY_BG       = HexColor("#f8fafc")
-GRAY_LIGHT    = HexColor("#e2e8f0")
+GREEN_PRIMARY = HexColor("#01743d") if REPORTLAB_AVAILABLE else None
+GRAY_DARK     = HexColor("#1e293b") if REPORTLAB_AVAILABLE else None
+GRAY_MID      = HexColor("#64748b") if REPORTLAB_AVAILABLE else None
+GRAY_BG       = HexColor("#f8fafc") if REPORTLAB_AVAILABLE else None
+GRAY_LIGHT    = HexColor("#e2e8f0") if REPORTLAB_AVAILABLE else None
 
-styles = getSampleStyleSheet()
+if REPORTLAB_AVAILABLE:
+    styles = getSampleStyleSheet()
+    s_title   = ParagraphStyle("title",  fontName="Helvetica-Bold", fontSize=15, textColor=GREEN_PRIMARY, spaceAfter=2)
+    s_sub     = ParagraphStyle("sub",    fontName="Helvetica",      fontSize=9,  textColor=GRAY_MID)
+    s_meta_r  = ParagraphStyle("metar",  fontName="Helvetica",      fontSize=9,  textColor=GRAY_DARK, alignment=TA_RIGHT)
+    s_section = ParagraphStyle("sec",    fontName="Helvetica-Bold", fontSize=8,  textColor=GRAY_DARK, spaceAfter=3)
+    s_rodape  = ParagraphStyle("rod",    fontName="Helvetica",      fontSize=7,  textColor=GRAY_MID)
+    s_rodape_r= ParagraphStyle("rodr",   fontName="Helvetica",      fontSize=7,  textColor=GRAY_MID,  alignment=TA_RIGHT)
+    s_obs     = ParagraphStyle("obs",    fontName="Helvetica",      fontSize=7,  textColor=GRAY_MID,  alignment=TA_RIGHT)
+    s_th      = ParagraphStyle("th",     fontName="Helvetica-Bold", fontSize=8,  textColor=GRAY_DARK)
+    s_td      = ParagraphStyle("td",     fontName="Helvetica",      fontSize=9,  textColor=GRAY_DARK)
+    s_td_c    = ParagraphStyle("tdc",    fontName="Helvetica",      fontSize=9,  textColor=GRAY_MID, alignment=TA_CENTER)
+    s_tot     = ParagraphStyle("tot",    fontName="Helvetica-Bold", fontSize=9,  textColor=GRAY_DARK, alignment=TA_RIGHT)
+    s_tot2    = ParagraphStyle("tot2",   fontName="Helvetica-Bold", fontSize=9,  textColor=GRAY_MID, alignment=TA_CENTER)
+    s_ass     = ParagraphStyle("ass",    fontName="Helvetica",      fontSize=8,  textColor=GRAY_MID)
 
-s_title   = ParagraphStyle("title",  fontName="Helvetica-Bold", fontSize=15, textColor=GREEN_PRIMARY, spaceAfter=2)
-s_sub     = ParagraphStyle("sub",    fontName="Helvetica",      fontSize=9,  textColor=GRAY_MID)
-s_meta_r  = ParagraphStyle("metar",  fontName="Helvetica",      fontSize=9,  textColor=GRAY_DARK, alignment=TA_RIGHT)
-s_section = ParagraphStyle("sec",    fontName="Helvetica-Bold", fontSize=8,  textColor=GRAY_DARK, spaceAfter=3)
-s_rodape  = ParagraphStyle("rod",    fontName="Helvetica",      fontSize=7,  textColor=GRAY_MID)
-s_rodape_r= ParagraphStyle("rodr",   fontName="Helvetica",      fontSize=7,  textColor=GRAY_MID,  alignment=TA_RIGHT)
-s_obs     = ParagraphStyle("obs",    fontName="Helvetica",      fontSize=7,  textColor=GRAY_MID,  alignment=TA_RIGHT)
-s_th      = ParagraphStyle("th",     fontName="Helvetica-Bold", fontSize=8,  textColor=GRAY_DARK)
-s_td      = ParagraphStyle("td",     fontName="Helvetica",      fontSize=9,  textColor=GRAY_DARK)
-s_td_c    = ParagraphStyle("tdc",    fontName="Helvetica",      fontSize=9,  textColor=GRAY_MID, alignment=TA_CENTER)
-s_tot     = ParagraphStyle("tot",    fontName="Helvetica-Bold", fontSize=9,  textColor=GRAY_DARK, alignment=TA_RIGHT)
-s_tot2    = ParagraphStyle("tot2",   fontName="Helvetica-Bold", fontSize=9,  textColor=GRAY_MID, alignment=TA_CENTER)
-s_ass     = ParagraphStyle("ass",    fontName="Helvetica",      fontSize=8,  textColor=GRAY_MID)
 
 def obter_primeiro_nome(nome_completo: str) -> str:
     """Extrai estritamente o primeiro nome por compliance e privacidade trabalhista."""
