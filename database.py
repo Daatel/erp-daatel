@@ -285,7 +285,8 @@ def _create_tables_internal(conn):
         vt_desconto TEXT DEFAULT 'Sem desconto',
         vr_desconto TEXT DEFAULT 'Sem desconto',
         equipamentos_fornecidos TEXT,
-        aceite_lgpd INTEGER DEFAULT 0
+        aceite_lgpd INTEGER DEFAULT 0,
+        nivel_classificacao TEXT DEFAULT 'B'
     )
     ''')
 
@@ -807,6 +808,99 @@ def _create_tables_internal(conn):
         valor VARCHAR(50) NOT NULL
     )
     ''')
+
+    # 29. Módulo de Seleção - Metas por Nível
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS selecao_metas_nivel (
+        nivel VARCHAR(10) PRIMARY KEY,
+        meta_kg_dia REAL NOT NULL,
+        descricao TEXT NOT NULL,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_por INTEGER
+    )
+    ''')
+
+    # 30. Módulo de Seleção - Parâmetros Mensais
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS selecao_parametros (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mes_ano DATE NOT NULL UNIQUE,
+        meta_diaria_casa_kg REAL NOT NULL DEFAULT 500.0,
+        dias_uteis_calculados INTEGER NOT NULL DEFAULT 22,
+        dias_uteis_efetivos INTEGER NOT NULL DEFAULT 22,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
+    # 31. Módulo de Seleção - Exceções do Calendário
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS selecao_excecoes_calendario (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data DATE NOT NULL UNIQUE,
+        tipo VARCHAR(10) NOT NULL,
+        descricao TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
+    # 32. Módulo de Seleção - Presença Diária
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS selecao_presenca_diaria (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data DATE NOT NULL,
+        selecionadora_id INTEGER NOT NULL,
+        confirmado_por INTEGER,
+        confirmado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
+    # 33. Módulo de Seleção - Pesagens Diárias por Selecionadora
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS selecao_pesagens_diarias (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data DATE NOT NULL,
+        selecionadora_id INTEGER NOT NULL,
+        peso_kg REAL NOT NULL,
+        meta_esperada_kg REAL NOT NULL,
+        lancado_por INTEGER,
+        lancado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
+    # 34. Módulo de Seleção - Balanço Diário de Aproveitamento do Lote
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS selecao_aproveitamento_diario (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data DATE NOT NULL UNIQUE,
+        peso_nobre_kg REAL DEFAULT 0.0,
+        peso_segunda_linha_kg REAL DEFAULT 0.0,
+        peso_descarte_kg REAL DEFAULT 0.0,
+        lancado_por INTEGER,
+        lancado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
+    # 35. Módulo de Seleção - Histórico de Níveis
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS selecao_historico_nivel (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        selecionadora_id INTEGER NOT NULL,
+        nivel_anterior VARCHAR(10),
+        nivel_novo VARCHAR(10) NOT NULL,
+        data_inicio DATE NOT NULL,
+        data_fim DATE,
+        alterado_por INTEGER,
+        alterado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
+    # Seed inicial das metas por nível se estiver vazia
+    cursor.execute("SELECT COUNT(*) FROM selecao_metas_nivel")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO selecao_metas_nivel (nivel, meta_kg_dia, descricao) VALUES ('A', 90.0, 'Alta performance / assídua')")
+        cursor.execute("INSERT INTO selecao_metas_nivel (nivel, meta_kg_dia, descricao) VALUES ('B', 70.0, 'Rendimento padrão')")
+        cursor.execute("INSERT INTO selecao_metas_nivel (nivel, meta_kg_dia, descricao) VALUES ('Teste', 50.0, 'Em treinamento / avaliação')")
+
 
     # Inicializar modo_estoque padrão se não existir
     is_pg = init_connection_pool() is not None

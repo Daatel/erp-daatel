@@ -30,7 +30,7 @@ h1 {
 # Fetch master data
 df_clientes = fetch_all("SELECT id, nome, nome_fantasia, rede_clientes, prazo_pagamento, representante_id, forma_pagamento_id FROM clientes WHERE status='ATIVO'")
 df_vendedores = fetch_all("SELECT id, nome, gatilho_comissao FROM funcionarios WHERE cargo LIKE '%Vendedor%' OR cargo LIKE '%Representante%'")
-df_produtos = fetch_all("SELECT id, nome, preco_venda_base FROM produtos WHERE is_materia_prima = FALSE")
+df_produtos = fetch_all("SELECT id, nome, preco_venda_base FROM produtos WHERE status IS NULL OR status != 'INATIVO' ORDER BY nome")
 df_regras = fetch_all("SELECT vendedor_id, produto_id, rede_clientes, percentual FROM comissoes_regras")
 df_fp = fetch_all("SELECT id, nome, parcelas FROM formas_pagamento ORDER BY id ASC")
 

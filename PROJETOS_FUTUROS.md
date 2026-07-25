@@ -47,6 +47,11 @@ Abaixo está o mapeamento dos locais e respectivos emojis que foram removidos da
   - Mensagens de Aviso (`st.warning` / `st.markdown`): `⚠️` (ex: "⚠️ Gravação em andamento...", "⚠️ Tem certeza...")
   - Título do modal de bloqueio: `Lançamento Direto Bloqueado 🔒`
 
+## ⏰ Integração Automática de Selecionadoras via Relógio de Ponto
+- **Objetivo:** Automatizar a presença e identificação de selecionadoras (CLT e Diaristas) diretamente a partir dos registros do relógio de ponto da fábrica.
+- **Motivação:** Eliminar a necessidade de marcação manual diária de presença no módulo de Seleção, sincronizando entradas/saídas do ponto biométrico ou facial direto com a tabela `selecao_presenca_diaria`.
+- **Status:** Registrado para implementação futura.
+
 ## 📋 Kanban de Pedidos (Produção) - Repasse Horta do Príncipe
 - **Objetivo:** Implementar o Kanban interativo (drag-and-drop) de pedidos de produção baseado na especificação `MD_Kanban_de_pedidos.MD` e no mockup `kanban_pedidos_producao_v3.html`.
 - **Escopo Técnico:** Requer a criação de novas colunas e tabelas no Supabase (`data_prevista`, `grade_id`, etc.), configuração de Edge Functions (`mover-pedido`) para gerenciar as permissões e atualização de banco, e injeção do componente de interface Kanban no front-end Streamlit utilizando JavaScript vanilla e SortableJS.
