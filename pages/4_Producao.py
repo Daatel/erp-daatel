@@ -7,6 +7,7 @@ from estilo import carregar_estilo
 # Importação dos submódulos de Seleção
 from components.selecao.painel_bi import render_painel_bi
 from components.selecao.mesa import render_mesa_selecao
+from components.selecao.ranking import render_ranking
 from components.selecao.configuracoes import render_configuracoes
 
 st.set_page_config(page_title="Produção", layout="wide")
@@ -25,11 +26,12 @@ Produção
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------------------
-# ROTEAMENTO NAS 5 ABAS DA PRODUÇÃO
+# ROTEAMENTO NAS ABAS DA PRODUÇÃO
 # -------------------------------------------------------------------------
-tab_bi, tab_mesa, tab_config, tab_lotes, tab_hist = st.tabs([
+tab_bi, tab_mesa, tab_ranking, tab_config, tab_lotes, tab_hist = st.tabs([
     "Painel de Seleção",
     "Mesa de Seleção",
+    "Ranking",
     "Configurações",
     "Apontamento de Lote",
     "Histórico de Produção"
@@ -48,13 +50,19 @@ with tab_mesa:
     render_mesa_selecao()
 
 # =========================================================
-# ABA 3: CONFIGURAÇÕES DE METAS & CALENDÁRIO (ADMIN)
+# ABA 3: RANKING & DESEMPENHO INDIVIDUAL
+# =========================================================
+with tab_ranking:
+    render_ranking()
+
+# =========================================================
+# ABA 4: CONFIGURAÇÕES DE METAS & CALENDÁRIO (ADMIN)
 # =========================================================
 with tab_config:
     render_configuracoes()
 
 # =========================================================
-# ABA 4: APONTAMENTO DE LOTE EMBALADO (LINHA FINAL)
+# ABA 5: APONTAMENTO DE LOTE EMBALADO (LINHA FINAL)
 # =========================================================
 with tab_lotes:
     if 'num_insumos' not in st.session_state:
@@ -251,7 +259,7 @@ with tab_lotes:
                     st.session_state['num_insumos'] = 3
 
 # =========================================================
-# ABA 5: HISTÓRICO DE PRODUÇÃO (LOTES EMBALADOS)
+# ABA 6: HISTÓRICO DE PRODUÇÃO (LOTES EMBALADOS)
 # =========================================================
 with tab_hist:
     st.subheader("Histórico de Lotes e Custos")
