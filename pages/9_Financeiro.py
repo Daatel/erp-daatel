@@ -19,6 +19,8 @@ from estilo import carregar_estilo
 
 from fpdf import FPDF
 
+from utils_ofx import parse_ofx, sugerir_conciliacao, executar_baixa_conciliacao_lote
+
 
 
 def gerar_pdf_financeiro(df_pdf, dt_ini, dt_fim, t_ent, t_sai, s_liq, banco_filtro, cat_filtro):
@@ -725,7 +727,7 @@ try:
 
     # ================== GUIAS ==================
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 
         "Painel Executivo", 
 
@@ -734,6 +736,8 @@ try:
         "Contas a Receber (Entrada)", 
 
         "Caixas e Bancos",
+
+        "Conciliação OFX",
 
         "Auditoria Logística"
 
@@ -2797,9 +2801,188 @@ try:
 
 
 
-    # ------------------ Guia 5: AUDITORIA LOGÍSTICA ------------------
+    # ------------------ Guia 5: CONCILIAÇÃO OFX ------------------
 
     with tab5:
+
+        st.subheader("🔄 Conciliador Bancário Automático (OFX)")
+
+        st.markdown("Importe o arquivo `.ofx` gerado pelo seu banco para baixar títulos e conciliar o caixa com segurança atômica.")
+
+        col_ofx1, col_ofx2 = st.columns([1, 2])
+
+        with col_ofx1:
+
+            conta_ofx_lbl = st.selectbox("Conta Bancária no ERP *", list(opcoes_bancos.keys()), key="ofx_conta_sel")
+
+            banco_ofx_id = opcoes_bancos[conta_ofx_lbl]
+
+            modo_simulacao = st.checkbox("🔍 Modo Simulação (Validar sem gravar no banco)", value=False, key="ofx_modo_simulacao")
+
+        with col_ofx2:
+
+            file_ofx = st.file_uploader("Selecione o arquivo de extrato bancário (.ofx)", type=["ofx"], key="ofx_file_uploader")
+
+        if file_ofx and banco_ofx_id:
+
+            content_bytes = file_ofx.read()
+
+            try:
+
+                content_str = content_bytes.decode("utf-8")
+
+            except UnicodeDecodeError:
+
+                content_str = content_bytes.decode("latin1", errors="ignore")
+
+            transacoes_raw = parse_ofx(content_str)
+
+            if not transacoes_raw:
+
+                st.warning("⚠️ Nenhuma transação válida encontrada no arquivo OFX enviado. Verifique se o arquivo possui a tag <BANKTRANLIST>.")
+
+            else:
+
+                resultados_conc = sugerir_conciliacao(transacoes_raw, banco_ofx_id)
+
+                df_ofx_grid = pd.DataFrame(resultados_conc)
+
+                # Buscar lista do Plano de Contas
+
+                df_pc_ofx = fetch_all("SELECT DISTINCT nome FROM planos_de_contas ORDER BY nome")
+
+                lista_pc_ofx = df_pc_ofx['nome'].tolist() if not df_pc_ofx.empty else []
+
+                if "OUTROS - A Classificar" not in lista_pc_ofx:
+
+                    lista_pc_ofx.insert(0, "OUTROS - A Classificar")
+
+                # Métricas do Extrato
+
+                n_total = len(df_ofx_grid)
+
+                n_ja_conc = len(df_ofx_grid[df_ofx_grid['sugestao_acao'] == '🚫 Já Conciliado'])
+
+                n_titulos = len(df_ofx_grid[df_ofx_grid['sugestao_acao'] == '🎯 Confirmar Título'])
+
+                n_direto = len(df_ofx_grid[df_ofx_grid['sugestao_acao'] == '➕ Lançamento Direto'])
+
+                st.markdown(f"""
+
+                <div style="display: flex; gap: 15px; background-color: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 15px;">
+
+                    <div>Total de Transações: <strong>{n_total}</strong></div>
+
+                    <div>|</div>
+
+                    <div>🎯 Títulos Sugeridos: <strong style="color: #16a34a;">{n_titulos}</strong></div>
+
+                    <div>|</div>
+
+                    <div>➕ Lançamentos Diretos: <strong style="color: #2563eb;">{n_direto}</strong></div>
+
+                    <div>|</div>
+
+                    <div>🚫 Já Importados: <strong style="color: #94a3b8;">{n_ja_conc}</strong></div>
+
+                </div>
+
+                """, unsafe_allow_html=True)
+
+                st.markdown("##### Grade de Revisão & Conciliação em Lote")
+
+                st.caption("Revise a coluna 'Ação / Destino' e o 'Plano de Contas' antes de confirmar a execução.")
+
+                # Prepara colunas para o data_editor
+
+                edited_ofx_df = st.data_editor(
+
+                    df_ofx_grid[['status_importacao', 'data', 'memo', 'valor', 'sugestao_acao', 'titulo_sugerido_desc', 'plano_conta_sugerido', 'fitid', 'titulo_id']],
+
+                    hide_index=True,
+
+                    width="stretch",
+
+                    column_config={
+
+                        "status_importacao": st.column_config.TextColumn("Status", disabled=True),
+
+                        "data": st.column_config.DateColumn("Data Banco", format="DD/MM/YYYY", disabled=True),
+
+                        "memo": st.column_config.TextColumn("Histórico no Banco (MEMO)", disabled=True),
+
+                        "valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f", disabled=True),
+
+                        "sugestao_acao": st.column_config.SelectboxColumn(
+
+                            "Ação / Destino",
+
+                            options=["🎯 Confirmar Título", "➕ Lançamento Direto", "🚫 Ignorar"],
+
+                            required=True
+
+                        ),
+
+                        "titulo_sugerido_desc": st.column_config.TextColumn("Título ERP Sincronizado", disabled=True),
+
+                        "plano_conta_sugerido": st.column_config.SelectboxColumn(
+
+                            "Plano de Contas",
+
+                            options=lista_pc_ofx,
+
+                            required=True
+
+                        ),
+
+                        "fitid": None,
+
+                        "titulo_id": None
+
+                    },
+
+                    key="editor_grid_ofx"
+
+                )
+
+                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+                col_btn_ofx1, col_btn_ofx2 = st.columns([2, 1])
+
+                with col_btn_ofx1:
+
+                    lbl_btn = "🔍 Testar Simulação de Conciliação" if modo_simulacao else "⚡ Executar Conciliação em Lote"
+
+                    if st.button(lbl_btn, type="primary", use_container_width=True, key="btn_exec_ofx"):
+
+                        with st.spinner("Processando transação atômica no banco de dados..."):
+
+                            sucesso, msg, logs_sim = executar_baixa_conciliacao_lote(edited_ofx_df, banco_ofx_id, modo_simulacao=modo_simulacao)
+
+                        if sucesso:
+
+                            st.success(msg)
+
+                            if modo_simulacao and logs_sim:
+
+                                with st.expander("📋 Ver Log da Simulação", expanded=True):
+
+                                    for line in logs_sim:
+
+                                        st.text(line)
+
+                            elif not modo_simulacao:
+
+                                import time; time.sleep(1.5); st.rerun()
+
+                        else:
+
+                            st.error(msg)
+
+
+    # ------------------ Guia 6: AUDITORIA LOGÍSTICA ------------------
+
+    with tab6:
 
         st.subheader("Auditoria de Comprovantes Logísticos")
 

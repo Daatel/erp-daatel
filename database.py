@@ -491,9 +491,13 @@ def _create_tables_internal(conn):
         conta_bancaria_id INTEGER,
         conciliado BOOLEAN DEFAULT 0,
         cliente_id INTEGER,
+        plano_conta_id INTEGER,
+        fitid TEXT,
         FOREIGN KEY(conta_bancaria_id) REFERENCES contas_bancarias(id)
     )
     ''')
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_fluxo_caixa_fitid ON fluxo_caixa(fitid)")
 
     # 12. Planos de Contas
     cursor.execute('''
@@ -976,6 +980,7 @@ def _create_tables_internal(conn):
         "ALTER TABLE maquinario ADD COLUMN localizacao TEXT DEFAULT 'Fábrica'",
         "ALTER TABLE estoque_movimentos ADD COLUMN lote_origem_id INTEGER",
         "ALTER TABLE fluxo_caixa ADD COLUMN cliente_id INTEGER",
+        "ALTER TABLE fluxo_caixa ADD COLUMN fitid TEXT",
         "ALTER TABLE contas_a_pagar ADD COLUMN cliente_id INTEGER",
         "ALTER TABLE vendas ADD COLUMN is_bonificacao BOOLEAN DEFAULT 0",
         "ALTER TABLE vendas ADD COLUMN custo_cmv_real REAL DEFAULT 0.0",

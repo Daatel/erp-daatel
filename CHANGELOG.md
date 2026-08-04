@@ -2,6 +2,24 @@
 
 ---
 
+## v1.9 — 2026-08-04 (Sessão: Conciliador Bancário Inteligente OFX & Relatório Razão)
+
+### 🔄 Conciliador Bancário Automático OFX (`utils_ofx.py`, `pages/9_Financeiro.py`)
+- **Parser SGML/XML Resiliente:** Leitor em Python puro para arquivos `.ofx` compatível com Bradesco, Itaú, Banco do Brasil, Caixa e bancos digitais.
+- **Matching com Consumo de Pool:** Motor de busca que associa títulos do Contas a Pagar/Receber mantendo estado por sessão, evitando que dois lançamentos de mesmo valor no mesmo dia sintonizem com o mesmo título.
+- **Tolerância Estrita D-2:** Filtro de vencimento limitado a até 2 dias de diferença. Lançamentos mais distantes exigem validação manual humana.
+- **Transação Atômica ACID:** Processamento em lote envolvido em `BEGIN / COMMIT / ROLLBACK` atômico via `db_transaction()`. Se um item falhar, nenhuma alteração é persistida no banco.
+- **Modo Simulação (Dry Run):** Opção de teste em tela para validar o matching sem gravar no banco de dados.
+
+### 📄 Relatório Razão / Extrato de Caixas e Bancos (`pages/9_Financeiro.py`)
+- **Extrato Diário em PDF:** Botão `📄 Extrato / Razão` na aba Caixas e Bancos gerando relatório em PDF segregado por dia com Saldo Inicial, Histórico, Plano de Contas, Entradas, Saídas e Saldo Final de cada dia.
+- **Cálculo Retroativo de Saldo Inicial:** Apuração de saldo acumulado anterior à data inicial do período (`< dt_ini`).
+
+### 🗄️ Banco de Dados (`database.py`)
+- **Trava Anti-Duplicidade:** Adicionada a coluna `fitid TEXT` e índice `idx_fluxo_caixa_fitid` na tabela `fluxo_caixa`.
+
+---
+
 ## v1.8 — 2026-07-25 (Sessão: Reformulação do Módulo de Produção — Seleção, Metas e Rendimento de Alho)
 
 ### 🧄 Novo Módulo de Seleção e Pesagem (`components/selecao/` e `pages/4_Producao.py`)
