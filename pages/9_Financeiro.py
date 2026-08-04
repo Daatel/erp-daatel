@@ -2805,7 +2805,36 @@ try:
 
     with tab5:
 
-        st.subheader("🔄 Conciliador Bancário Automático (OFX)")
+        # CSS limpo para remover o fundo preto do file uploader e padronizar com a marca DAATEL
+        st.markdown("""
+        <style>
+        div[data-testid="stFileUploader"] {
+            background-color: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            padding: 8px !important;
+        }
+        div[data-testid="stFileUploader"] section {
+            background-color: #f8fafc !important;
+            border: 1px dashed #cbd5e1 !important;
+            border-radius: 6px !important;
+        }
+        div[data-testid="stFileUploader"] section * {
+            color: #334155 !important;
+        }
+        div[data-testid="stFileUploader"] button {
+            background-color: #0f172a !important;
+            color: #ffffff !important;
+            border-radius: 6px !important;
+            border: none !important;
+        }
+        div[data-testid="stFileUploader"] button * {
+            color: #ffffff !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        st.subheader("Conciliador Bancário Automático (OFX)")
 
         st.markdown("Importe o arquivo `.ofx` gerado pelo seu banco para baixar títulos e conciliar o caixa com segurança atômica.")
 
@@ -2817,7 +2846,7 @@ try:
 
             banco_ofx_id = opcoes_bancos[conta_ofx_lbl]
 
-            modo_simulacao = st.checkbox("🔍 Modo Simulação (Validar sem gravar no banco)", value=False, key="ofx_modo_simulacao")
+            modo_simulacao = st.checkbox("Modo Simulação (Validar sem gravar no banco)", value=False, key="ofx_modo_simulacao")
 
         with col_ofx2:
 
