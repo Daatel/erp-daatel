@@ -149,6 +149,167 @@ def gerar_pdf_financeiro(df_pdf, dt_ini, dt_fim, t_ent, t_sai, s_liq, banco_filt
 
     return bytes(pdf.output())
 
+
+def gerar_pdf_razao_caixa_banco(df_mov, dt_ini, dt_fim, saldo_inicial_periodo, banco_filtro):
+    import unicodedata
+    def clean(txt):
+        if not txt or pd.isna(txt):
+            return ""
+        return "".join(ch for ch in unicodedata.normalize('NFKD', str(txt)) if unicodedata.category(ch) != 'Mn')
+
+    def fmt_brl(val):
+        return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # Cabeçalho da Empresa
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 8, "EMPORIO DO ALHO - RAZAO / EXTRATO DE CAIXAS E BANCOS", new_x="LMARGIN", new_y="NEXT", align="C")
+    
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 5, f"Periodo: {dt_ini.strftime('%d/%m/%Y')} ate {dt_fim.strftime('%d/%m/%Y')}  |  Conta: {clean(banco_filtro)}", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.cell(0, 5, f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.ln(4)
+
+    # Saldo Inicial do Período
+    pdf.set_fill_color(240, 244, 248)
+    pdf.set_font("Helvetica", "B", 9.5)
+    s_ini_str = fmt_brl(saldo_inicial_periodo)
+    pdf.cell(0, 8, f" SALDO INICIAL DO PERIODO (em {dt_ini.strftime('%d/%m/%Y')}): {s_ini_str}", border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+
+    saldo_corrente = saldo_inicial_periodo
+    total_entradas_periodo = 0.0
+    total_saidas_periodo = 0.0
+
+    if not df_mov.empty:
+        df_sorted = df_mov.sort_values(by=['data_parsed', 'id'], ascending=[True, True])
+        datas_unicas = df_sorted['data_parsed'].unique()
+
+        w_data = 20
+        w_cat = 45
+        w_desc = 65
+        w_ent = 30
+        w_sai = 30
+
+        for d in datas_unicas:
+            grupo_dia = df_sorted[df_sorted['data_parsed'] == d]
+            dt_str = d.strftime('%d/%m/%Y')
+
+            # Sub-cabeçalho do Dia
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_fill_color(226, 232, 240)
+            pdf.cell(0, 6, f" Movimentacoes do Dia: {dt_str}", border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
+
+            # Cabeçalho da Tabela do Dia
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_fill_color(248, 250, 252)
+            pdf.cell(w_data, 6, "Data", border=1, align="C", fill=True)
+            pdf.cell(w_cat, 6, "Plano de Contas", border=1, align="L", fill=True)
+            pdf.cell(w_desc, 6, "Historico / Descricao", border=1, align="L", fill=True)
+            pdf.cell(w_ent, 6, "Entrada (R$)", border=1, align="R", fill=True)
+            pdf.cell(w_sai, 6, "Saida (R$)", border=1, align="R", fill=True, new_x="LMARGIN", new_y="NEXT")
+
+            pdf.set_font("Helvetica", "", 8)
+            ent_dia = 0.0
+            sai_dia = 0.0
+
+            for _, row in grupo_dia.iterrows():
+                val = float(row['Valor'])
+                is_ent = (row['Movimentação'] == 'Entrada')
+                if is_ent:
+                    ent_dia += val
+                    val_ent_str = fmt_brl(val)
+                    val_sai_str = "-"
+                else:
+                    sai_dia += val
+                    val_ent_str = "-"
+                    val_sai_str = fmt_brl(val)
+
+                cat_txt = clean(str(row.get('Categoria', '')))[:25]
+                desc_txt = clean(str(row.get('Histórico', '')))[:38]
+
+                pdf.cell(w_data, 6, dt_str, border=1, align="C")
+                pdf.cell(w_cat, 6, cat_txt, border=1, align="L")
+                pdf.cell(w_desc, 6, desc_txt, border=1, align="L")
+                pdf.cell(w_ent, 6, val_ent_str, border=1, align="R")
+                pdf.cell(w_sai, 6, val_sai_str, border=1, align="R", new_x="LMARGIN", new_y="NEXT")
+
+            saldo_corrente = saldo_corrente + ent_dia - sai_dia
+            total_entradas_periodo += ent_dia
+            total_saidas_periodo += sai_dia
+
+            # Subtotal do Dia e Saldo Final do Dia
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_fill_color(241, 245, 249)
+            text_dia = f"Totais: Entradas {fmt_brl(ent_dia)} | Saidas {fmt_brl(sai_dia)}  =>  SALDO FINAL DO DIA: {fmt_brl(saldo_corrente)}"
+            pdf.cell(0, 6, text_dia, border=1, align="R", fill=True, new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(3)
+
+    # Resumo Consolidado do Período
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_fill_color(226, 232, 240)
+    pdf.cell(0, 7, " RESUMO DO PERIODO E SALDO FINAL CONSOLIDADO", border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
+
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 6, f"   (+) Saldo Inicial do Periodo:     {fmt_brl(saldo_inicial_periodo)}", border="LR", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, f"   (+) Total de Entradas no Periodo:   {fmt_brl(total_entradas_periodo)}", border="LR", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, f"   (-) Total de Saidas no Periodo:     {fmt_brl(total_saidas_periodo)}", border="LR", new_x="LMARGIN", new_y="NEXT")
+
+    pdf.set_font("Helvetica", "B", 9.5)
+    saldo_final_periodo = saldo_inicial_periodo + total_entradas_periodo - total_saidas_periodo
+    pdf.cell(0, 7, f"   (=) SALDO FINAL DO PERIODO:       {fmt_brl(saldo_final_periodo)}", border="LBR", new_x="LMARGIN", new_y="NEXT")
+
+    pdf.ln(8)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.cell(0, 5, "Relatorio oficial de extrato/razao gerado eletronicamente pelo ERP Fabrica de Alho.", new_x="LMARGIN", new_y="NEXT", align="C")
+
+    return bytes(pdf.output())
+
+
+@st.dialog("Relatório Extrato / Razão de Caixas e Bancos")
+def dialog_relatorio_razao(df_ext_base, dt_ini, dt_fi, conta_con, opcoes_bancos, df_bancos):
+    st.write(f"**Conta selecionada:** {conta_con}")
+    st.write(f"**Período:** {dt_ini.strftime('%d/%m/%Y')} até {dt_fi.strftime('%d/%m/%Y')}")
+    
+    # Calcular Saldo Inicial do Período (< dt_ini)
+    if conta_con != "Todas as contas":
+        b_id = opcoes_bancos[conta_con]
+        df_ini = fetch_all("SELECT saldo_inicial FROM contas_bancarias WHERE id=?", (b_id,))
+        s_inicial_base = float(df_ini.iloc[0]['saldo_inicial']) if not df_ini.empty else 0.0
+        df_prev = fetch_all("SELECT tipo, valor FROM fluxo_caixa WHERE conta_bancaria_id = ? AND data < ?", (b_id, dt_ini.strftime("%Y-%m-%d")))
+    else:
+        s_inicial_base = sum([float(s) for s in df_bancos['saldo_inicial']])
+        df_prev = fetch_all("SELECT tipo, valor FROM fluxo_caixa WHERE data < ?", (dt_ini.strftime("%Y-%m-%d"),))
+
+    saldo_inicial_periodo = s_inicial_base
+    if not df_prev.empty:
+        for _, r_prev in df_prev.iterrows():
+            v = float(r_prev['valor']) if pd.notna(r_prev['valor']) else 0.0
+            if r_prev['tipo'] == 'Entrada':
+                saldo_inicial_periodo += v
+            else:
+                saldo_inicial_periodo -= v
+
+    saldo_ini_formatted = f"R$ {saldo_inicial_periodo:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    st.info(f"💵 **Saldo Inicial em {dt_ini.strftime('%d/%m/%Y')}:** {saldo_ini_formatted}")
+
+    pdf_bytes = gerar_pdf_razao_caixa_banco(df_ext_base, dt_ini, dt_fi, saldo_inicial_periodo, conta_con)
+    nome_arq = f"Extrato_Razao_{conta_con.replace(' ', '_')}_{dt_ini.strftime('%Y%m%d')}_a_{dt_fi.strftime('%Y%m%d')}.pdf"
+
+    st.download_button(
+        label="📥 Baixar Relatório em PDF",
+        data=pdf_bytes,
+        file_name=nome_arq,
+        mime="application/pdf",
+        type="primary",
+        use_container_width=True
+    )
+
+
 @st.dialog("Consolidação de Lançamentos")
 def dialog_confirmar_consolidacao(modificacoes):
     st.warning("⚠️ **Atenção:** Após a consolidação, os lançamentos selecionados serão fechados e **não será mais possível revertê-los ou alterá-los**.")
@@ -2253,7 +2414,7 @@ try:
 
         # Linha Única de Filtros e Botões (Colunas de proporções compactas)
 
-        col_f1, col_f2, col_f3, col_b1, col_b2, col_b3 = st.columns([1.0, 1.4, 1.0, 1.2, 1.0, 1.2])
+        col_f1, col_f2, col_f3, col_b1, col_b2, col_b3, col_b4 = st.columns([1.0, 1.3, 1.0, 1.0, 1.0, 1.1, 1.2])
 
         
 
@@ -2328,6 +2489,13 @@ try:
                 username = st.session_state.get('logged_user', 'Usuário')
 
                 mostrar_mensagem_bloqueio(username)
+
+
+        with col_b4:
+
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+
+            btn_abrir_razao = st.button("📄 Extrato / Razão", key="btn_abrir_razao_dialog", use_container_width=True)
 
                 
 
@@ -2471,6 +2639,10 @@ try:
                 df_ext['Categoria'].str.lower().str.contains(busca_txt_lower, na=False)
 
             ]
+
+            
+        if btn_abrir_razao:
+            dialog_relatorio_razao(df_ext, dt_ini, dt_fi, conta_con, opcoes_bancos, df_bancos)
 
             
 
