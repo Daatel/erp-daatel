@@ -2,6 +2,22 @@
 
 ---
 
+## v1.8 — 2026-07-25 (Sessão: Reformulação do Módulo de Produção — Seleção, Metas e Rendimento de Alho)
+
+### 🧄 Novo Módulo de Seleção e Pesagem (`components/selecao/` e `pages/4_Producao.py`)
+- **Arquitetura Modular:** Módulo de produção reestruturado em componentes isolados (`components/selecao/`), englobando BI, Mesa de Seleção, Ranking, Configurações e PDF.
+- **Painel BI de Seleção (`painel_bi.py`):** Visualização executiva de indicadores mensais, gráfico diário de produção vs. meta da casa e projeção de entregas.
+- **Mesa de Seleção Operacional (`mesa.py`):** Lançamento simplificado de presença diária, pesagem individual por selecionadora e registro de rendimento por lote (Nobre, 2ª Linha e Descarte).
+- **Ranking de Selecionadoras (`ranking.py`):** Tabela de performance filtrada pelo cargo Selecionador(a), comparando pesagem realizada contra meta individual.
+- **Gerenciamento de Metas & Calendário (`configuracoes.py`):** Definição de metas por nível (A/B/Teste), parâmetros mensais e calendário de exceções/feriados.
+- **Folha de Pesagem em PDF (`pdf_folha.py`):** Exportação em PDF formatado com ReportLab para preenchimento ou arquivamento físico.
+
+### 🗄️ Banco de Dados & Pessoas (`pages/3_Pessoas.py`, `database.py`)
+- **Perfil de Selecionadora:** Adicionado cargo "Selecionador(a)" no cadastro de pessoas com definição de Nível de Classificação (`A`, `B`, `Teste`) e Vínculo (`CLT`/`Diarista`).
+- **Migração SQL Integrada (`migration_selecao.sql`):** Persistência relacional completa para histórico de níveis, pesagens diárias e aproveitamento de lotes.
+
+---
+
 ## v1.7 — 2026-06-18 (Sessão: Desacoplamento de Estorno e Correção de Emissão de DAV)
 
 ### ✅ Tela de Faturamento Independente (`7_Faturamento.py`)
