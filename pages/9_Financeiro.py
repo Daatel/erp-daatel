@@ -298,6 +298,8 @@ def dialog_relatorio_razao(df_ext_base, dt_ini, dt_fi, conta_con, opcoes_bancos,
 
     saldo_ini_formatted = f"R$ {saldo_inicial_periodo:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     st.info(f"💵 **Saldo Inicial em {dt_ini.strftime('%d/%m/%Y')}:** {saldo_ini_formatted}")
+    if conta_con == "Todas as contas":
+        st.caption("💡 *Nota: O filtro 'Todas as contas' soma o saldo de todas as contas da empresa (Bradesco R$ 719,33 + Tesouraria/Caixa Físico R$ 20,50 = R$ 739,80). Para emitir apenas o extrato do Bradesco, selecione 'BRADESCO' no filtro da tela.*")
 
     pdf_bytes = gerar_pdf_razao_caixa_banco(df_ext_base, dt_ini, dt_fi, saldo_inicial_periodo, conta_con)
     nome_arq = f"Extrato_Razao_{conta_con.replace(' ', '_')}_{dt_ini.strftime('%Y%m%d')}_a_{dt_fi.strftime('%Y%m%d')}.pdf"
