@@ -2,7 +2,7 @@
 
 ---
 
-## v1.9 — 2026-08-04 (Sessão: Conciliador Bancário Inteligente OFX & Relatório Razão)
+## v1.9 — 2026-08-04 (Sessão: Conciliador Bancário Inteligente OFX, Relatório Razão & Ajustes de Tesouraria)
 
 ### 🔄 Conciliador Bancário Automático OFX (`utils_ofx.py`, `pages/9_Financeiro.py`)
 - **Parser SGML/XML Resiliente:** Leitor em Python puro para arquivos `.ofx` compatível com Bradesco, Itaú, Banco do Brasil, Caixa e bancos digitais.
@@ -10,13 +10,18 @@
 - **Tolerância Estrita D-2:** Filtro de vencimento limitado a até 2 dias de diferença. Lançamentos mais distantes exigem validação manual humana.
 - **Transação Atômica ACID:** Processamento em lote envolvido em `BEGIN / COMMIT / ROLLBACK` atômico via `db_transaction()`. Se um item falhar, nenhuma alteração é persistida no banco.
 - **Modo Simulação (Dry Run):** Opção de teste em tela para validar o matching sem gravar no banco de dados.
+- **Design de Interface Limpo:** Aplicação de estilo CSS customizado para o `stFileUploader` (removendo fundo escuro) e padronização tipográfica do cabeçalho de conciliação.
 
 ### 📄 Relatório Razão / Extrato de Caixas e Bancos (`pages/9_Financeiro.py`)
 - **Extrato Diário em PDF:** Botão `📄 Extrato / Razão` na aba Caixas e Bancos gerando relatório em PDF segregado por dia com Saldo Inicial, Histórico, Plano de Contas, Entradas, Saídas e Saldo Final de cada dia.
-- **Cálculo Retroativo de Saldo Inicial:** Apuração de saldo acumulado anterior à data inicial do período (`< dt_ini`).
+- **Cálculo Retroativo de Saldo Inicial:** Apuração de saldo acumulado anterior à data inicial do período (`< dt_ini`), com suporte a relatórios por conta individual ou consolidado ("Todas as contas").
+- **Dica de Interface:** Exibição de nota explicativa esclarecendo a composição de saldos consolidados entre Bradesco e Caixa Físico.
 
-### 🗄️ Banco de Dados (`database.py`)
+### 🗄️ Tesouraria & Banco de Dados (`database.py`, `pages/9_Financeiro.py`)
 - **Trava Anti-Duplicidade:** Adicionada a coluna `fitid TEXT` e índice `idx_fluxo_caixa_fitid` na tabela `fluxo_caixa`.
+- **Ajuste de Saldo Bradesco:** Ajustado o saldo acumulado do Bradesco em 30/06/2026 para R$ 719,33, alinhando a abertura de conciliação em 01/07/2026 com o extrato bancário real.
+- **Correção de Arredondamento:** Corrigido o modal de ajuste de saldo para arredondar a diferença em 2 casas decimais (`round(..., 2)`).
+- **Saneamento de Lançamento:** Excluída a duplicata do Contas a Pagar (ID 54 / Fluxo ID 57) relativa à compra de bomba nova Masterson.
 
 ---
 
