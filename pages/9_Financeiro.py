@@ -446,7 +446,7 @@ def mostrar_ajuste_saldo_modal(opcoes_bancos):
 
             
 
-    diferenca = saldo_desejado - saldo_atual_na_data
+    diferenca = round(saldo_desejado - saldo_atual_na_data, 2)
 
     
 
@@ -484,7 +484,7 @@ def mostrar_ajuste_saldo_modal(opcoes_bancos):
 
             tipo_ajuste = "Entrada" if diferenca > 0 else "Saída"
 
-            valor_ajuste = abs(diferenca)
+            valor_ajuste = round(abs(diferenca), 2)
 
             desc_ajuste = f"Ajuste de saldo (Saldo desejado: R$ {saldo_desejado:,.2f})".replace(",", "X").replace(".", ",").replace("X", ".")
 
