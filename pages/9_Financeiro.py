@@ -1795,7 +1795,9 @@ try:
     with tab2:
 
         df_all_contas = fetch_all("""
-            SELECT c.id, f.nome_fantasia as 'Fornecedor', cl.nome as 'Cliente', c.numero_documento as 'N. Doc', p.nome as 'Plano de Contas', 
+            SELECT c.id, f.nome_fantasia as 'Fornecedor_Fantasia', f.nome as 'Fornecedor_Razao', 
+                   cl.nome_fantasia as 'Cliente_Fantasia', cl.nome as 'Cliente_Razao', 
+                   c.numero_documento as 'N. Doc', p.nome as 'Plano de Contas', 
                    c.descricao as 'Histórico', c.data_vencimento as 'Vencimento', 
                    c.valor as 'Valor', c.status as 'Status', c.data_pagamento as 'Data PGTO',
                    c.comprovante_url as 'Comprovante', c.cliente_id, cb.nome as 'Conta'
@@ -1807,46 +1809,41 @@ try:
             ORDER BY c.data_vencimento ASC
         """)
 
-        
-
         # --- TRAVA DE CANHOTOS LOGÍSTICA ---
-
         df_man_bloqueados = fetch_all("SELECT id FROM manifestos_carga WHERE status='EM TRÂNSITO'")
-
         ids_bloqueados = df_man_bloqueados['id'].tolist() if not df_man_bloqueados.empty else []
 
-        
-
         def checar_trava(desc):
-
             if pd.isna(desc): return False
-
             if "Acerto Rota/Manifesto #" in desc:
-
                 try:
-
                     man_id = int(desc.split("#")[1].split("-")[0].strip())
-
                     if man_id in ids_bloqueados:
-
                         return True
-
                 except:
-
                     pass
-
             return False
 
-            
-
-        def determinar_credor(r):
-            forn = r.get('Fornecedor')
-            if forn and pd.notna(forn) and str(forn).strip() and str(forn) != 'None':
-                return str(forn).strip()
-            
-            cli = r.get('Cliente')
-            if cli and pd.notna(cli) and str(cli).strip() and str(cli) != 'None':
-                return str(cli).strip()
+        def determinar_credor(r, modo_razao=False):
+            if modo_razao:
+                forn = r.get('Fornecedor_Razao')
+                if forn and pd.notna(forn) and str(forn).strip() and str(forn) != 'None':
+                    return str(forn).strip()
+                cli = r.get('Cliente_Razao')
+                if cli and pd.notna(cli) and str(cli).strip() and str(cli) != 'None':
+                    return str(cli).strip()
+            else:
+                forn_f = r.get('Fornecedor_Fantasia')
+                forn_r = r.get('Fornecedor_Razao')
+                forn = forn_f if forn_f and pd.notna(forn_f) and str(forn_f).strip() and str(forn_f) != 'None' else forn_r
+                if forn and pd.notna(forn) and str(forn).strip() and str(forn) != 'None':
+                    return str(forn).strip()
+                
+                cli_f = r.get('Cliente_Fantasia')
+                cli_r = r.get('Cliente_Razao')
+                cli = cli_f if cli_f and pd.notna(cli_f) and str(cli_f).strip() and str(cli_f) != 'None' else cli_r
+                if cli and pd.notna(cli) and str(cli).strip() and str(cli) != 'None':
+                    return str(cli).strip()
                 
             desc = r.get('Histórico') or ""
             if " - VT - " in desc:
@@ -1864,9 +1861,13 @@ try:
 
         if not df_all_contas.empty:
             df_all_contas['Bloqueado'] = df_all_contas['Histórico'].apply(checar_trava)
-            df_all_contas['Credor'] = df_all_contas.apply(determinar_credor, axis=1)
-            df_all_contas['Credor'] = df_all_contas.apply(
-                lambda r: f"🔴 [BLOQUEADO FALTAM CANHOTOS] {r['Credor']}" if r.get('Bloqueado', False) else r['Credor'], axis=1
+            df_all_contas['Credor_Fantasia'] = df_all_contas.apply(lambda r: determinar_credor(r, modo_razao=False), axis=1)
+            df_all_contas['Credor_Razao'] = df_all_contas.apply(lambda r: determinar_credor(r, modo_razao=True), axis=1)
+            df_all_contas['Credor_Fantasia'] = df_all_contas.apply(
+                lambda r: f"🔴 [BLOQUEADO FALTAM CANHOTOS] {r['Credor_Fantasia']}" if r.get('Bloqueado', False) else r['Credor_Fantasia'], axis=1
+            )
+            df_all_contas['Credor_Razao'] = df_all_contas.apply(
+                lambda r: f"🔴 [BLOQUEADO FALTAM CANHOTOS] {r['Credor_Razao']}" if r.get('Bloqueado', False) else r['Credor_Razao'], axis=1
             )
 
             
@@ -1942,8 +1943,8 @@ try:
             status_filter_p = st.selectbox("Status", ["PENDENTE", "AGUARDANDO BAIXA", "PAGO", "TODAS"], key="pag_filt_mod")
 
         with col_pf2:
-
             busca_txt_p = st.text_input("Pesquisa - Nome/Fatura", placeholder="Buscar fornecedor...", key="pag_search_mod")
+            buscar_razao_p = st.checkbox("Buscar por Razão Social", key="pag_buscar_razao")
 
             
 
@@ -2029,6 +2030,7 @@ try:
                 return desc
                 
             df_view_p['Histórico'] = df_view_p.apply(clean_fatura_p, axis=1)
+            df_view_p['Credor'] = df_view_p['Credor_Razao'] if buscar_razao_p else df_view_p['Credor_Fantasia']
 
 
 
@@ -2110,7 +2112,8 @@ try:
     with tab3:
 
         df_receber = fetch_all("""
-            SELECT c.id, cl.nome as 'Cliente', c.numero_documento as 'N. Doc', p.nome as 'Plano de Contas', c.descricao as 'Histórico', 
+            SELECT c.id, cl.nome_fantasia as 'Cliente_Fantasia', cl.nome as 'Cliente_Razao', 
+                   c.numero_documento as 'N. Doc', p.nome as 'Plano de Contas', c.descricao as 'Histórico', 
                    c.data_vencimento as 'Vencimento', c.valor as 'Valor', 
                    c.status as 'Status', c.data_recebimento as 'Recebido Em', cb.nome as 'Conta'
             FROM contas_a_receber c
@@ -2119,6 +2122,23 @@ try:
             LEFT JOIN contas_bancarias cb ON c.conta_bancaria_id = cb.id
             ORDER BY c.data_vencimento ASC
         """)
+
+        def determinar_cliente(r, modo_razao=False):
+            if modo_razao:
+                cli = r.get('Cliente_Razao')
+                if cli and pd.notna(cli) and str(cli).strip() and str(cli) != 'None':
+                    return str(cli).strip()
+            else:
+                cli_f = r.get('Cliente_Fantasia')
+                cli_r = r.get('Cliente_Razao')
+                cli = cli_f if cli_f and pd.notna(cli_f) and str(cli_f).strip() and str(cli_f) != 'None' else cli_r
+                if cli and pd.notna(cli) and str(cli).strip() and str(cli) != 'None':
+                    return str(cli).strip()
+            return ""
+
+        if not df_receber.empty:
+            df_receber['Cliente_Fantasia'] = df_receber.apply(lambda r: determinar_cliente(r, modo_razao=False), axis=1)
+            df_receber['Cliente_Razao'] = df_receber.apply(lambda r: determinar_cliente(r, modo_razao=True), axis=1)
 
         
 
@@ -2193,8 +2213,8 @@ try:
             status_filter_r = st.selectbox("Status", ["PENDENTE", "RECEBIDO", "TODAS"], key="rec_filt_mod")
 
         with col_rf2:
-
             busca_txt_r = st.text_input("Pesquisa - Nome/Fatura", placeholder="Buscar cliente...", key="rec_search_mod")
+            buscar_razao_r = st.checkbox("Buscar por Razão Social", key="rec_buscar_razao")
 
             
 
@@ -2288,6 +2308,7 @@ try:
                 return desc
                 
             df_view_r['Histórico'] = df_view_r.apply(clean_fatura_r, axis=1)
+            df_view_r['Cliente'] = df_view_r['Cliente_Razao'] if buscar_razao_r else df_view_r['Cliente_Fantasia']
 
 
 
