@@ -169,14 +169,18 @@ def migrar_senhas_usuarios(conn):
         conn.commit()
         print(f"[MIGRAÇÃO] {migrados} senhas legadas criptografadas com sucesso!")
 
-@st.cache_resource
+_DB_INITIALIZED = False
+
 def initialize_database():
-    create_tables()
-    conn = get_connection()
-    try:
-        migrar_senhas_usuarios(conn)
-    finally:
-        release_connection(conn)
+    global _DB_INITIALIZED
+    if not _DB_INITIALIZED:
+        create_tables()
+        conn = get_connection()
+        try:
+            migrar_senhas_usuarios(conn)
+        finally:
+            release_connection(conn)
+        _DB_INITIALIZED = True
     return True
 
 def _create_tables_internal(conn):
@@ -951,6 +955,7 @@ def _create_tables_internal(conn):
     # Migração: Adicionar colunas se não existirem
     alter_queries = [
         "ALTER TABLE contas_a_receber ADD COLUMN data_emissao DATE",
+        "ALTER TABLE contas_a_pagar ADD COLUMN data_emissao DATE",
         "ALTER TABLE compras_itens ADD COLUMN unidade TEXT",
         "ALTER TABLE compras_itens ADD COLUMN quantidade_estoque REAL",
         "ALTER TABLE compras_itens ADD COLUMN produto_nome TEXT",
@@ -1854,6 +1859,11 @@ def enviar_relatorio_profilaxia_async():
 def enviar_relatorio_resumo_executivo_async():
     import threading
     threading.Thread(target=enviar_relatorio_resumo_executivo, daemon=True).start()
+
+try:
+    initialize_database()
+except Exception as _init_err:
+    logger.error(f"Erro na auto-inicialização do banco: {_init_err}")
 
 if __name__ == "__main__":
     create_tables()
