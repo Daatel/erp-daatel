@@ -87,9 +87,10 @@ def dialog_lancar_pagar():
     desc_p = col_m4.text_input("Descrição / Fatura (Ex: Nota Fiscal nº 123)", value=st.session_state.get("cap_desc_p", ""), key="cap_desc_p")
     val_p = col_mx.number_input("Valor da Duplicata (R$)", min_value=0.01, step=50.0, key="cap_val_p")
     
-    col_m5, col_m6 = st.columns(2)
-    venc_p = col_m5.date_input("Vencimento (ou da 1ª Parcela)", date.today() + timedelta(days=30), key="cap_venc_p")
-    with col_m6:
+    col_m5, col_m6, col_m7 = st.columns(3)
+    dt_emissao_p = col_m5.date_input("Data de Emissão", date.today(), key="cap_emissao_p")
+    venc_p = col_m6.date_input("Vencimento (ou da 1ª Parcela)", date.today() + timedelta(days=30), key="cap_venc_p")
+    with col_m7:
         is_vinc = st.checkbox("É Cliente Vinculado (CNPJ) ?", value=False, key="cap_is_vinc")
         cli_sel = st.selectbox("Cliente Vinculado (CNPJ)", list(op_cli.keys()), disabled=not is_vinc, label_visibility="collapsed", key="cap_cli_sel")
     
@@ -152,8 +153,8 @@ def dialog_lancar_pagar():
                         desc_final = f"{desc_p} ({i+1}/{n_parcelas})" if n_parcelas > 1 else desc_p
                         
                         run_query(
-                            "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, cliente_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDENTE')",
-                            (forn_id, pc_id, cli_id, num_doc_p, desc_final, val_p, dt_venc.strftime("%Y-%m-%d"))
+                            "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, cliente_id, numero_documento, descricao, valor, data_vencimento, data_emissao, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                            (forn_id, pc_id, cli_id, num_doc_p, desc_final, val_p, dt_venc.strftime("%Y-%m-%d"), dt_emissao_p.strftime("%Y-%m-%d"))
                         )
                 
                 st.session_state["cap_clique_bloqueado"] = False
@@ -174,9 +175,12 @@ def dialog_confirmar_baixa_lote_pagar(ids_selecionados, df_all_contas, opcoes_ba
     
     st.metric("Total Selecionado", f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     
+    op_bancos = {"-- SELECIONE A CONTA BANCÁRIA --": None}
+    op_bancos.update(opcoes_bancos)
+
     colA, colB = st.columns(2)
     d_pgto = colA.date_input("Data real do Pagamento", date.today())
-    conta_saida = colB.selectbox("Sair de qual banco/conta?", list(opcoes_bancos.keys()))
+    conta_saida = colB.selectbox("Sair de qual banco/conta?", list(op_bancos.keys()))
     
     # Lógica de Baixa Parcial
     valor_pago = total
@@ -190,7 +194,10 @@ def dialog_confirmar_baixa_lote_pagar(ids_selecionados, df_all_contas, opcoes_ba
             st.info(f"ℹ️ O título original de R$ {total:,.2f} será desmembrado: R$ {valor_pago:,.2f} será liquidado e o saldo restante de R$ {saldo:,.2f} continuará pendente.")
             
     if st.button("💸 Confirmar Liquidação", type="primary", use_container_width=True):
-        conta_id = opcoes_bancos[conta_saida]
+        if conta_saida == "-- SELECIONE A CONTA BANCÁRIA --" or conta_saida not in opcoes_bancos:
+            st.error("Por favor, selecione a Conta Bancária de saída para realizar a baixa.")
+        else:
+            conta_id = opcoes_bancos[conta_saida]
         
         for _, r in df_selecionadas.iterrows():
             c_id = int(r['id'])

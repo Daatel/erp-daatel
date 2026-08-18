@@ -1123,6 +1123,16 @@ def _create_tables_internal(conn):
                 )
                 WHERE plano_conta_id IS NULL;
             """)
+            cur_ddl.execute("UPDATE contas_a_pagar SET data_emissao = (SELECT cmp.data FROM compras cmp WHERE cmp.id = contas_a_pagar.compra_id) WHERE compra_id IS NOT NULL AND (data_emissao IS NULL OR data_emissao = data_vencimento)")
+            cur_ddl.execute("""
+                UPDATE contas_a_pagar
+                SET plano_conta_id = COALESCE(
+                    (SELECT f.plano_conta_id FROM fornecedores f WHERE f.id = contas_a_pagar.fornecedor_id AND f.plano_conta_id IS NOT NULL),
+                    (SELECT id FROM planos_de_contas WHERE categoria IN ('CUSTO_VAR', 'DESPESA_FIXA', 'DESPESA_COM') AND (nome LIKE '%Matéria-Prima%' OR nome LIKE '%Compra%') ORDER BY id ASC LIMIT 1),
+                    (SELECT id FROM planos_de_contas WHERE categoria IN ('CUSTO_VAR', 'DESPESA_FIXA') ORDER BY id ASC LIMIT 1)
+                )
+                WHERE plano_conta_id IS NULL;
+            """)
         except Exception:
             pass
 

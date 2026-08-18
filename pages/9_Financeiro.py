@@ -1797,14 +1797,23 @@ try:
         df_all_contas = fetch_all("""
             SELECT c.id, f.nome_fantasia as 'Fornecedor_Fantasia', f.nome as 'Fornecedor_Razao', 
                    cl.nome_fantasia as 'Cliente_Fantasia', cl.nome as 'Cliente_Razao', 
-                   c.numero_documento as 'N. Doc', p.nome as 'Plano de Contas', 
-                   c.descricao as 'Histórico', c.data_vencimento as 'Vencimento', 
+                   c.numero_documento as 'N. Doc', 
+                   COALESCE(p.nome, forn.plano_nome, 'Compra de Matéria-Prima') as 'Plano de Contas', 
+                   c.descricao as 'Histórico', 
+                   COALESCE(c.data_emissao, cmp.data_compra, c.data_vencimento) as 'Dt. Emissão',
+                   c.data_vencimento as 'Vencimento', 
                    c.valor as 'Valor', c.status as 'Status', c.data_pagamento as 'Data PGTO',
                    c.comprovante_url as 'Comprovante', c.cliente_id, cb.nome as 'Conta'
             FROM contas_a_pagar c
             LEFT JOIN fornecedores f ON c.fornecedor_id = f.id
             LEFT JOIN clientes cl ON c.cliente_id = cl.id
+            LEFT JOIN compras cmp ON c.compra_id = cmp.id
             LEFT JOIN planos_de_contas p ON c.plano_conta_id = p.id
+            LEFT JOIN (
+                SELECT f2.id, p2.nome as plano_nome 
+                FROM fornecedores f2 
+                JOIN planos_de_contas p2 ON f2.plano_conta_id = p2.id
+            ) forn ON c.fornecedor_id = forn.id
             LEFT JOIN contas_bancarias cb ON c.conta_bancaria_id = cb.id
             ORDER BY c.data_vencimento ASC
         """)
@@ -2010,29 +2019,17 @@ try:
             
             def format_doc_p(row):
                 d = str(row['N. Doc']).strip()
-                doc = f"#{row['id']}" if d == 'None' or d == 'nan' or d == '' else d
-                
+                doc = f"#{row['id']}" if d in ('None', 'nan', '', 'None - None') else d
                 import re
                 m = re.search(r'\(\s*(\d+/\d+)\s*\)', str(row['Histórico']))
-                if m:
-                    return f"{doc} - {m.group(1)}"
+                if m and m.group(1) not in doc:
+                    return f"{doc} ({m.group(1)})"
                 return doc
             df_view_p['N. Doc'] = df_view_p.apply(format_doc_p, axis=1)
             
-            def clean_fatura_p(row):
-                desc = str(row['Histórico'])
-                if 'Venda #' in desc and 'Descarga' not in desc and 'Acordo' not in desc:
-                     m = re.search(r'\([^)]+-\s*(.*?)\)$', desc)
-                     if m:
-                         return m.group(1)
-                elif 'Acerto Rota/Manifesto' in desc:
-                     return 'Acerto Rota/Manifesto'
-                return desc
-                
-            df_view_p['Histórico'] = df_view_p.apply(clean_fatura_p, axis=1)
             df_view_p['Credor'] = df_view_p['Credor_Razao'] if buscar_razao_p else df_view_p['Credor_Fantasia']
-
-
+            df_view_p['Plano de Contas'] = df_view_p['Plano de Contas'].apply(lambda x: "-" if pd.isna(x) or str(x).strip() in ('None', 'nan', '') else str(x).strip())
+            df_view_p['Conta'] = df_view_p['Conta'].apply(lambda x: "-" if pd.isna(x) or str(x).strip() in ('None', 'nan', '') else str(x).strip())
 
             if status_filter_p != "TODAS":
 
@@ -2048,7 +2045,9 @@ try:
 
                     df_view_p['Credor'].str.lower().str.contains(b_p, na=False) |
 
-                    df_view_p['Histórico'].str.lower().str.contains(b_p, na=False)
+                    df_view_p['Histórico'].str.lower().str.contains(b_p, na=False) |
+
+                    df_view_p['N. Doc'].str.lower().str.contains(b_p, na=False)
 
                 ]
 
@@ -2062,25 +2061,29 @@ try:
 
                 df_view_p['Pagar?'] = False
 
-                df_view_p['Vencimento'] = pd.to_datetime(df_view_p['Vencimento']).dt.strftime('%d/%m/%Y')
+                df_view_p['Dt. Emissão'] = pd.to_datetime(df_view_p['Dt. Emissão']).dt.strftime('%d/%m/%Y').fillna("-")
+
+                df_view_p['Vencimento'] = pd.to_datetime(df_view_p['Vencimento']).dt.strftime('%d/%m/%Y').fillna("-")
 
                 df_view_p['Data PGTO'] = pd.to_datetime(df_view_p['Data PGTO']).dt.strftime('%d/%m/%Y').fillna("-")
 
                 
 
-                is_disabled_p = ["id", "Credor", "Plano de Contas", "Histórico", "Vencimento", "Valor", "Status", "Data PGTO", "Conta"]
+                is_disabled_p = ["id", "Dt. Emissão", "Vencimento", "Credor", "N. Doc", "Plano de Contas", "Status", "Data PGTO", "Conta"]
                 if status_filter_p == "PAGO":
                     is_disabled_p.append("Pagar?")
                     
                 edited_df_p = st.data_editor(
-                    df_view_p[['Pagar?', 'id', 'Credor', 'N. Doc', 'Vencimento', 'Valor', 'Plano de Contas', 'Histórico', 'Status', 'Data PGTO', 'Conta']],
+                    df_view_p[['Pagar?', 'id', 'Dt. Emissão', 'Vencimento', 'N. Doc', 'Credor', 'Valor', 'Plano de Contas', 'Status', 'Data PGTO', 'Conta']],
                     hide_index=True,
                     disabled=is_disabled_p,
                     width="stretch",
                     height=500,
                     column_config={
                         "Pagar?": st.column_config.CheckboxColumn("Pagar?", help="Marque para liquidar"),
-                        "Valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f")
+                        "Valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f"),
+                        "Status": st.column_config.TextColumn("Status"),
+                        "Conta": st.column_config.TextColumn("Conta Bancária")
                     },
                     key="editor_pagar"
                 )
