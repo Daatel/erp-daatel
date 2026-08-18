@@ -1126,6 +1126,11 @@ def _create_tables_internal(conn):
         except Exception:
             pass
 
+        try:
+            aplicar_ajuste_bradesco_31_07(conn, is_pg=True)
+        except Exception:
+            pass
+
         cur_ddl.close()
         conn.autocommit = False
     else:
@@ -1142,6 +1147,54 @@ def _create_tables_internal(conn):
                 conn.commit()
             except Exception:
                 pass
+
+        try:
+            aplicar_ajuste_bradesco_31_07(conn, is_pg=False)
+        except Exception:
+            pass
+
+def aplicar_ajuste_bradesco_31_07(conn, is_pg=False):
+    """
+    Garante que o ajuste de saldo da conta Bradesco em 31/07/2026 para o valor desejado de R$ 1.961,54
+    seja calculado e gravado no fluxo_caixa de forma 100% idempotente.
+    """
+    try:
+        cursor = conn.cursor()
+        query_banco = "SELECT id, saldo_inicial FROM contas_bancarias WHERE UPPER(nome) LIKE '%BRADESCO%' OR UPPER(banco) LIKE '%BRADESCO%' LIMIT 1"
+        cursor.execute(query_banco)
+        row = cursor.fetchone()
+        if not row:
+            return
+        b_id = row[0]
+        saldo_ini = float(row[1]) if row[1] else 0.0
+
+        query_check = "SELECT id FROM fluxo_caixa WHERE conta_bancaria_id = %s AND data = '2026-07-31' AND categoria = 'Ajuste de saldo' AND descricao LIKE '%%1.961,54%%'" if is_pg else "SELECT id FROM fluxo_caixa WHERE conta_bancaria_id = ? AND data = '2026-07-31' AND categoria = 'Ajuste de saldo' AND descricao LIKE '%1.961,54%'"
+        cursor.execute(query_check, (b_id,))
+        if cursor.fetchone():
+            return
+
+        query_fluxo = "SELECT tipo, valor FROM fluxo_caixa WHERE conta_bancaria_id = %s AND data <= '2026-07-31'" if is_pg else "SELECT tipo, valor FROM fluxo_caixa WHERE conta_bancaria_id = ? AND data <= '2026-07-31'"
+        cursor.execute(query_fluxo, (b_id,))
+        rows = cursor.fetchall()
+        saldo_acum = saldo_ini
+        for r_tipo, r_val in rows:
+            v = float(r_val) if r_val else 0.0
+            if r_tipo == 'Entrada':
+                saldo_acum += v
+            else:
+                saldo_acum -= v
+
+        diff = round(1961.54 - saldo_acum, 2)
+        if abs(diff) >= 0.01:
+            tipo_adj = "Entrada" if diff > 0 else "Saída"
+            val_adj = round(abs(diff), 2)
+            desc_adj = "Ajuste de saldo (Saldo desejado: R$ 1.961,54)"
+            query_ins = "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, conta_bancaria_id, conciliado) VALUES ('2026-07-31', %s, 'Ajuste de saldo', %s, %s, %s, TRUE)" if is_pg else "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, conta_bancaria_id, conciliado) VALUES ('2026-07-31', ?, 'Ajuste de saldo', ?, ?, ?, 1)"
+            cursor.execute(query_ins, (tipo_adj, desc_adj, val_adj, b_id))
+            if not is_pg:
+                conn.commit()
+    except Exception as e:
+        logger.error(f"Erro ao aplicar ajuste Bradesco 31/07: {e}")
 
 
 def clean_params(params):

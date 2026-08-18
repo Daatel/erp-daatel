@@ -2362,12 +2362,12 @@ try:
 
                 
 
-                is_disabled_r = ["id", "Dt. Emissão", "Vencimento", "N. Doc", "Cliente", "Plano de Contas", "Histórico", "Status", "Recebido Em", "Conta"]
+                is_disabled_r = ["id", "Dt. Emissão", "Vencimento", "N. Doc", "Cliente", "Plano de Contas", "Status", "Recebido Em", "Conta"]
                 if status_filter_r == "RECEBIDO":
                     is_disabled_r.append("Receber?")
                     
                 edited_df_r = st.data_editor(
-                    df_view_r[['Receber?', 'id', 'Dt. Emissão', 'Vencimento', 'N. Doc', 'Cliente', 'Valor', 'Plano de Contas', 'Histórico', 'Status', 'Recebido Em', 'Conta']],
+                    df_view_r[['Receber?', 'id', 'Dt. Emissão', 'Vencimento', 'N. Doc', 'Cliente', 'Valor', 'Plano de Contas', 'Status', 'Recebido Em', 'Conta']],
                     hide_index=True,
                     disabled=is_disabled_r,
                     width="stretch",
