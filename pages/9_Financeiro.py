@@ -2114,11 +2114,12 @@ try:
         df_receber = fetch_all("""
             SELECT c.id, cl.nome_fantasia as 'Cliente_Fantasia', cl.nome as 'Cliente_Razao', 
                    c.numero_documento as 'N. Doc', p.nome as 'Plano de Contas', c.descricao as 'Histórico', 
-                   COALESCE(c.data_emissao, c.data_vencimento) as 'Dt. Emissão',
+                   COALESCE(c.data_emissao, v.data, c.data_vencimento) as 'Dt. Emissão',
                    c.data_vencimento as 'Vencimento', c.valor as 'Valor', 
                    c.status as 'Status', c.data_recebimento as 'Recebido Em', cb.nome as 'Conta'
             FROM contas_a_receber c
             LEFT JOIN clientes cl ON c.cliente_id = cl.id
+            LEFT JOIN vendas v ON c.venda_id = v.id
             LEFT JOIN planos_de_contas p ON c.plano_conta_id = p.id
             LEFT JOIN contas_bancarias cb ON c.conta_bancaria_id = cb.id
             ORDER BY c.data_vencimento ASC
@@ -2291,19 +2292,27 @@ try:
             
             def format_doc_r(row):
                 d = str(row['N. Doc']).strip()
-                if d in ('None', 'nan', '', 'None - None'):
-                    d = f"#{row['id']}"
+                h = str(row['Histórico']).strip()
                 import re
-                m = re.search(r'\(\s*(\d+/\d+)\s*\)', str(row['Histórico']))
-                if m and m.group(1) not in d:
-                    return f"{d} ({m.group(1)})"
+                m_grupo = re.search(r'Grupo\s+(\d+)', h)
+                m_parc = re.search(r'\(\s*(\d+/\d+)\s*\)', h)
+                parc_str = f" ({m_parc.group(1)})" if m_parc else ""
+                
+                if "Documento Auxiliar" in d or "Nota Fiscal (NF)" in d or d in ('None', 'nan', '', 'None - None'):
+                    if m_grupo:
+                        return f"DAV {m_grupo.group(1)}{parc_str}"
+                    elif row.get('id'):
+                        return f"DAV #{row['id']}{parc_str}"
+                
+                if m_parc and m_parc.group(1) not in d:
+                    return f"{d}{parc_str}"
                 return d
                 
             df_view_r['N. Doc'] = df_view_r.apply(format_doc_r, axis=1)
             
             def clean_fatura_r(row):
                 desc = str(row['Histórico'])
-                if 'Venda #' in desc:
+                if 'Venda #' in desc or 'Documento Auxiliar' in desc:
                     return "-"
                 return desc
                 

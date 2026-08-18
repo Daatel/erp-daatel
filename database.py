@@ -1112,6 +1112,11 @@ def _create_tables_internal(conn):
                 except Exception:
                     pass
 
+        try:
+            cur_ddl.execute("UPDATE contas_a_receber SET data_emissao = (SELECT v.data FROM vendas v WHERE v.id = contas_a_receber.venda_id) WHERE venda_id IS NOT NULL AND (data_emissao IS NULL OR data_emissao = data_vencimento)")
+        except Exception:
+            pass
+
         cur_ddl.close()
         conn.autocommit = False
     else:
