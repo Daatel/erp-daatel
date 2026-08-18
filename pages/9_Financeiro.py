@@ -2113,7 +2113,9 @@ try:
 
         df_receber = fetch_all("""
             SELECT c.id, cl.nome_fantasia as 'Cliente_Fantasia', cl.nome as 'Cliente_Razao', 
-                   c.numero_documento as 'N. Doc', p.nome as 'Plano de Contas', c.descricao as 'Histórico', 
+                   c.numero_documento as 'N. Doc', 
+                   COALESCE(p.nome, pc_cli.nome, 'Venda de alho descascado') as 'Plano de Contas', 
+                   c.descricao as 'Histórico', 
                    COALESCE(c.data_emissao, v.data, c.data_vencimento) as 'Dt. Emissão',
                    c.data_vencimento as 'Vencimento', c.valor as 'Valor', 
                    c.status as 'Status', c.data_recebimento as 'Recebido Em', cb.nome as 'Conta'
@@ -2121,6 +2123,7 @@ try:
             LEFT JOIN clientes cl ON c.cliente_id = cl.id
             LEFT JOIN vendas v ON c.venda_id = v.id
             LEFT JOIN planos_de_contas p ON c.plano_conta_id = p.id
+            LEFT JOIN planos_de_contas pc_cli ON cl.plano_conta_id = pc_cli.id
             LEFT JOIN contas_bancarias cb ON c.conta_bancaria_id = cb.id
             ORDER BY c.data_vencimento ASC
         """)

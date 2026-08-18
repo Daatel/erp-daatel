@@ -1114,6 +1114,15 @@ def _create_tables_internal(conn):
 
         try:
             cur_ddl.execute("UPDATE contas_a_receber SET data_emissao = (SELECT v.data FROM vendas v WHERE v.id = contas_a_receber.venda_id) WHERE venda_id IS NOT NULL AND (data_emissao IS NULL OR data_emissao = data_vencimento)")
+            cur_ddl.execute("""
+                UPDATE contas_a_receber
+                SET plano_conta_id = COALESCE(
+                    (SELECT cl.plano_conta_id FROM clientes cl WHERE cl.id = contas_a_receber.cliente_id AND cl.plano_conta_id IS NOT NULL),
+                    (SELECT id FROM planos_de_contas WHERE categoria = 'RECEITA' AND (nome LIKE '%descascado%' OR nome LIKE '%Alho%') ORDER BY id ASC LIMIT 1),
+                    (SELECT id FROM planos_de_contas WHERE categoria IN ('RECEITA', 'RECEITA_NAO_OP') ORDER BY id ASC LIMIT 1)
+                )
+                WHERE plano_conta_id IS NULL;
+            """)
         except Exception:
             pass
 
