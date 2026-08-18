@@ -2059,8 +2059,6 @@ try:
 
             else:
 
-                df_view_p['Pagar?'] = False
-
                 df_view_p['Dt. Emissão'] = pd.to_datetime(df_view_p['Dt. Emissão']).dt.strftime('%d/%m/%Y').fillna("-")
 
                 df_view_p['Vencimento'] = pd.to_datetime(df_view_p['Vencimento']).dt.strftime('%d/%m/%Y').fillna("-")
@@ -2069,42 +2067,38 @@ try:
 
                 
 
-                is_disabled_p = ["id", "Dt. Emissão", "Vencimento", "Credor", "N. Doc", "Plano de Contas", "Status", "Data PGTO", "Conta"]
-                if status_filter_p == "PAGO":
-                    is_disabled_p.append("Pagar?")
-                    
-                edited_df_p = st.data_editor(
-                    df_view_p[['Pagar?', 'id', 'Dt. Emissão', 'Vencimento', 'N. Doc', 'Credor', 'Valor', 'Plano de Contas', 'Status', 'Data PGTO', 'Conta']],
+                event_p = st.dataframe(
+                    df_view_p[['id', 'Dt. Emissão', 'Vencimento', 'N. Doc', 'Credor', 'Valor', 'Plano de Contas', 'Status', 'Data PGTO', 'Conta']],
                     hide_index=True,
-                    disabled=is_disabled_p,
                     width="stretch",
                     height=500,
                     column_config={
-                        "Pagar?": st.column_config.CheckboxColumn("Pagar?", help="Marque para liquidar"),
                         "Valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f"),
                         "Status": st.column_config.TextColumn("Status"),
                         "Conta": st.column_config.TextColumn("Conta Bancária")
                     },
-                    key="editor_pagar"
+                    selection_mode="multi-row",
+                    on_select="rerun",
+                    key="grid_pagar"
                 )
 
-                
-
-                selecionados_p = edited_df_p[edited_df_p['Pagar?'] == True]
-
+                selected_indices_p = event_p.selection.rows
+                selecionados_p = df_view_p.iloc[selected_indices_p] if selected_indices_p else pd.DataFrame()
                 st.session_state['selecionados_ids_p'] = selecionados_p['id'].tolist() if not selecionados_p.empty else []
 
                 
 
                 if btn_baixar_p:
 
-                    if selecionados_p.empty:
+                    ids_pag_sel = st.session_state.get('selecionados_ids_p', [])
 
-                        st.warning("Selecione pelo menos uma duplicata marcando a caixinha 'Pagar?'.")
+                    if not ids_pag_sel:
+
+                        st.warning("Selecione pelo menos uma duplicata na tabela para liquidar.")
 
                     else:
 
-                        dialog_confirmar_baixa_lote_pagar(selecionados_p['id'].tolist(), df_all_contas, opcoes_bancos)
+                        dialog_confirmar_baixa_lote_pagar(ids_pag_sel, df_all_contas, opcoes_bancos)
 
 
 
@@ -2147,6 +2141,7 @@ try:
         if not df_receber.empty:
             df_receber['Cliente_Fantasia'] = df_receber.apply(lambda r: determinar_cliente(r, modo_razao=False), axis=1)
             df_receber['Cliente_Razao'] = df_receber.apply(lambda r: determinar_cliente(r, modo_razao=True), axis=1)
+            df_receber['Cliente'] = df_receber['Cliente_Fantasia']
 
         
 
@@ -2355,8 +2350,6 @@ try:
 
             else:
 
-                df_view_r['Receber?'] = False
-
                 df_view_r['Dt. Emissão'] = pd.to_datetime(df_view_r['Dt. Emissão']).dt.strftime('%d/%m/%Y').fillna("-")
 
                 df_view_r['Vencimento'] = pd.to_datetime(df_view_r['Vencimento']).dt.strftime('%d/%m/%Y').fillna("-")
@@ -2365,44 +2358,38 @@ try:
 
                 
 
-                is_disabled_r = ["id", "Dt. Emissão", "Vencimento", "N. Doc", "Cliente", "Plano de Contas", "Status", "Recebido Em", "Conta"]
-                if status_filter_r == "RECEBIDO":
-                    is_disabled_r.append("Receber?")
-                    
-                edited_df_r = st.data_editor(
-                    df_view_r[['Receber?', 'id', 'Dt. Emissão', 'Vencimento', 'N. Doc', 'Cliente', 'Valor', 'Plano de Contas', 'Status', 'Recebido Em', 'Conta']],
+                event_r = st.dataframe(
+                    df_view_r[['id', 'Dt. Emissão', 'Vencimento', 'N. Doc', 'Cliente', 'Valor', 'Plano de Contas', 'Status', 'Recebido Em', 'Conta']],
                     hide_index=True,
-                    disabled=is_disabled_r,
                     width="stretch",
                     height=500,
                     column_config={
-                        "Receber?": st.column_config.CheckboxColumn("Receber?", help="Marque para acusar recebimento"),
                         "Valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f"),
                         "Status": st.column_config.TextColumn("Status"),
                         "Conta": st.column_config.TextColumn("Conta Bancária")
                     },
-
-                    key="editor_receber"
-
+                    selection_mode="multi-row",
+                    on_select="rerun",
+                    key="grid_receber"
                 )
 
-                
-
-                selecionados_r = edited_df_r[edited_df_r['Receber?'] == True]
-
+                selected_indices_r = event_r.selection.rows
+                selecionados_r = df_view_r.iloc[selected_indices_r] if selected_indices_r else pd.DataFrame()
                 st.session_state['selecionados_ids_r'] = selecionados_r['id'].tolist() if not selecionados_r.empty else []
 
                 
 
                 if btn_baixar_r:
 
-                    if selecionados_r.empty:
+                    ids_rec_sel = st.session_state.get('selecionados_ids_r', [])
 
-                        st.warning("Selecione pelo menos uma fatura marcando a caixinha 'Receber?'.")
+                    if not ids_rec_sel:
+
+                        st.warning("Selecione pelo menos uma fatura na tabela para realizar o recebimento.")
 
                     else:
 
-                        dialog_confirmar_baixa_lote_receber(selecionados_r['id'].tolist(), df_receber, opcoes_bancos)
+                        dialog_confirmar_baixa_lote_receber(ids_rec_sel, df_receber, opcoes_bancos)
 
 
 

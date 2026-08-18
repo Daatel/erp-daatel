@@ -698,6 +698,15 @@ def dialog_renegociar_receber():
                     st.success(f"🤝 Renegociação concluída! Acordo #{acordo_id} registrado.")
                     import time; time.sleep(1.5); st.rerun()
 
+def primeiro_valor_valido(row, campos, default=""):
+    for campo in campos:
+        valor = row.get(campo)
+        if pd.notna(valor):
+            valor_str = str(valor).strip()
+            if valor_str and valor_str != "None":
+                return valor_str
+    return default
+
 @st.dialog("Confirmar Recebimento", width="large")
 def dialog_confirmar_baixa_lote_receber(ids_selecionados, df_receber, opcoes_bancos):
     st.write(f"Você selecionou **{len(ids_selecionados)}** título(s) para recebimento.")
@@ -731,8 +740,8 @@ def dialog_confirmar_baixa_lote_receber(ids_selecionados, df_receber, opcoes_ban
             for _, r in df_selecionadas.iterrows():
                 rr_id = int(r['id'])
                 v_base = float(r['Valor'])
-                cli = r['Cliente'] if pd.notna(r['Cliente']) else "Diversos"
-                fat = r['N. Doc'] if pd.notna(r['N. Doc']) else r['Histórico'] if pd.notna(r['Histórico']) else ""
+                cli = primeiro_valor_valido(r, ['Cliente', 'Cliente_Fantasia', 'Cliente_Razao'], 'Diversos')
+                fat = primeiro_valor_valido(r, ['N. Doc', 'Histórico'], '')
                 
                 val_efetivo = valor_pago if is_partial else v_base
                 
