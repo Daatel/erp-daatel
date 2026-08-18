@@ -1815,7 +1815,7 @@ try:
                 JOIN planos_de_contas p2 ON f2.plano_conta_id = p2.id
             ) forn ON c.fornecedor_id = forn.id
             LEFT JOIN contas_bancarias cb ON c.conta_bancaria_id = cb.id
-            ORDER BY c.data_vencimento ASC
+            ORDER BY c.data_vencimento ASC, c.id ASC
         """)
 
         # --- TRAVA DE CANHOTOS LOGÍSTICA ---
@@ -2065,7 +2065,7 @@ try:
 
                 df_view_p['Data PGTO'] = pd.to_datetime(df_view_p['Data PGTO']).dt.strftime('%d/%m/%Y').fillna("-")
 
-                
+                df_view_p = df_view_p.reset_index(drop=True)
 
                 event_p = st.dataframe(
                     df_view_p[['id', 'Dt. Emissão', 'Vencimento', 'N. Doc', 'Credor', 'Valor', 'Plano de Contas', 'Status', 'Data PGTO', 'Conta']],
@@ -2084,13 +2084,13 @@ try:
 
                 selected_indices_p = event_p.selection.rows
                 selecionados_p = df_view_p.iloc[selected_indices_p] if selected_indices_p else pd.DataFrame()
-                st.session_state['selecionados_ids_p'] = selecionados_p['id'].tolist() if not selecionados_p.empty else []
+                st.session_state['selecionados_ids_p'] = selecionados_p['id'].astype(int).tolist() if not selecionados_p.empty else []
 
                 
 
                 if btn_baixar_p:
 
-                    ids_pag_sel = st.session_state.get('selecionados_ids_p', [])
+                    ids_pag_sel = [int(i) for i in st.session_state.get('selecionados_ids_p', []) if pd.notna(i)]
 
                     if not ids_pag_sel:
 
@@ -2122,7 +2122,7 @@ try:
             LEFT JOIN planos_de_contas p ON c.plano_conta_id = p.id
             LEFT JOIN planos_de_contas pc_cli ON cl.plano_conta_id = pc_cli.id
             LEFT JOIN contas_bancarias cb ON c.conta_bancaria_id = cb.id
-            ORDER BY c.data_vencimento ASC
+            ORDER BY c.data_vencimento ASC, c.id ASC
         """)
 
         def determinar_cliente(r, modo_razao=False):
@@ -2356,7 +2356,7 @@ try:
 
                 df_view_r['Recebido Em'] = pd.to_datetime(df_view_r['Recebido Em']).dt.strftime('%d/%m/%Y').fillna("-")
 
-                
+                df_view_r = df_view_r.reset_index(drop=True)
 
                 event_r = st.dataframe(
                     df_view_r[['id', 'Dt. Emissão', 'Vencimento', 'N. Doc', 'Cliente', 'Valor', 'Plano de Contas', 'Status', 'Recebido Em', 'Conta']],
@@ -2375,13 +2375,13 @@ try:
 
                 selected_indices_r = event_r.selection.rows
                 selecionados_r = df_view_r.iloc[selected_indices_r] if selected_indices_r else pd.DataFrame()
-                st.session_state['selecionados_ids_r'] = selecionados_r['id'].tolist() if not selecionados_r.empty else []
+                st.session_state['selecionados_ids_r'] = selecionados_r['id'].astype(int).tolist() if not selecionados_r.empty else []
 
                 
 
                 if btn_baixar_r:
 
-                    ids_rec_sel = st.session_state.get('selecionados_ids_r', [])
+                    ids_rec_sel = [int(i) for i in st.session_state.get('selecionados_ids_r', []) if pd.notna(i)]
 
                     if not ids_rec_sel:
 
@@ -3074,7 +3074,7 @@ try:
 
             LEFT JOIN planos_de_contas p ON c.plano_conta_id = p.id
 
-            ORDER BY c.data_vencimento ASC
+            ORDER BY c.data_vencimento ASC, c.id ASC
 
         """)
 
