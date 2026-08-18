@@ -504,9 +504,10 @@ def dialog_lancar_receber():
                         st.session_state["car_pc_sel"] = pc_key
                         break
         
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c3_e = st.columns(4)
     cli_nome = c1.selectbox("Cliente", list(op_cli.keys()), key="car_cli_sel")
     plan_sel = c2.selectbox("Plano de Contas", list(op_plan.keys()), key="car_pc_sel")
+    dt_emissao = c3_e.date_input("Data de Emissão", value=date.today(), key="car_dt_emissao")
     venc = c3.date_input("Vencimento", value=st.session_state.get("car_venc", date.today() + timedelta(days=15)), key="car_venc")
     
     c4, c5, c6 = st.columns([1, 2, 1])
@@ -523,8 +524,8 @@ def dialog_lancar_receber():
             st.error("Preencha a descrição.")
         else:
             with st.spinner("Registrando recebível..."):
-                run_query("INSERT INTO contas_a_receber (cliente_id, plano_conta_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
-                          (op_cli[cli_nome], op_plan[plan_sel], num_doc_r, desc, val_r, venc.strftime("%Y-%m-%d")))
+                run_query("INSERT INTO contas_a_receber (cliente_id, plano_conta_id, numero_documento, descricao, valor, data_emissao, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                          (op_cli[cli_nome], op_plan[plan_sel], num_doc_r, desc, val_r, dt_emissao.strftime("%Y-%m-%d"), venc.strftime("%Y-%m-%d")))
             st.session_state["car_limpar_formulario"] = True
             st.success("Boleto emitido (pendente)")
             import time; time.sleep(1); st.rerun()
@@ -679,11 +680,12 @@ def dialog_renegociar_receber():
                         for i, p_info in enumerate(preview_reneg):
                             nova_desc = f"{desc_acordo} (Acordo #{acordo_id} - Parcela {p_info['Parcela']})"
                             venc_str = p_info['venc_date'].strftime("%Y-%m-%d")
+                            dt_emissao_acordo = date.today().strftime("%Y-%m-%d")
                             val_num = p_info['valor_num']
                             
                             run_query(
-                                "INSERT INTO contas_a_receber (cliente_id, plano_conta_id, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
-                                (c_id_reneg, p_c_id_default_r, nova_desc, val_num, venc_str)
+                                "INSERT INTO contas_a_receber (cliente_id, plano_conta_id, descricao, valor, data_emissao, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')",
+                                (c_id_reneg, p_c_id_default_r, nova_desc, val_num, dt_emissao_acordo, venc_str)
                             )
                             
                     st.success(f"🤝 Renegociação concluída! Acordo #{acordo_id} registrado.")
@@ -714,47 +716,51 @@ def dialog_confirmar_baixa_lote_receber(ids_selecionados, df_receber, opcoes_ban
             st.info(f"ℹ️ O título original de R$ {total:,.2f} será desmembrado: R$ {valor_pago:,.2f} será recebido e o saldo restante de R$ {saldo:,.2f} continuará pendente.")
             
     if st.button("💸 Confirmar Recebimento", type="primary", use_container_width=True):
-        bCid = opcoes_bancos[banco_destino]
-        
-        for _, r in df_selecionadas.iterrows():
-            rr_id = int(r['id'])
-            v_base = float(r['Valor'])
-            cli = r['Cliente'] if pd.notna(r['Cliente']) else "Diversos"
-            fat = r['N. Doc'] if pd.notna(r['N. Doc']) else r['Histórico'] if pd.notna(r['Histórico']) else ""
+        if not banco_destino or banco_destino not in opcoes_bancos:
+            st.error("Por favor, selecione uma Conta Bancária de Destino válida.")
+        else:
+            bCid = opcoes_bancos[banco_destino]
             
-            val_efetivo = valor_pago if is_partial else v_base
-            
-            if is_partial:
-                saldo = v_base - val_efetivo
-                df_orig = fetch_all("SELECT * FROM contas_a_receber WHERE id = ?", (rr_id,))
-                if not df_orig.empty:
-                    orig = df_orig.iloc[0]
-                    c_id_orig = int(orig['cliente_id']) if pd.notna(orig['cliente_id']) else None
-                    v_id_orig = int(orig['venda_id']) if pd.notna(orig['venda_id']) else None
-                    pc_id_orig = int(orig['plano_conta_id']) if pd.notna(orig['plano_conta_id']) else None
-                    desc_orig = orig['descricao'] if pd.notna(orig['descricao']) else ""
-                    venc_orig = orig['data_vencimento']
-                    doc_orig = orig['numero_documento'] if pd.notna(orig['numero_documento']) else None
-                    
-                    # Insere o saldo restante
-                    run_query("INSERT INTO contas_a_receber (cliente_id, venda_id, plano_conta_id, descricao, valor, data_vencimento, status, numero_documento) VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE', ?)",
-                              (c_id_orig, v_id_orig, pc_id_orig, f"{desc_orig} (Saldo Parcial)", saldo, venc_orig, doc_orig))
-            
-            # Atualiza o original com val_efetivo
-            run_query("UPDATE contas_a_receber SET status='RECEBIDO', data_recebimento=?, conta_bancaria_id=?, valor=? WHERE id=?",
-                      (dt_rec.strftime("%Y-%m-%d"), bCid, val_efetivo, rr_id))
-            
-            df_v = fetch_all("SELECT venda_id FROM contas_a_receber WHERE id = ?", (rr_id,))
-            if not df_v.empty and pd.notna(df_v.iloc[0]['venda_id']):
-                vid = int(df_v.iloc[0]['venda_id'])
-                gerar_comissao_se_necessario(vid, 'LIQUIDAÇÃO', cli)
+            for _, r in df_selecionadas.iterrows():
+                rr_id = int(r['id'])
+                v_base = float(r['Valor'])
+                cli = r['Cliente'] if pd.notna(r['Cliente']) else "Diversos"
+                fat = r['N. Doc'] if pd.notna(r['N. Doc']) else r['Histórico'] if pd.notna(r['Histórico']) else ""
                 
-            desc_final = f"REC. Cliente {cli}: {fat}"
-            run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, FALSE)",
-                      (dt_rec.strftime("%Y-%m-%d"), desc_final, val_efetivo, rr_id, bCid))
-                      
-        st.success(f"✔️ {len(df_selecionadas)} recebimentos injetados no Fluxo do banco {banco_destino}!")
-        import time; time.sleep(1.5); st.rerun()
+                val_efetivo = valor_pago if is_partial else v_base
+                
+                if is_partial:
+                    saldo = v_base - val_efetivo
+                    df_orig = fetch_all("SELECT * FROM contas_a_receber WHERE id = ?", (rr_id,))
+                    if not df_orig.empty:
+                        orig = df_orig.iloc[0]
+                        c_id_orig = int(orig['cliente_id']) if pd.notna(orig['cliente_id']) else None
+                        v_id_orig = int(orig['venda_id']) if pd.notna(orig['venda_id']) else None
+                        pc_id_orig = int(orig['plano_conta_id']) if pd.notna(orig['plano_conta_id']) else None
+                        desc_orig = orig['descricao'] if pd.notna(orig['descricao']) else ""
+                        venc_orig = orig['data_vencimento']
+                        dt_emissao_orig = orig['data_emissao'] if 'data_emissao' in orig and pd.notna(orig['data_emissao']) else date.today().strftime("%Y-%m-%d")
+                        doc_orig = orig['numero_documento'] if pd.notna(orig['numero_documento']) else None
+                        
+                        # Insere o saldo restante
+                        run_query("INSERT INTO contas_a_receber (cliente_id, venda_id, plano_conta_id, descricao, valor, data_emissao, data_vencimento, status, numero_documento) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDENTE', ?)",
+                                  (c_id_orig, v_id_orig, pc_id_orig, f"{desc_orig} (Saldo Parcial)", saldo, dt_emissao_orig, venc_orig, doc_orig))
+                
+                # Atualiza o original com val_efetivo
+                run_query("UPDATE contas_a_receber SET status='RECEBIDO', data_recebimento=?, conta_bancaria_id=?, valor=? WHERE id=?",
+                          (dt_rec.strftime("%Y-%m-%d"), bCid, val_efetivo, rr_id))
+                
+                df_v = fetch_all("SELECT venda_id FROM contas_a_receber WHERE id = ?", (rr_id,))
+                if not df_v.empty and pd.notna(df_v.iloc[0]['venda_id']):
+                    vid = int(df_v.iloc[0]['venda_id'])
+                    gerar_comissao_se_necessario(vid, 'LIQUIDAÇÃO', cli)
+                    
+                desc_final = f"REC. Cliente {cli}: {fat}"
+                run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, FALSE)",
+                          (dt_rec.strftime("%Y-%m-%d"), desc_final, val_efetivo, rr_id, bCid))
+                          
+            st.success(f"✔️ {len(df_selecionadas)} recebimentos injetados no Fluxo do banco {banco_destino}!")
+            import time; time.sleep(1.5); st.rerun()
 
 @st.dialog("Editar Duplicata a Receber", width="large")
 def dialog_editar_receber(id_selecionado):

@@ -572,14 +572,29 @@ with tab1:
                             prods_desc = ", ".join([r['produto'] for r in rows_grupo])
                             cli_nome_grupo = first_row['cliente']
                             
+                            # Resolver plano de contas do cliente ou padrão de receita
+                            pc_id_final = pc_id
+                            if not pc_id_final:
+                                cli_pc_df = fetch_all_tx(cursor, "SELECT plano_conta_id FROM clientes WHERE id=?", (cli_id_grupo,))
+                                if not cli_pc_df.empty and pd.notna(cli_pc_df.iloc[0]['plano_conta_id']):
+                                    pc_id_final = int(cli_pc_df.iloc[0]['plano_conta_id'])
+                            if not pc_id_final:
+                                pc_rec_df = fetch_all_tx(cursor, "SELECT id FROM planos_de_contas WHERE categoria IN ('RECEITA', 'RECEITA_NAO_OP') LIMIT 1")
+                                if not pc_rec_df.empty:
+                                    pc_id_final = int(pc_rec_df.iloc[0]['id'])
+
+                            label_doc_g = dav_numeros_grupo.get(chave_grupo) if "DAV" in tipo_doc else (bling_ids_grupo.get(chave_grupo) or chave_grupo)
+                            num_doc_limpo = f"{'DAV' if 'DAV' in tipo_doc else 'NF'} {label_doc_g}".replace("solo_", "#")
+
                             for p in insts_grupo:
                                 val_i = float(p['Valor (R$)'])
                                 venc_i = p['Vencimento']
                                 venc_str = venc_i.strftime("%Y-%m-%d") if hasattr(venc_i, 'strftime') else str(venc_i)
+                                dt_emissao_str = date.today().strftime("%Y-%m-%d")
                                 desc_i = f"{tipo_doc} ({p['Parcela']}) - Grupo {chave_grupo} ({cli_nome_grupo} - {prods_desc})"
                                 
-                                run_query_tx(cursor, "INSERT INTO contas_a_receber (venda_id, cliente_id, plano_conta_id, numero_documento, descricao, valor, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                          (primeiro_pid, cli_id_grupo, pc_id, tipo_doc, desc_i, val_i, venc_str, 'PENDENTE'))
+                                run_query_tx(cursor, "INSERT INTO contas_a_receber (venda_id, cliente_id, plano_conta_id, numero_documento, descricao, valor, data_emissao, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                          (primeiro_pid, cli_id_grupo, pc_id_final, num_doc_limpo, desc_i, val_i, dt_emissao_str, venc_str, 'PENDENTE'))
                         
                         # === FASE 2: PROCESSAR CADA ITEM INDIVIDUALMENTE ===
                         for _, row in pedidos_selecionados.iterrows():

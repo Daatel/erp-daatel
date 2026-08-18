@@ -497,8 +497,6 @@ def _create_tables_internal(conn):
     )
     ''')
 
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_fluxo_caixa_fitid ON fluxo_caixa(fitid)")
-
     # 12. Planos de Contas
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS planos_de_contas (
@@ -571,6 +569,7 @@ def _create_tables_internal(conn):
         plano_conta_id INTEGER,
         descricao TEXT NOT NULL,
         valor REAL NOT NULL,
+        data_emissao DATE,
         data_vencimento DATE NOT NULL,
         data_recebimento DATE,
         status TEXT NOT NULL DEFAULT 'PENDENTE',
@@ -947,16 +946,11 @@ def _create_tables_internal(conn):
         for nome_f, parc_f in prazos_padrao:
             cursor.execute("INSERT INTO formas_pagamento (nome, parcelas) VALUES (?, ?)", (nome_f, parc_f))
 
-    # Criar índices de desempenho para otimização de consultas (Fase 1)
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_mov_produto ON estoque_movimentos(produto_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_mov_lote ON estoque_movimentos(lote_origem_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_vendas_cliente ON vendas(cliente_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_contas_receber_venda ON contas_a_receber(venda_id)")
-
     conn.commit() # Salva as tabelas base antes das migrações de coluna
 
     # Migração: Adicionar colunas se não existirem
     alter_queries = [
+        "ALTER TABLE contas_a_receber ADD COLUMN data_emissao DATE",
         "ALTER TABLE compras_itens ADD COLUMN unidade TEXT",
         "ALTER TABLE compras_itens ADD COLUMN quantidade_estoque REAL",
         "ALTER TABLE compras_itens ADD COLUMN produto_nome TEXT",
@@ -1070,6 +1064,14 @@ def _create_tables_internal(conn):
         "ALTER TABLE clientes ADD COLUMN plano_conta_id INTEGER"
     ]
     
+    index_queries = [
+        "CREATE INDEX IF NOT EXISTS idx_fluxo_caixa_fitid ON fluxo_caixa(fitid)",
+        "CREATE INDEX IF NOT EXISTS idx_estoque_mov_produto ON estoque_movimentos(produto_id)",
+        "CREATE INDEX IF NOT EXISTS idx_estoque_mov_lote ON estoque_movimentos(lote_origem_id)",
+        "CREATE INDEX IF NOT EXISTS idx_vendas_cliente ON vendas(cliente_id)",
+        "CREATE INDEX IF NOT EXISTS idx_contas_receber_venda ON contas_a_receber(venda_id)"
+    ]
+
     # Executar DDL de migração com autocommit na mesma conexão (evita esgotar o pool)
     import re as _re
     is_pg = init_connection_pool() is not None
@@ -1095,11 +1097,27 @@ def _create_tables_internal(conn):
                     conn.rollback()
                 except Exception:
                     pass
+        
+        for q in index_queries:
+            try:
+                cur_ddl.execute(q)
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
         cur_ddl.close()
         conn.autocommit = False
     else:
         # SQLite: try/except por statement
         for q in alter_queries:
+            try:
+                conn.execute(q)
+                conn.commit()
+            except Exception:
+                pass
+        for q in index_queries:
             try:
                 conn.execute(q)
                 conn.commit()

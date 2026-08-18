@@ -2114,6 +2114,7 @@ try:
         df_receber = fetch_all("""
             SELECT c.id, cl.nome_fantasia as 'Cliente_Fantasia', cl.nome as 'Cliente_Razao', 
                    c.numero_documento as 'N. Doc', p.nome as 'Plano de Contas', c.descricao as 'Histórico', 
+                   COALESCE(c.data_emissao, c.data_vencimento) as 'Dt. Emissão',
                    c.data_vencimento as 'Vencimento', c.valor as 'Valor', 
                    c.status as 'Status', c.data_recebimento as 'Recebido Em', cb.nome as 'Conta'
             FROM contas_a_receber c
@@ -2290,27 +2291,26 @@ try:
             
             def format_doc_r(row):
                 d = str(row['N. Doc']).strip()
-                doc = f"#{row['id']}" if d == 'None' or d == 'nan' or d == '' else d
-                
-                # Check for (X/X) in Fatura
+                if d in ('None', 'nan', '', 'None - None'):
+                    d = f"#{row['id']}"
                 import re
                 m = re.search(r'\(\s*(\d+/\d+)\s*\)', str(row['Histórico']))
-                if m:
-                    return f"{doc} - {m.group(1)}"
-                return doc
+                if m and m.group(1) not in d:
+                    return f"{d} ({m.group(1)})"
+                return d
                 
             df_view_r['N. Doc'] = df_view_r.apply(format_doc_r, axis=1)
             
             def clean_fatura_r(row):
                 desc = str(row['Histórico'])
                 if 'Venda #' in desc:
-                    return "-" # Ocultar info redundante para vendas automáticas
+                    return "-"
                 return desc
                 
             df_view_r['Histórico'] = df_view_r.apply(clean_fatura_r, axis=1)
             df_view_r['Cliente'] = df_view_r['Cliente_Razao'] if buscar_razao_r else df_view_r['Cliente_Fantasia']
-
-
+            df_view_r['Plano de Contas'] = df_view_r['Plano de Contas'].apply(lambda x: "-" if pd.isna(x) or str(x).strip() in ('None', 'nan', '') else str(x).strip())
+            df_view_r['Conta'] = df_view_r['Conta'].apply(lambda x: "-" if pd.isna(x) or str(x).strip() in ('None', 'nan', '') else str(x).strip())
 
             if status_filter_r != "TODAS":
 
@@ -2326,7 +2326,9 @@ try:
 
                     df_view_r['Cliente'].str.lower().str.contains(b_r, na=False) |
 
-                    df_view_r['Histórico'].str.lower().str.contains(b_r, na=False)
+                    df_view_r['Histórico'].str.lower().str.contains(b_r, na=False) |
+
+                    df_view_r['N. Doc'].str.lower().str.contains(b_r, na=False)
 
                 ]
 
@@ -2340,25 +2342,29 @@ try:
 
                 df_view_r['Receber?'] = False
 
-                df_view_r['Vencimento'] = pd.to_datetime(df_view_r['Vencimento']).dt.strftime('%d/%m/%Y')
+                df_view_r['Dt. Emissão'] = pd.to_datetime(df_view_r['Dt. Emissão']).dt.strftime('%d/%m/%Y').fillna("-")
+
+                df_view_r['Vencimento'] = pd.to_datetime(df_view_r['Vencimento']).dt.strftime('%d/%m/%Y').fillna("-")
 
                 df_view_r['Recebido Em'] = pd.to_datetime(df_view_r['Recebido Em']).dt.strftime('%d/%m/%Y').fillna("-")
 
                 
 
-                is_disabled_r = ["id", "Cliente", "Plano de Contas", "Histórico", "Vencimento", "Valor", "Status", "Recebido Em", "Conta"]
+                is_disabled_r = ["id", "Dt. Emissão", "Vencimento", "N. Doc", "Cliente", "Plano de Contas", "Histórico", "Status", "Recebido Em", "Conta"]
                 if status_filter_r == "RECEBIDO":
                     is_disabled_r.append("Receber?")
                     
                 edited_df_r = st.data_editor(
-                    df_view_r[['Receber?', 'id', 'Cliente', 'N. Doc', 'Vencimento', 'Valor', 'Plano de Contas', 'Histórico', 'Status', 'Recebido Em', 'Conta']],
+                    df_view_r[['Receber?', 'id', 'Dt. Emissão', 'Vencimento', 'N. Doc', 'Cliente', 'Valor', 'Plano de Contas', 'Histórico', 'Status', 'Recebido Em', 'Conta']],
                     hide_index=True,
                     disabled=is_disabled_r,
                     width="stretch",
                     height=500,
                     column_config={
                         "Receber?": st.column_config.CheckboxColumn("Receber?", help="Marque para acusar recebimento"),
-                        "Valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f")
+                        "Valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f"),
+                        "Status": st.column_config.TextColumn("Status"),
+                        "Conta": st.column_config.TextColumn("Conta Bancária")
                     },
 
                     key="editor_receber"
