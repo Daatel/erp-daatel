@@ -2,6 +2,22 @@
 
 ---
 
+## v2.0 — 2026-08-25 (Sessão: Conector de Voz ERP DAATEL via Telegram Bot & IA Gemini NLU)
+
+### 🎙️ Conector de Voz & Telegram Bot (`telegram_bot_listener.py`, `services/`)
+- **Long Polling & Event Loop Async:** Servidor `telegram_bot_listener.py` assíncrono escutando o bot `@Daatel_Agente_bot` com scheduler de limpeza TTL (24h) e trava atômica por `rowcount == 1`.
+- **Engine Gemini API NLU (`services/voice_nlu_service.py`):** Transcrição e estruturação inteligente de comandos de voz em 4 modos (`PDV_EXPRESS`, `PEDIDO_VENDA`, `CONTA_PAGAR`, `CONTA_RECEBER`) com expurgo remoto de mídia temporária via `genai.delete_file` (LGPD).
+- **Busca Fuzzy & Entidades (`services/voice_entity_matcher.py`):** Algoritmo de cruzamento fonético insensível a acentuação e caixa para Clientes, Fornecedores, Produtos e Plano de Contas.
+- **Emissão Instantânea de DAV em PDF (`services/voice_pdf_service.py`):** Geração de Documentos Auxiliares de Venda em PDF ReportLab enviados diretamente no Telegram via `sendDocument`.
+- **Resolução Estrita de Pagamentos & Contas (`services/erp_voice_bridge.py`):** Direcionamento obrigatório de *Dinheiro* para a conta **Caixa Físico** e *Pix* para a conta **Banco Bradesco**. Botões inline interativos quando o meio é omitido.
+- **Resolução de Clientes e Prazos:** Suporte a Pedidos de Venda com cálculo de prazo de vencimento herdado do cadastro do cliente ou dito no áudio, e menu interativo `[🔍 Escolher da Lista]` ou fallback para `CONSUMIDOR FINAL / BALCÃO`.
+
+### 👥 Módulo de Pessoas & Configurações (`pages/3_Pessoas.py`, `database.py`)
+- **Integração de Telegram Chat ID:** Novos campos `Telegram Chat ID` e `Limite de Alçada por Voz (R$)` adicionados ao **Bloco 6: Ferramentas, Acessos e Termos de Aceite** dos formulários de cadastro e edição de colaboradores em `3_Pessoas.py`.
+- **Migrations DDL (SQLite/PostgreSQL):** Criação das tabelas `telegram_usuarios_autorizados`, `rascunhos_voz_telegram` e `audit_log_voz` com suporte a `TIMESTAMP` e seed idempotente `CONSUMIDOR`.
+
+---
+
 ## v1.9 — 2026-08-04 (Sessão: Conciliador Bancário Inteligente OFX, Relatório Razão & Ajustes de Tesouraria)
 
 ### 🔄 Conciliador Bancário Automático OFX (`utils_ofx.py`, `pages/9_Financeiro.py`)
