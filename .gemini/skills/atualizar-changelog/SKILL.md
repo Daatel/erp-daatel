@@ -5,6 +5,8 @@ description: Enforces mandatory updating of CHANGELOG.md at the end of every dev
 
 # Diretriz de Atualização Obrigatória do CHANGELOG.md — ERP DAATEL
 
+> 💡 **Escopo Estrito:** Esta skill aplica-se **exclusivamente** às sessões de desenvolvimento deste projeto (`Gestao_Fabrica_Alho`), onde o arquivo `CHANGELOG.md` está presente na raiz.
+
 Para garantir que o histórico do sistema permaneça 100% auditável, sincronizado com os commits e transparente para o cliente e equipe, é **OBRIGATÓRIO** atualizar o arquivo `CHANGELOG.md` na raiz do projeto ao final de cada sessão de desenvolvimento ou alteração relevante de código.
 
 ---
