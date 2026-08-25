@@ -18,6 +18,20 @@
 
 ---
 
+## v1.9.5 — 2026-08-18 (Sessão: Otimização do Financeiro — Contas a Pagar/Receber, Dt. Emissão, Plano de Contas & Grids Interativas)
+
+### 💵 Reestruturação de Contas a Pagar & Receber (`pages/9_Financeiro.py`, `utils_financeiro_modals.py`)
+- **Campo Data de Emissão (`data_emissao`):** Adicionado suporte completo à Data de Emissão original da NF/Título nos formulários e relatórios do Contas a Pagar e Receber.
+- **Busca Flexível Cliente/Fornecedor:** Busca padrão configurada por Nome Fantasia com opção de alternância por checkbox para Razão Social.
+- **Tratamento de Dados Legados & N. Doc:** Limpeza dinâmica de Número do Documento, resolução automática de Plano de Contas omisso em títulos legados e vinculação estrita à Conta Bancária.
+- **Grids Interativas & Regra Anti-Banheira:** Migração das grids de liquidação/baixas para `st.dataframe` com seleção nativa, ordenação SQL determinística por `id ASC` e congelamento imediato de seleção em `st.session_state`.
+- **Ajuste de Saldo Bradesco (31/07/2026):** Lançamento automático e idempotente de ajuste de saldo na conta Bradesco fixado em R$ 1.961,54.
+
+### 🗄️ Banco de Dados & DDL (`database.py`)
+- **Migração DDL Automatizada (SQLite/PostgreSQL):** Automação de `ALTER TABLE` para inclusão da coluna `data_emissao` compatível com PostgreSQL (Supabase) e SQLite.
+
+---
+
 ## v1.9 — 2026-08-04 (Sessão: Conciliador Bancário Inteligente OFX, Relatório Razão & Ajustes de Tesouraria)
 
 ### 🔄 Conciliador Bancário Automático OFX (`utils_ofx.py`, `pages/9_Financeiro.py`)
