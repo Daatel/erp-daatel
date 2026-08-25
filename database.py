@@ -908,6 +908,63 @@ def _create_tables_internal(conn):
         cursor.execute("INSERT INTO selecao_metas_nivel (nivel, meta_kg_dia, descricao) VALUES ('B', 70.0, 'Rendimento padrão')")
         cursor.execute("INSERT INTO selecao_metas_nivel (nivel, meta_kg_dia, descricao) VALUES ('Teste', 50.0, 'Em treinamento / avaliação')")
 
+    # 36. Módulo Conector por Voz - Autorização e Alçada Telegram
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS telegram_usuarios_autorizados (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id BIGINT NOT NULL UNIQUE,
+        usuario_id INTEGER NOT NULL,
+        limite_alcada REAL DEFAULT 0.0,
+        status TEXT DEFAULT 'ATIVO',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(usuario_id) REFERENCES usuarios(id)
+    )
+    ''')
+
+    # 37. Módulo Conector por Voz - Rascunhos de Lançamentos
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS rascunhos_voz_telegram (
+        id TEXT PRIMARY KEY,
+        chat_id BIGINT NOT NULL,
+        usuario_id INTEGER NOT NULL,
+        tipo_operacao TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        status TEXT DEFAULT 'PENDENTE',
+        versao INTEGER DEFAULT 1,
+        aprovado_por INTEGER,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        processado_em TIMESTAMP,
+        expira_em TIMESTAMP NOT NULL,
+        FOREIGN KEY(usuario_id) REFERENCES usuarios(id),
+        FOREIGN KEY(aprovado_por) REFERENCES usuarios(id)
+    )
+    ''')
+
+    # 38. Módulo Conector por Voz - Audit Log Dedicado
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS audit_log_voz (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        rascunho_id TEXT,
+        usuario_id INTEGER,
+        chat_id BIGINT,
+        acao TEXT NOT NULL,
+        tipo_operacao TEXT,
+        valor_total REAL,
+        transcricao_original TEXT,
+        payload_json TEXT,
+        status_execucao TEXT,
+        detalhe TEXT
+    )
+    ''')
+
+    # Seed: Cliente CONSUMIDOR para PDV Express
+    cursor.execute('''
+    INSERT INTO clientes (nome, status, observacoes)
+    SELECT 'CONSUMIDOR', 'ATIVO', 'Cliente genérico para vendas de balcão via Conector de Voz'
+    WHERE NOT EXISTS (SELECT 1 FROM clientes WHERE nome = 'CONSUMIDOR')
+    ''')
+
 
     # Inicializar modo_estoque padrão se não existir
     is_pg = init_connection_pool() is not None

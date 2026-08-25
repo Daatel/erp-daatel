@@ -164,9 +164,14 @@ with tab_cadastro:
                 ajuda_custo = st.number_input("Ajuda de Custo Mensal (R$)", min_value=0.0, step=50.0, key="reg_ajuda")
 
             # Expander 6: Ferramentas
-            with st.expander("💻 Bloco 6: Ferramentas e Termos de Aceite", expanded=False):
+            with st.expander("💻 Bloco 6: Ferramentas, Acessos e Termos de Aceite", expanded=False):
                 equipamentos = st.multiselect("Equipamentos e Acessos Fornecidos", ["Notebook", "Celular", "Acesso a ERP/CRM", "Uniforme"], key="reg_equip")
                 equipamentos_str = ",".join(equipamentos)
+                
+                st.markdown("📲 **Integração Bot Telegram & Voz**")
+                col_t1, col_t2 = st.columns(2)
+                reg_telegram_chat = col_t1.text_input("Telegram Chat ID", key="reg_telegram_chat", help="Obtido enviando qualquer mensagem ao @userinfobot no Telegram")
+                reg_limite_alcada = col_t2.number_input("Limite de Alçada por Voz (R$)", min_value=0.0, step=500.0, key="reg_limite_alcada", help="Valor máximo que este colaborador pode aprovar por voz sem necessitar de gerência")
                 st.markdown("##### **TERMO DE CIÊNCIA E AUTORIZAÇÃO (LGPD)**")
                 st.caption(
                     "Declaro que as informações acima são verdadeiras e autorizo o uso dos meus dados pessoais pela empresa "
@@ -210,6 +215,10 @@ with tab_cadastro:
                 f_id = opts_f[f_sel]
                 f_data = fetch_all("SELECT * FROM funcionarios WHERE id=?", (f_id,)).iloc[0]
                 
+                df_tel = fetch_all("SELECT chat_id, limite_alcada FROM telegram_usuarios_autorizados WHERE usuario_id = ?", (f_id,))
+                curr_chat_id = str(df_tel.iloc[0]['chat_id']) if not df_tel.empty else ""
+                curr_alcada = float(df_tel.iloc[0]['limite_alcada'] or 0.0) if not df_tel.empty else 0.0
+
                 with st.form("form_func_edit"):
                     # Expander 1: Identificação
                     with st.expander("👤 Bloco 1: Identificação e Contato", expanded=True):
@@ -344,13 +353,18 @@ with tab_cadastro:
                         ef_ajuda = st.number_input("Ajuda de Custo Mensal (R$)", value=float(f_data.get('ajuda_custo', 0.0) or 0.0), step=50.0)
 
                     # Expander 6: Ferramentas
-                    with st.expander("💻 Bloco 6: Ferramentas e Termos de Aceite", expanded=False):
+                    with st.expander("💻 Bloco 6: Ferramentas, Acessos e Termos de Aceite", expanded=False):
                         eq_opts = ["Notebook", "Celular", "Acesso a ERP/CRM", "Uniforme"]
                         db_eq = f_data.get('equipamentos_fornecidos', '') or ''
                         db_eq_list = [x.strip() for x in db_eq.split(",") if x.strip()]
                         ef_equip = st.multiselect("Equipamentos e Acessos Fornecidos", eq_opts, default=db_eq_list)
                         ef_equip_str = ",".join(ef_equip)
                         
+                        st.markdown("📲 **Integração Bot Telegram & Voz**")
+                        col_et1, col_et2 = st.columns(2)
+                        ef_telegram_chat = col_et1.text_input("Telegram Chat ID", value=curr_chat_id, key="ef_telegram_chat", help="Obtido enviando qualquer mensagem ao @userinfobot no Telegram")
+                        ef_limite_alcada = col_et2.number_input("Limite de Alçada por Voz (R$)", value=curr_alcada, min_value=0.0, step=500.0, key="ef_limite_alcada", help="Valor máximo que este colaborador pode aprovar por voz sem necessitar de gerência")
+
                         stts_opts = ["ATIVO", "INATIVO"]
                         db_stts = f_data.get('status', 'ATIVO')
                         if db_stts not in stts_opts: db_stts = "ATIVO"
@@ -373,6 +387,18 @@ with tab_cadastro:
                                  ef_banco, ef_tipo_conta, ef_pix, ef_dep1, ef_dep2, ef_dept, ef_modelo, ef_carga, ef_horario, ef_escala,
                                  ef_adicionais_str, comiss_int, ef_comiss_regra, ef_gatilho, ef_bonus, ef_adiant, ef_vt_desc, ef_vr_desc, ef_equip_str, ef_nivel, f_id)
                             )
+                            if ef_telegram_chat:
+                                try:
+                                    import re
+                                    t_chat = int(re.sub(r'\D', '', str(ef_telegram_chat)))
+                                    run_query("""
+                                        INSERT INTO telegram_usuarios_autorizados (chat_id, usuario_id, limite_alcada, status)
+                                        VALUES (?, ?, ?, 'ATIVO')
+                                        ON CONFLICT(chat_id) DO UPDATE SET limite_alcada = EXCLUDED.limite_alcada, usuario_id = EXCLUDED.usuario_id, status = 'ATIVO'
+                                    """, (t_chat, f_id, float(ef_limite_alcada or 0.0)))
+                                except Exception as _te_err:
+                                    pass
+
                             st.success("Modificações salvas com sucesso!")
                             import time; time.sleep(1); st.rerun()
 
