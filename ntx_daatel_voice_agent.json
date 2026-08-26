@@ -69,11 +69,13 @@
       "parameters": {
         "method": "POST",
         "url": "http://localhost:8000/api/v1/voice-bridge/draft",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer daatel_voice_secret_token_2026"
+            },
             {
               "name": "X-Idempotency-Key",
               "value": "={{ $json.message ? $json.message.message_id : $json.callback_query.id }}"
@@ -197,6 +199,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer daatel_voice_secret_token_2026"
+            },
             {
               "name": "X-Idempotency-Key",
               "value": "={{ $json.callback_query.id }}"
