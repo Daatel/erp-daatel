@@ -2,6 +2,15 @@
 
 ---
 
+## v2.1.2 — 2026-08-26 (Sessão: Instalação de Pacotes NLU & Resolução de Chave Gemini em Minha Empresa)
+
+### 🎙️ Conector de Voz & Gemini NLU (`requirements.txt`, `services/voice_nlu_service.py`, `database.py`, `pages/1_Cadastros.py`)
+- **Dependências NLU Instaladas:** Adicionadas e instaladas as bibliotecas `google-generativeai`, `pydantic`, `apscheduler` e `rapidfuzz` em `requirements.txt`.
+- **Campo de Chave Gemini em Minha Empresa:** Adicionada a coluna `gemini_api_key` na tabela `empresa_config` e campo para cadastro visual em `1_Cadastros.py` (aba *🏢 Minha Empresa*).
+- **Fallback Multi-Nível de Chave API:** `VoiceNLUService` configurado para buscar a chave do Gemini em `api_key`, `os.getenv`, `st.secrets` e na tabela `empresa_config`.
+
+---
+
 ## v2.1.1 — 2026-08-26 (Sessão: Desativação do Relatório Diário de Profilaxia via Telegram)
 
 ### 🔕 Notificações & Cron (`database.py`, `send_report_cron.py`, `pages/1_Cadastros.py`)

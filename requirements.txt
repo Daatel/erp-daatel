@@ -6,3 +6,7 @@ fpdf2
 openpyxl
 requests
 reportlab
+google-generativeai
+pydantic
+apscheduler
+rapidfuzz

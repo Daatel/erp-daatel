@@ -62,21 +62,22 @@ with tab_empresa:
         
         end_emp = st.text_input("Endereço Completo (Rua, Número, Bairro, Cidade-UF)", value=emp.get('endereco_completo', ''))
         
-        st.markdown("### 🤖 Configuração do Robô de Relatórios (Telegram)")
-        st.caption("Crie um Bot com o @BotFather no Telegram para receber o resumo diário de fechamento financeiro e de vendas.")
-        e_tel1, e_tel2 = st.columns(2)
+        st.markdown("### 🤖 Configuração de Inteligência Artificial & Telegram Bot")
+        st.caption("Insira o Token do Bot do Telegram e a Chave de API do Gemini para ativar a interpretação por voz.")
+        e_tel1, e_tel2, e_tel3 = st.columns(3)
         telegram_token = e_tel1.text_input("Token do Bot Telegram", value=emp.get('telegram_token', '') or '', type="password", help="Ex: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ")
-        telegram_chat_id = e_tel2.text_input("ID do Chat Telegram (Seu Chat ID)", value=emp.get('telegram_chat_id', '') or '', help="Ex: 987654321. Você pode obter seu ID conversando com o @userinfobot no Telegram.")
+        telegram_chat_id = e_tel2.text_input("ID do Chat Telegram (Seu Chat ID)", value=emp.get('telegram_chat_id', '') or '', help="Ex: 987654321. Obtenha conversando com o @userinfobot no Telegram.")
+        gemini_api_key = e_tel3.text_input("Chave de API Gemini (IA de Voz)", value=emp.get('gemini_api_key', '') or '', type="password", help="Obtenha gratuitamente no Google AI Studio (aistudio.google.com)")
         
         if st.form_submit_button("Salvar Dados da Empresa"):
             run_query("""
                 UPDATE empresa_config 
                 SET razao_social=?, nome_fantasia=?, cnpj=?, endereco_completo=?, telefone=?, email=?,
                     inscricao_estadual=?, inscricao_municipal=?, cep=?, instagram=?, website=?,
-                    telegram_token=?, telegram_chat_id=?
+                    telegram_token=?, telegram_chat_id=?, gemini_api_key=?
                 WHERE id=?
-            """, (r_social, n_fantasia, cnpj_emp, end_emp, telefone_emp, email_emp, ie_emp, im_emp, cep_emp, insta_emp, web_emp, telegram_token, telegram_chat_id, emp['id']))
-            st.success("Dados da Empresa e credenciais de Telegram atualizados!")
+            """, (r_social, n_fantasia, cnpj_emp, end_emp, telefone_emp, email_emp, ie_emp, im_emp, cep_emp, insta_emp, web_emp, telegram_token, telegram_chat_id, gemini_api_key, emp['id']))
+            st.success("Dados da Empresa, credenciais de Telegram e chave do Gemini atualizados!")
             import time; time.sleep(1); st.rerun()
 
     # Botões de Teste de Disparo dos Relatórios

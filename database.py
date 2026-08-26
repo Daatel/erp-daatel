@@ -958,6 +958,12 @@ def _create_tables_internal(conn):
     )
     ''')
 
+    # Migration para salvar a Chave de API do Gemini no ERP
+    try:
+        cursor.execute("ALTER TABLE empresa_config ADD COLUMN gemini_api_key TEXT")
+    except Exception:
+        pass
+
     # Seed: Cliente CONSUMIDOR para PDV Express
     cursor.execute('''
     INSERT INTO clientes (nome, status, observacoes)

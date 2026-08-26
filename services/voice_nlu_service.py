@@ -64,7 +64,25 @@ class VoiceCommandSchema(BaseModel):
 
 class VoiceNLUService:
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if not key:
+            try:
+                import streamlit as st
+                key = st.secrets.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+            except Exception:
+                pass
+        if not key:
+            try:
+                from database import fetch_all
+                df_emp = fetch_all("SELECT gemini_api_key FROM empresa_config LIMIT 1")
+                if not df_emp.empty and df_emp.iloc[0].get("gemini_api_key"):
+                    k_val = str(df_emp.iloc[0]["gemini_api_key"]).strip()
+                    if k_val:
+                        key = k_val
+            except Exception:
+                pass
+
+        self.api_key = key
         self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
         
         if self.api_key and GEMINI_AVAILABLE:
