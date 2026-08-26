@@ -246,6 +246,15 @@ class VoiceBridgeRequestHandler(BaseHTTPRequestHandler):
         existing_draft_id = body.get("draft_id")
         file_id = body.get("file_id")
 
+        # FASE 1: Modo Diagnóstico Echo (Sem Gemini, Sem DB, Sem Download)
+        if body.get("modo_diagnostico") or origem == "echo":
+            return self._send_json({
+                "status": "incompleto",
+                "modo": "PDV_EXPRESS",
+                "pergunta_sugerida": "✅ FASE 1 OK! Conexão Telegram -> Cloudflare -> n8n -> ERP Python (:8000) 100% operacional!",
+                "botoes_sugeridos": ["Cancelar"]
+            }, 200)
+
         # Se veio um file_id do Telegram (áudio), baixa e processa via NLU diretamente
         if file_id and (origem == "audio" or not payload_cmd):
             try:

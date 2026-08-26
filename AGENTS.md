@@ -23,3 +23,15 @@
   3. Utilizar sempre os scripts launchers com trava anti-duplicação:
      - `start_voice_bridge.cmd` (Porta 8000)
      - `start_n8n.cmd` (Porta 5678)
+
+---
+
+## 3. Regra de Incrementalidade Estrita (One-Layer-at-a-Time Rule)
+* **Proibido Alterar Múltiplas Camadas em Paralelo:** Em diagnósticos ou refatorações de integrações complexas (Telegram -> Cloudflare -> n8n -> API -> NLU -> DB), o agente DEVE seguir obrigatoriamente a esteira de validação incremental de 1 camada por vez.
+* **Ordem Sequencial de Validação:**
+  - **FASE 1:** Conectividade Básica (`Telegram` -> `n8n` -> `Python Echo {"status": "received"}`)
+  - **FASE 2:** Download de Mídia (`Python` -> `Telegram File API`)
+  - **FASE 3:** Processamento NLU (`Python` -> `Gemini API`)
+  - **FASE 4:** Extração Estruturada (`Pydantic VoiceCommandSchema`)
+  - **FASE 5:** Negócio & Banco (`Fuzzy Matcher` -> `Rascunho Supabase`)
+  - **FASE 6:** Confirmação & Efetivação (`DAV PDF` -> `Telegram Reply`)
