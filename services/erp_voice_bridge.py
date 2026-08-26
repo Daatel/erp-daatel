@@ -466,3 +466,124 @@ def efetivar_lancamento_rascunho(rascunho_id: str, executado_por_usuario_id: int
     except Exception as exec_err:
         logger.error(f"Erro na efetivação de lançamento: {exec_err}")
         return False, f"❌ Erro ao gravar lançamento no ERP: {str(exec_err)}", None
+
+    def executar_efetivacao_rascunho(self, rascunho_id: str, executado_por_usuario_id: int, payload: dict) -> dict:
+        """
+        Efetiva o rascunho (confirmado) criando os registros reais no banco de dados do ERP.
+        Retorna dict com 'sucesso', 'mensagem' e 'documento'.
+        """
+        modo = payload.get("modo", "PDV_EXPRESS")
+        hoje_str = date.today().strftime("%Y-%m-%d")
+        num_doc = f"VOICE-{int(datetime.now().timestamp())}"
+        
+        entidade = payload.get("entidade") or {}
+        parceiro_id = entidade.get("id") or 1
+        parceiro_nome = entidade.get("nome") or "Consumidor Balcão"
+        
+        fin = payload.get("financeiro") or {}
+        val_total = float(fin.get("valor_total") or 0.0)
+        fp_nome = fin.get("forma_pagamento") or "Dinheiro"
+        conta_id = fin.get("conta_bancaria_id") or 1
+        conta_nome = fin.get("conta_bancaria_nome") or "Caixa Físico"
+        data_venc = fin.get("data_vencimento") or hoje_str
+        
+        pdf_path = None
+        doc_info = None
+
+        if modo == "PDV_EXPRESS":
+            # Número DAV sequencial
+            df_dav = database.fetch_all("SELECT MAX(CAST(numero_documento AS INTEGER)) as max_dav FROM vendas WHERE tipo_documento = 'DAV'")
+            max_dav = df_dav.iloc[0]['max_dav'] if not df_dav.empty and pd.notna(df_dav.iloc[0]['max_dav']) else 0
+            novo_dav = int(max_dav) + 1
+            num_doc_dav = f"{novo_dav:010d}"
+
+            venda_itens = []
+            for item in payload.get("itens", []):
+                p_id = item.get("produto_id_matched") or 1
+                qtd = float(item.get("quantidade") or 1.0)
+                v_unit = float(item.get("valor_unitario") or 0.0)
+                v_sub = float(item.get("subtotal") or (qtd * v_unit))
+
+                database.run_query("""
+                    INSERT INTO vendas (data, cliente_id, produto_id, quantidade, valor_unitario, valor_total, status, tipo_documento, numero_documento)
+                    VALUES (?, ?, ?, ?, ?, ?, 'FATURADO', 'DAV', ?)
+                """, (hoje_str, parceiro_id, p_id, qtd, v_unit, v_sub, num_doc_dav))
+                
+                # Baixa de estoque FIFO
+                custo_cmv, is_est, cmv_metodo, custo_aus = database.consumir_estoque_fifo(
+                    produto_id=int(p_id),
+                    quantidade=qtd,
+                    data_mov=hoje_str,
+                    origem='Venda Balcão Express (n8n Voice)',
+                    doc_ref=f"DAV #{num_doc_dav}"
+                )
+                
+                venda_itens.append({
+                    "produto_nome": item.get("produto_nome_matched") or "Produto",
+                    "quantidade": qtd,
+                    "valor_unitario": v_unit,
+                    "valor_total": v_sub
+                })
+
+            # Financeiro à vista
+            database.run_query("""
+                INSERT INTO contas_a_receber (cliente_id, descricao, valor, data_vencimento, data_recebimento, status, conta_bancaria_id)
+                VALUES (?, ?, ?, ?, ?, 'RECEBIDO', ?)
+            """, (parceiro_id, f"DAV #{num_doc_dav} (Voz Balcão n8n)", val_total, hoje_str, hoje_str, conta_id))
+
+            database.run_query("""
+                INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, conciliado, cliente_id, conta_bancaria_id)
+                VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, TRUE, ?, ?)
+            """, (hoje_str, f"REC. Balcão Voz ({conta_nome}): DAV #{num_doc_dav}", val_total, parceiro_id, conta_id))
+
+            # PDF DAV
+            venda_pdf_dict = {
+                "numero_documento": num_doc_dav,
+                "cliente_nome": parceiro_nome,
+                "data": hoje_str,
+                "condicao_pagamento": "A_VISTA",
+                "valor_total": val_total,
+                "itens": venda_itens
+            }
+            pdf_path = gerar_pdf_dav(venda_pdf_dict)
+            doc_info = {"tipo": "DAV", "numero": num_doc_dav, "pdf_path": pdf_path}
+
+            msg_ret = f"✅ **Venda Balcão faturada com sucesso!** (DAV #{num_doc_dav})"
+
+        elif modo == "PEDIDO_VENDA":
+            num_doc_ped = f"PED-{int(datetime.now().timestamp())}"
+            for item in payload.get("itens", []):
+                p_id = item.get("produto_id_matched") or 1
+                qtd = float(item.get("quantidade") or 1.0)
+                v_unit = float(item.get("valor_unitario") or 0.0)
+                v_sub = float(item.get("subtotal") or (qtd * v_unit))
+
+                database.run_query("""
+                    INSERT INTO vendas (data, cliente_id, produto_id, quantidade, valor_unitario, valor_total, status, tipo_documento, numero_documento)
+                    VALUES (?, ?, ?, ?, ?, ?, 'APROVADO', 'PEDIDO_VOZ', ?)
+                """, (hoje_str, parceiro_id, p_id, qtd, v_unit, v_sub, num_doc_ped))
+
+            doc_info = {"tipo": "PEDIDO", "numero": num_doc_ped}
+            msg_ret = f"✅ **Pedido de Venda registrado em carteira!** (Doc: {num_doc_ped})"
+
+        elif modo == "CONTA_PAGAR":
+            database.run_query("""
+                INSERT INTO contas_a_pagar (numero_documento, fornecedor_id, descricao, valor, data_vencimento, status)
+                VALUES (?, ?, ?, ?, ?, 'PENDENTE')
+            """, (num_doc, parceiro_id, f"Despesa por Voz (n8n): {parceiro_nome}", val_total, data_venc))
+            doc_info = {"tipo": "CONTA_PAGAR", "numero": num_doc}
+            msg_ret = f"✅ **Conta a Pagar registrada com sucesso!** (Doc: {num_doc})"
+
+        else:
+            database.run_query("""
+                INSERT INTO contas_a_receber (numero_documento, cliente_id, descricao, valor, data_emissao, data_vencimento, status)
+                VALUES (?, ?, ?, ?, ?, ?, 'PENDENTE')
+            """, (num_doc, parceiro_id, f"Faturamento por Voz (n8n): {parceiro_nome}", val_total, hoje_str, data_venc))
+            doc_info = {"tipo": "CONTA_RECEBER", "numero": num_doc}
+            msg_ret = f"✅ **Conta a Receber registrada com sucesso!** (Doc: {num_doc})"
+
+        return {
+            "sucesso": True,
+            "mensagem": msg_ret,
+            "documento": doc_info
+        }

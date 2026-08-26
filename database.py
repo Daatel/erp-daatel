@@ -921,7 +921,7 @@ def _create_tables_internal(conn):
     )
     ''')
 
-    # 37. Módulo Conector por Voz - Rascunhos de Lançamentos
+    # 37. Módulo Conector por Voz - Rascunhos de Lançamentos (Máquina de Estados)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS rascunhos_voz_telegram (
         id TEXT PRIMARY KEY,
@@ -929,7 +929,9 @@ def _create_tables_internal(conn):
         usuario_id INTEGER NOT NULL,
         tipo_operacao TEXT NOT NULL,
         payload_json TEXT NOT NULL,
-        status TEXT DEFAULT 'PENDENTE',
+        status TEXT DEFAULT 'incompleto',
+        campos_faltantes_json TEXT,
+        idempotency_key TEXT,
         versao INTEGER DEFAULT 1,
         aprovado_por INTEGER,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -939,6 +941,17 @@ def _create_tables_internal(conn):
         FOREIGN KEY(aprovado_por) REFERENCES usuarios(id)
     )
     ''')
+
+    # Migrations para adicionar campos de estado na tabela rascunhos_voz_telegram
+    try:
+        cursor.execute("ALTER TABLE rascunhos_voz_telegram ADD COLUMN campos_faltantes_json TEXT")
+    except Exception:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE rascunhos_voz_telegram ADD COLUMN idempotency_key TEXT")
+    except Exception:
+        pass
 
     # 38. Módulo Conector por Voz - Audit Log Dedicado
     cursor.execute('''
@@ -955,6 +968,18 @@ def _create_tables_internal(conn):
         payload_json TEXT,
         status_execucao TEXT,
         detalhe TEXT
+    )
+    ''')
+
+    # 39. Módulo Conector por Voz - Tabela de Log de Idempotência (n8n & REST API)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS idempotency_logs (
+        idempotency_key TEXT PRIMARY KEY,
+        chat_id BIGINT NOT NULL,
+        endpoint TEXT NOT NULL,
+        response_json TEXT NOT NULL,
+        status_code INTEGER DEFAULT 200,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     ''')
 

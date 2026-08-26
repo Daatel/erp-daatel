@@ -144,3 +144,43 @@ class VoiceNLUService:
                     genai.delete_file(audio_file.name)
                 except Exception as clean_err:
                     logger.warning(f"Falha ao expurgar arquivo remoto no Gemini: {clean_err}")
+
+    def process_text_correction(self, text_input: str, current_draft_json: dict) -> VoiceCommandSchema:
+        """
+        Recebe uma mensagem de texto do operador e o rascunho JSON atual,
+        e retorna o VoiceCommandSchema atualizado com as correções aplicadas.
+        """
+        if not self.model:
+            raise RuntimeError("Gemini API Key não configurada ou biblioteca google-generativeai ausente.")
+
+        hoje_str = datetime.now().strftime("%Y-%m-%d (%A)")
+        draft_str = json.dumps(current_draft_json, ensure_ascii=False)
+
+        prompt = f"""
+        Você é o assistente de voz do ERP DAATEL.
+        Data atual de referência: {hoje_str}.
+
+        RASCUNHO ATUAL:
+        {draft_str}
+
+        INSTRUÇÃO DO OPERADOR (CORREÇÃO OU COMPLEMENTO):
+        "{text_input}"
+
+        Sua tarefa:
+        1. Mantenha os dados do RASCUNHO ATUAL intactos, EXCETO os campos que o operador está corrigindo ou complementando.
+        2. Se o operador disse um novo valor (ex: "é 45 e não 54"), atualize apenas o valor total ou do item.
+        3. Se o operador informou a forma de pagamento (ex: "pix", "dinheiro"), atualize `forma_pagamento_nome`.
+        4. Se o operador informou o cliente ou fornecedor, atualize `nome_parceiro`.
+        5. Retorne a estrutura JSON completa e atualizada conforme o esquema VoiceCommandSchema.
+        """
+
+        response = self.model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+                response_schema=VoiceCommandSchema,
+                temperature=0.1
+            )
+        )
+
+        return VoiceCommandSchema.model_validate_json(response.text)

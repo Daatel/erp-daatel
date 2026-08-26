@@ -2,6 +2,17 @@
 
 ---
 
+## v2.2.0 — 2026-08-26 (Sessão: Migração do Conector por Voz para n8n & Endpoints REST Seguros)
+
+### 🎙️ Arquitetura n8n & Endpoints REST (`api_voice_bridge.py`, `database.py`, `ntx_daatel_voice_agent.json`, `services/`)
+- **Endpoints REST (`api_voice_bridge.py`):** Criados os endpoints `POST /api/v1/voice-bridge/draft`, `POST /api/v1/voice-bridge/confirm` e `GET /api/v1/voice-bridge/draft/ativo`.
+- **Autenticação & Idempotência:** Exigência de header `Authorization: Bearer <token>` e chave de idempotência `X-Idempotency-Key` (usando `message_id` do Telegram) para evitar duplicatas em retries.
+- **Máquina de Estados de Rascunho:** Tabela `rascunhos_voz_telegram` atualizada com suporte aos estados `incompleto`, `completo_aguardando_confirmacao`, `confirmado`, `cancelado` e `expirado` (TTL de 15 min).
+- **Correções Incrementais por Texto:** Método `process_text_correction` adicionado em `voice_nlu_service.py` para permitir que o operador complemente ou corrija campos faltantes por texto.
+- **Workflow n8n Ready-to-Import (`ntx_daatel_voice_agent.json`):** Blueprint JSON do n8n com Telegram Trigger, Gemini NLU, HTTP Request REST e envio de DAV PDF.
+
+---
+
 ## v2.1.2 — 2026-08-26 (Sessão: Instalação de Pacotes NLU & Resolução de Chave Gemini em Minha Empresa)
 
 ### 🎙️ Conector de Voz & Gemini NLU (`requirements.txt`, `services/voice_nlu_service.py`, `database.py`, `pages/1_Cadastros.py`)

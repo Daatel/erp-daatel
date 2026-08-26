@@ -1,0 +1,346 @@
+{
+  "name": "Conector de Voz ERP DAATEL — Agente Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "id": "node-telegram-trigger",
+      "name": "📱 Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-daatel",
+          "name": "Bot Daatel Agente (@Daatel_Agente_bot)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.message.voice ? 'audio' : ($json.callback_query ? 'callback' : 'texto') }}",
+              "value2": "audio"
+            }
+          ]
+        }
+      },
+      "id": "node-check-input-type",
+      "name": "🔀 É Áudio, Texto ou Botão?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $json.message.voice.file_id }}"
+      },
+      "id": "node-telegram-download-audio",
+      "name": "📥 Baixar Áudio do Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-daatel",
+          "name": "Bot Daatel Agente (@Daatel_Agente_bot)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/v1/voice-bridge/draft",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Idempotency-Key",
+              "value": "={{ $json.message ? $json.message.message_id : $json.callback_query.id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.message ? $json.message.chat.id : $json.callback_query.message.chat.id }}"
+            },
+            {
+              "name": "origem",
+              "value": "audio"
+            },
+            {
+              "name": "payload_command",
+              "value": "={{ $json.nlu_result }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-http-erp-draft",
+      "name": "⚡ ERP API — /draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "value2": "completo_aguardando_confirmacao"
+            }
+          ]
+        }
+      },
+      "id": "node-if-draft-completo",
+      "name": "❓ Rascunho Completo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.texto_confirmacao }}",
+        "additionalFields": {
+          "reply_markup": "inline_keyboard",
+          "inline_keyboard": {
+            "rows": [
+              {
+                "row": {
+                  "buttons": [
+                    {
+                      "text": "✅ Confirmar",
+                      "callback_data": "={{ 'confirm:' + $json.draft_id }}"
+                    },
+                    {
+                      "text": "❌ Cancelar",
+                      "callback_data": "={{ 'cancel:' + $json.draft_id }}"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "id": "node-telegram-send-confirmation",
+      "name": "💬 Enviar Confirmação + Botões",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        150
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-daatel",
+          "name": "Bot Daatel Agente (@Daatel_Agente_bot)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.pergunta_sugerida }}",
+        "additionalFields": {}
+      },
+      "id": "node-telegram-ask-missing-field",
+      "name": "💬 Pergunta Campo Faltante",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        350
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-daatel",
+          "name": "Bot Daatel Agente (@Daatel_Agente_bot)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/v1/voice-bridge/confirm",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Idempotency-Key",
+              "value": "={{ $json.callback_query.id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.callback_query.message.chat.id }}"
+            },
+            {
+              "name": "draft_id",
+              "value": "={{ $json.callback_query.data.split(':')[1] }}"
+            },
+            {
+              "name": "acao",
+              "value": "={{ $json.callback_query.data.startsWith('confirm') ? 'confirmar' : 'cancelar' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-http-erp-confirm",
+      "name": "⚡ ERP API — /confirm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.mensagem }}",
+        "additionalFields": {}
+      },
+      "id": "node-telegram-send-result",
+      "name": "💬 Enviar Resultado Final",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        500
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-daatel",
+          "name": "Bot Daatel Agente (@Daatel_Agente_bot)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "📱 Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "🔀 É Áudio, Texto ou Botão?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 É Áudio, Texto ou Botão?": {
+      "main": [
+        [
+          {
+            "node": "📥 Baixar Áudio do Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "⚡ ERP API — /confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Baixar Áudio do Telegram": {
+      "main": [
+        [
+          {
+            "node": "⚡ ERP API — /draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚡ ERP API — /draft": {
+      "main": [
+        [
+          {
+            "node": "❓ Rascunho Completo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Rascunho Completo?": {
+      "main": [
+        [
+          {
+            "node": "💬 Enviar Confirmação + Botões",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "💬 Pergunta Campo Faltante",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚡ ERP API — /confirm": {
+      "main": [
+        [
+          {
+            "node": "💬 Enviar Resultado Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "DAATEL",
+    "ERP",
+    "Voice"
+  ]
+}
