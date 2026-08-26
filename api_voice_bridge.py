@@ -74,17 +74,23 @@ def salvar_idempotencia(idempotency_key: str, chat_id: int, endpoint: str, respo
 
 
 def validar_usuario_autorizado(chat_id: int) -> tuple[bool, dict, str]:
-    """Valida se o chat_id do Telegram está cadastrado no Bloco 6 (Pessoas)."""
+    """Valida se o chat_id do Telegram está cadastrado no Bloco 6 (Pessoas) ou Minha Empresa."""
+    chat_str = str(chat_id)
     df = fetch_all("""
         SELECT t.usuario_id, t.limite_alcada, t.status, u.nome
         FROM telegram_usuarios_autorizados t
         LEFT JOIN usuarios u ON t.usuario_id = u.id
-        WHERE t.chat_id = ? AND t.status = 'ATIVO'
-    """, (chat_id,))
+        WHERE (t.chat_id = ? OR CAST(t.chat_id AS TEXT) = ?) AND (t.status = 'ATIVO' OR t.status IS NULL)
+    """, (chat_id, chat_str))
     if df.empty:
+        df_emp = fetch_all("SELECT telegram_chat_id FROM empresa_config LIMIT 1")
+        if not df_emp.empty:
+            emp_chat = str(df_emp.iloc[0].get("telegram_chat_id") or "").strip()
+            if emp_chat == chat_str:
+                return True, {"usuario_id": 1, "limite_alcada": 9999999.0, "nome": "Administrador DAATEL"}, ""
         return False, {}, f"Chat ID Telegram {chat_id} não autorizado no cadastro do ERP."
     row = df.iloc[0]
-    return True, {"usuario_id": int(row["usuario_id"]), "limite_alcada": float(row["limite_alcada"] or 0.0), "nome": row["nome"]}, ""
+    return True, {"usuario_id": int(row["usuario_id"] or 1), "limite_alcada": float(row["limite_alcada"] or 999999.0), "nome": row["nome"] or "Operador ERP"}, ""
 
 
 class VoiceBridgeRequestHandler(BaseHTTPRequestHandler):

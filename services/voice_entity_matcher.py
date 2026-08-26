@@ -135,3 +135,33 @@ def buscar_plano_contas_fuzzy(categoria_falada: str, df_planos: pd.DataFrame, th
     if melhor_score >= threshold:
         return melhor_plano, melhor_score
     return None, melhor_score
+
+
+def match_cliente(nome_falado: str, threshold: float = 60.0) -> Optional[Dict[str, Any]]:
+    import database
+    try:
+        df_c = database.fetch_all("SELECT * FROM clientes WHERE status = 'ATIVO'")
+    except Exception:
+        df_c = database.fetch_all("SELECT * FROM clientes")
+    res, _ = buscar_cliente_fuzzy(nome_falado, df_c, threshold)
+    return res
+
+
+def match_fornecedor(nome_falado: str, threshold: float = 60.0) -> Optional[Dict[str, Any]]:
+    import database
+    try:
+        df_f = database.fetch_all("SELECT * FROM fornecedores WHERE status = 'ATIVO'")
+    except Exception:
+        df_f = database.fetch_all("SELECT * FROM fornecedores")
+    res, _ = buscar_fornecedor_fuzzy(nome_falado, df_f, threshold)
+    return res
+
+
+def match_produto(nome_falado: str, threshold: float = 55.0) -> Optional[Dict[str, Any]]:
+    import database
+    try:
+        df_p = database.fetch_all("SELECT * FROM produtos WHERE status = 'ATIVO'")
+    except Exception:
+        df_p = database.fetch_all("SELECT * FROM produtos")
+    res, _ = buscar_produto_fuzzy(nome_falado, df_p, threshold)
+    return res
