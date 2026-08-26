@@ -232,6 +232,13 @@ class VoiceBridgeRequestHandler(BaseHTTPRequestHandler):
                     pass
             except Exception as audio_err:
                 logger.error(f"Erro ao processar áudio do Telegram (file_id={file_id}): {audio_err}")
+                err_msg = str(audio_err)
+                if "API_KEY_INVALID" in err_msg or "API key not valid" in err_msg:
+                    return self._send_json({
+                        "status": "incompleto",
+                        "pergunta_sugerida": "⚠️ A Chave API do Gemini cadastrada no ERP não é válida (deve começar com AIzaSy...). Obtenha uma em aistudio.google.com/app/apikey e cadastre no ERP em Cadastros -> Minha Empresa.",
+                        "botoes_sugeridos": ["Cancelar"]
+                    }, 200)
                 return self._send_json({"error": f"Erro ao processar áudio de voz: {audio_err}"}, 500)
 
         # Se for correção por texto com draft existente
