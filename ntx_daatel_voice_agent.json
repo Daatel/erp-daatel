@@ -68,7 +68,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:8000/api/v1/voice-bridge/draft",
+        "url": "http://127.0.0.1:8000/api/v1/voice-bridge/draft",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -195,7 +195,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:8000/api/v1/voice-bridge/confirm",
+        "url": "http://127.0.0.1:8000/api/v1/voice-bridge/confirm",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
