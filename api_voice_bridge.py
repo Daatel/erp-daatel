@@ -93,6 +93,25 @@ def validar_usuario_autorizado(chat_id: int) -> tuple[bool, dict, str]:
     return True, {"usuario_id": int(row["usuario_id"] or 1), "limite_alcada": float(row["limite_alcada"] or 999999.0), "nome": row["nome"] or "Operador ERP"}, ""
 
 
+def baixar_audio_telegram(file_id: str, bot_token: str = "8697304148:AAGvaVb25XA__BaQl6JMTbsoweTAoUnG9Xs") -> str:
+    import urllib.request
+    import tempfile
+    url_get = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}"
+    req = urllib.request.urlopen(url_get)
+    res = json.loads(req.read().decode("utf-8"))
+    if not res.get("ok"):
+        raise ValueError(f"Erro ao obter caminho do arquivo do Telegram: {res}")
+    file_path_tg = res["result"]["file_path"]
+    url_dl = f"https://api.telegram.org/file/bot{bot_token}/{file_path_tg}"
+    req_dl = urllib.request.urlopen(url_dl)
+    audio_bytes = req_dl.read()
+    ext = os.path.splitext(file_path_tg)[1] or ".oga"
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+    tmp.write(audio_bytes)
+    tmp.close()
+    return tmp.name
+
+
 class VoiceBridgeRequestHandler(BaseHTTPRequestHandler):
     
     def _send_json(self, response_dict: dict, status_code: int = 200):
@@ -198,6 +217,22 @@ class VoiceBridgeRequestHandler(BaseHTTPRequestHandler):
         origem = body.get("origem", "audio")
         text_input = body.get("text_input", "").strip()
         existing_draft_id = body.get("draft_id")
+        file_id = body.get("file_id")
+
+        # Se veio um file_id do Telegram (áudio), baixa e processa via NLU diretamente
+        if file_id and (origem == "audio" or not payload_cmd):
+            try:
+                temp_audio_path = baixar_audio_telegram(file_id)
+                nlu_service = VoiceNLUService()
+                cmd_schema = nlu_service.process_voice_audio(temp_audio_path)
+                payload_cmd = cmd_schema.model_dump()
+                try:
+                    os.remove(temp_audio_path)
+                except Exception:
+                    pass
+            except Exception as audio_err:
+                logger.error(f"Erro ao processar áudio do Telegram (file_id={file_id}): {audio_err}")
+                return self._send_json({"error": f"Erro ao processar áudio de voz: {audio_err}"}, 500)
 
         # Se for correção por texto com draft existente
         if origem == "texto" and existing_draft_id:

@@ -91,11 +91,15 @@
             },
             {
               "name": "origem",
-              "value": "audio"
+              "value": "={{ $json.message && $json.message.voice ? 'audio' : 'texto' }}"
             },
             {
-              "name": "payload_command",
-              "value": "={{ $json.nlu_result }}"
+              "name": "file_id",
+              "value": "={{ $json.message && $json.message.voice ? $json.message.voice.file_id : '' }}"
+            },
+            {
+              "name": "text_input",
+              "value": "={{ $json.message && $json.message.text ? $json.message.text : '' }}"
             }
           ]
         },
@@ -275,7 +279,7 @@
       "main": [
         [
           {
-            "node": "📥 Baixar Áudio do Telegram",
+            "node": "⚡ ERP API — /draft",
             "type": "main",
             "index": 0
           }
@@ -283,17 +287,6 @@
         [
           {
             "node": "⚡ ERP API — /confirm",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "📥 Baixar Áudio do Telegram": {
-      "main": [
-        [
-          {
-            "node": "⚡ ERP API — /draft",
             "type": "main",
             "index": 0
           }
