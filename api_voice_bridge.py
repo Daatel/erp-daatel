@@ -94,22 +94,40 @@ def validar_usuario_autorizado(chat_id: int) -> tuple[bool, dict, str]:
 
 
 def baixar_audio_telegram(file_id: str, bot_token: str = "8697304148:AAGvaVb25XA__BaQl6JMTbsoweTAoUnG9Xs") -> str:
+    """Baixa o áudio do Telegram com retry e backoff exponencial (1s, 2s, 4s)."""
     import urllib.request
     import tempfile
-    url_get = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}"
-    req = urllib.request.urlopen(url_get)
-    res = json.loads(req.read().decode("utf-8"))
-    if not res.get("ok"):
-        raise ValueError(f"Erro ao obter caminho do arquivo do Telegram: {res}")
-    file_path_tg = res["result"]["file_path"]
-    url_dl = f"https://api.telegram.org/file/bot{bot_token}/{file_path_tg}"
-    req_dl = urllib.request.urlopen(url_dl)
-    audio_bytes = req_dl.read()
-    ext = os.path.splitext(file_path_tg)[1] or ".oga"
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-    tmp.write(audio_bytes)
-    tmp.close()
-    return tmp.name
+    import time
+
+    max_retries = 4
+    backoff = 1.0
+    last_err = None
+
+    for attempt in range(max_retries):
+        try:
+            url_get = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}"
+            req = urllib.request.urlopen(url_get, timeout=10)
+            res = json.loads(req.read().decode("utf-8"))
+            if res.get("ok"):
+                file_path_tg = res["result"]["file_path"]
+                url_dl = f"https://api.telegram.org/file/bot{bot_token}/{file_path_tg}"
+                req_dl = urllib.request.urlopen(url_dl, timeout=15)
+                audio_bytes = req_dl.read()
+                ext = os.path.splitext(file_path_tg)[1] or ".oga"
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+                tmp.write(audio_bytes)
+                tmp.close()
+                return tmp.name
+            else:
+                last_err = f"Telegram API getFile retornou ok=false: {res}"
+        except Exception as e:
+            last_err = e
+
+        logger.warning(f"[TELEGRAM RETRY] Tentativa {attempt + 1}/{max_retries} para file_id={file_id} falhou. Aguardando {backoff}s. Erro: {last_err}")
+        time.sleep(backoff)
+        backoff *= 2.0
+
+    raise RuntimeError(f"Não foi possível baixar o áudio do Telegram após {max_retries} tentativas: {last_err}")
 
 
 class VoiceBridgeRequestHandler(BaseHTTPRequestHandler):
@@ -175,33 +193,42 @@ class VoiceBridgeRequestHandler(BaseHTTPRequestHandler):
         return self._send_json({"error": "Endpoint não encontrado"}, 404)
 
     def do_POST(self):
-        parsed_url = urlparse(self.path)
-        path = parsed_url.path
-
-        if not self._autenticar_request():
-            return self._send_json({"error": "Não autorizado. Header Authorization Bearer inválido."}, 401)
-
-        idempotency_key = self.headers.get("X-Idempotency-Key", "").strip()
-
         try:
-            content_len = int(self.headers.get("Content-Length", 0))
-            body_bytes = self.rfile.read(content_len) if content_len > 0 else b"{}"
-            body_json = json.loads(body_bytes.decode("utf-8"))
-        except Exception as err:
-            return self._send_json({"error": f"JSON inválido no corpo da requisição: {err}"}, 400)
+            parsed_url = urlparse(self.path)
+            path = parsed_url.path
 
-        # Checa idempotência para retries do n8n
-        is_cached, cached_res, cached_code = checar_idempotencia(idempotency_key, path)
-        if is_cached:
-            logger.info(f"[IDEMPOTENT] Retornando resposta em cache para a chave {idempotency_key}")
-            return self._send_json(cached_res, cached_code)
+            if not self._autenticar_request():
+                return self._send_json({"error": "Não autorizado. Header Authorization Bearer inválido."}, 401)
 
-        if path == "/api/v1/voice-bridge/draft":
-            return self._handle_draft(body_json, idempotency_key)
-        elif path == "/api/v1/voice-bridge/confirm":
-            return self._handle_confirm(body_json, idempotency_key)
-        else:
-            return self._send_json({"error": "Endpoint não encontrado"}, 404)
+            idempotency_key = self.headers.get("X-Idempotency-Key", "").strip()
+
+            try:
+                content_len = int(self.headers.get("Content-Length", 0))
+                body_bytes = self.rfile.read(content_len) if content_len > 0 else b"{}"
+                body_json = json.loads(body_bytes.decode("utf-8"))
+            except Exception as err:
+                return self._send_json({"error": f"JSON inválido no corpo da requisição: {err}"}, 400)
+
+            # Checa idempotência para retries do n8n
+            is_cached, cached_res, cached_code = checar_idempotencia(idempotency_key, path)
+            if is_cached:
+                logger.info(f"[IDEMPOTENT] Retornando resposta em cache para a chave {idempotency_key}")
+                return self._send_json(cached_res, cached_code)
+
+            if path == "/api/v1/voice-bridge/draft":
+                return self._handle_draft(body_json, idempotency_key)
+            elif path == "/api/v1/voice-bridge/confirm":
+                return self._handle_confirm(body_json, idempotency_key)
+            else:
+                return self._send_json({"error": "Endpoint não encontrado"}, 404)
+        except Exception as crash_err:
+            logger.error(f"[SERVER EXCEPTION TRAP] Exceção não capturada no handler POST: {crash_err}", exc_info=True)
+            return self._send_json({
+                "status": "incompleto",
+                "error": f"Erro no servidor ERP: {crash_err}",
+                "pergunta_sugerida": f"⚠️ Ocorreu um erro ao processar o lançamento no ERP: {crash_err}.",
+                "botoes_sugeridos": ["Cancelar"]
+            }, 502)
 
     def _handle_draft(self, body: dict, idempotency_key: str):
         chat_id = body.get("chat_id")
