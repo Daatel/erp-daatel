@@ -1,0 +1,36 @@
+name: Keep-Alive Streamlit ERP (DAATEL)
+
+on:
+  schedule:
+    # Executa a cada 15 minutos (24h por dia) para evitar suspensao no Streamlit Cloud
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Permite disparo manual pelo painel do GitHub Actions
+
+jobs:
+  keep-alive:
+    name: Executar Keep-Alive do Streamlit
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout do Repositorio
+      uses: actions/checkout@v4
+
+    - name: Configurar Ambiente Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Instalar Dependencias do Python
+      run: |
+        python -m pip install --upgrade pip
+        pip install playwright
+
+    - name: Instalar Navegador Chromium (Playwright)
+      run: |
+        playwright install --with-deps chromium
+
+    - name: Executar Script Keep-Alive
+      env:
+        APP_URL: "https://daatel-erp.streamlit.app"
+      run: |
+        python keep_alive_streamlit.py

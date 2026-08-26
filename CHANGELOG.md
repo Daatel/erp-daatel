@@ -2,6 +2,14 @@
 
 ---
 
+## v2.1 — 2026-08-26 (Sessão: Automação Keep-Alive Streamlit Cloud via Playwright & GitHub Actions)
+
+### 🤖 Automação Keep-Alive & Reativação Streamlit (`keep_alive_streamlit.py`, `.github/workflows/keep_alive.yml`)
+- **Engine Headless Playwright (`keep_alive_streamlit.py`):** Script em Python para navegação headless Chromium em `https://daatel-erp.streamlit.app`, detecção da tela de suspensão ("Zzzz"), acionamento automático do botão *"Yes, get this app back up!"* e manutenção de sessão WebSocket por ~15s.
+- **Workflow em Nuvem no GitHub Actions (`.github/workflows/keep_alive.yml`):** Cron job agendado para rodar a cada 15 minutos em nuvem de forma totalmente gratuita, garantindo que o app permaneça ativo 24/7 sem consumir recursos de máquina local.
+
+---
+
 ## v2.0 — 2026-08-25 (Sessão: Conector de Voz ERP DAATEL via Telegram Bot & IA Gemini NLU)
 
 ### 🎙️ Conector de Voz & Telegram Bot (`telegram_bot_listener.py`, `services/`)
