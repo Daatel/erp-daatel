@@ -2,6 +2,14 @@
 
 ---
 
+## v2.1.1 — 2026-08-26 (Sessão: Desativação do Relatório Diário de Profilaxia via Telegram)
+
+### 🔕 Notificações & Cron (`database.py`, `send_report_cron.py`, `pages/1_Cadastros.py`)
+- **Desativação de Profilaxia Diária:** Desativado o disparo do relatório diário de profilaxia de lançamentos em `database.py` e `send_report_cron.py`, atendendo à solicitação da gestão de encerrar esses alertas repetitivos no Telegram.
+- **Limpeza de UI:** Removido o botão de teste de profilaxia da tela `1_Cadastros.py`, mantendo apenas o disparo manual do Resumo Executivo do CEO.
+
+---
+
 ## v2.1 — 2026-08-26 (Sessão: Automação Keep-Alive Streamlit Cloud via Playwright & GitHub Actions)
 
 ### 🤖 Automação Keep-Alive & Reativação Streamlit (`keep_alive_streamlit.py`, `.github/workflows/keep_alive.yml`)

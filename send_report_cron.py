@@ -52,15 +52,15 @@ def run():
     hora_brasilia = (datetime.datetime.utcnow().hour - 3) % 24
     print(f"[INFO] [CRON] Horario de Brasilia calculado: {hora_brasilia}:00")
 
-    # Se for o disparo da noite (a partir das 17:00 de Brasília) ou manual de fim do dia
-    if hora_brasilia >= 17 or hora_brasilia <= 2:
-        print("[START] [CRON] Iniciando disparo automatico da Profilaxia Financeira...")
-        from database import enviar_relatorio_profilaxia
-        res_prof, err_prof = enviar_relatorio_profilaxia()
-        if res_prof:
-            print("[OK] [CRON] Relatorio de Profilaxia enviado com sucesso via Telegram!")
-        else:
-            print(f"[ERRO] [CRON] Falha no envio da Profilaxia: {err_prof}")
+    # Desativado por solicitação da gestão
+    # if hora_brasilia >= 17 or hora_brasilia <= 2:
+    #     print("[START] [CRON] Iniciando disparo automatico da Profilaxia Financeira...")
+    #     from database import enviar_relatorio_profilaxia
+    #     res_prof, err_prof = enviar_relatorio_profilaxia()
+    #     if res_prof:
+    #         print("[OK] [CRON] Relatorio de Profilaxia enviado com sucesso via Telegram!")
+    #     else:
+    #         print(f"[ERRO] [CRON] Falha no envio da Profilaxia: {err_prof}")
 
 if __name__ == "__main__":
     run()

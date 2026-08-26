@@ -83,19 +83,10 @@ with tab_empresa:
     if emp.get('telegram_token') and emp.get('telegram_chat_id'):
         st.markdown("---")
         st.markdown("#### 🧪 Testes de Conectividade de Relatórios")
-        col_t1, col_t2 = st.columns(2)
-        
-        with col_t1:
-            if st.button("📲 Enviar Relatório de Profilaxia (Auditoria)", use_container_width=True):
-                from database import enviar_relatorio_profilaxia_async
-                enviar_relatorio_profilaxia_async()
-                st.success("✅ Solicitado! O relatório de profilaxia está sendo processado em background. Verifique seu Telegram em alguns instantes.")
-                    
-        with col_t2:
-            if st.button("📊 Enviar Resumo do Dia do CEO (Cockpit)", use_container_width=True):
-                from database import enviar_relatorio_resumo_executivo_async
-                enviar_relatorio_resumo_executivo_async()
-                st.success("✅ Solicitado! O resumo executivo do CEO está sendo gerado em background. Verifique seu Telegram em alguns instantes.")
+        if st.button("📊 Enviar Resumo do Dia do CEO (Cockpit)", use_container_width=True):
+            from database import enviar_relatorio_resumo_executivo_async
+            enviar_relatorio_resumo_executivo_async()
+            st.success("✅ Solicitado! O resumo executivo do CEO está sendo gerado em background. Verifique seu Telegram em alguns instantes.")
 
     st.markdown("---")
     st.markdown("### 📦 Parâmetros de Estoque & CMV")

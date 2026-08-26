@@ -1841,39 +1841,8 @@ def enviar_mensagem_telegram(mensagem: str) -> tuple[bool, str]:
         return False, f"Erro interno de conexao: {str(e)}"
 
 def enviar_relatorio_profilaxia() -> tuple[bool, str]:
-    def escape_html(text: str) -> str:
-        return str(text or "").replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-        
-    try:
-        from datetime import date
-        hoje = date.today().strftime('%Y-%m-%d')
-        
-        # Busca todos os lançamentos de fluxo de caixa de hoje
-        query = """
-            SELECT tipo, categoria, descricao, valor
-            FROM fluxo_caixa
-            WHERE data = ?
-            ORDER BY tipo, categoria
-        """
-        df = fetch_all(query, (hoje,))
-        
-        msg = f"🔍 <b>ERP Alho - Profilaxia Diária de Lançamentos ({date.today().strftime('%d/%m/%Y')})</b>\n"
-        msg += "<i>Objetivo: Revisar classificações e orientar a equipe de lançamentos.</i>\n\n"
-        
-        if df.empty:
-            msg += "<i>Nenhum lançamento financeiro realizado hoje para auditoria.</i>\n"
-        else:
-            msg += "<b>💰 Auditoria de Plano de Contas:</b>\n"
-            for _, r in df.iterrows():
-                valor = float(r['valor'] or 0.0)
-                tipo = str(r['tipo']).upper()
-                emoji = "🟢 RECEITA" if "RECEITA" in tipo or "ENTRADA" in tipo or "RECEB" in tipo else "🔴 DESPESA"
-                msg += f"• <code>[{emoji}]</code> <b>{escape_html(r['descricao'])}</b>\n"
-                msg += f"  └➔ Classificado como: <u>{escape_html(r['categoria'])}</u> | Valor: <i>R$ {valor:,.2f}</i>\n\n"
-                
-        return enviar_mensagem_telegram(msg)
-    except Exception as e:
-        return False, f"Erro ao gerar profilaxia: {str(e)}"
+    # Relatório de profilaxia desativado por solicitação da gestão
+    return True, "Relatório de profilaxia desativado."
 
 def enviar_relatorio_resumo_executivo() -> tuple[bool, str]:
     def escape_html(text: str) -> str:
