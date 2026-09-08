@@ -23,6 +23,9 @@ tmp_crop.py
 # OS generated files
 .DS_Store
 Thumbs.db
+desktop.ini
+Desktop.ini
+**/desktop.ini
 
 # Credentials & Scratch folders (Security & Cleanliness)
 bling_credentials.json
