@@ -1,3 +1,13 @@
+## v2.3.1 — 2026-09-08 (Sessão: Atomicidade Transacional & Idempotência em Liquidações Financeiras)
+
+### 💵 Financeiro & Tesouraria (`utils_financeiro_modals.py`, `pages/9_Financeiro.py`)
+- **Saneamento e Equalização em Produção:** Saneados 4 lançamentos órfãos em `contas_a_pagar` do dia 04/09/2026 (IDs 504, 505, 506 e 507), inserindo os correspondentes registros em `fluxo_caixa`. A verificação por anti-join confirmou 100% de paridade (R$ 9.850,00 no Contas a Pagar = R$ 9.850,00 no Fluxo de Caixa).
+- **Atomicidade Transacional Atômica (ACID):** Refatoradas as rotinas de liquidação em lote (`dialog_confirmar_baixa_lote_pagar`, `dialog_confirmar_baixa_lote_receber` em `utils_financeiro_modals.py`) e de estorno/reversão (`executar_reversao_baixa` em `pages/9_Financeiro.py`) para execução em bloco `with db_transaction() as conn:`.
+- **Guarda de Idempotência Anti-Rerun:** Adicionada verificação preventiva contra reruns ou solicitações duplicadas do Streamlit (`status != 'PAGO'` e `status != 'RECEBIDO'`), impedindo duplicação de lançamentos no fluxo de caixa sob reconexões ou reexecuções de página.
+- **Varredura Preventiva Global:** Varredura por anti-join em todo o histórico do banco de dados confirmou zero outros títulos órfãos legados.
+
+---
+
 ## v2.3.0 — 2026-09-08 (Sessão: Resolução de Filtros Temporais & Padronização de Históricos de Fornecedores no Financeiro)
 
 ### 💵 Financeiro & Caixas e Bancos (`pages/9_Financeiro.py`, `utils_financeiro_modals.py`)

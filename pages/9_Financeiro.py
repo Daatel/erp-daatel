@@ -13,7 +13,7 @@ import traceback
 
 import calendar
 
-from database import fetch_all, run_query, gerar_comissao_se_necessario
+from database import fetch_all, run_query, db_transaction, run_query_tx, fetch_all_tx, gerar_comissao_se_necessario
 
 from estilo import carregar_estilo
 
@@ -333,30 +333,35 @@ def dialog_confirmar_consolidacao(modificacoes):
 
 
 def executar_reversao_baixa(lista_ids):
-    for id_mov in lista_ids:
-        # Resgata o tipo e fonte_id do fluxo de caixa
-        df_fc = fetch_all("SELECT tipo, fonte_id, descricao, valor FROM fluxo_caixa WHERE id = ?", (id_mov,))
-        if not df_fc.empty:
-            tipo = df_fc.iloc[0]['tipo']
-            fonte_id = df_fc.iloc[0]['fonte_id']
-            descricao = df_fc.iloc[0]['descricao']
-            valor = df_fc.iloc[0]['valor']
-            
-            # Se for um título baixado
-            if pd.notna(fonte_id):
-                fonte_id = int(fonte_id)
-                if tipo == 'Saída':
-                    # Reverte contas a pagar
-                    run_query("UPDATE contas_a_pagar SET status = 'PENDENTE', data_pagamento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
-                elif tipo == 'Entrada':
-                    # Reverte contas a receber
-                    run_query("UPDATE contas_a_receber SET status = 'PENDENTE', data_recebimento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
-                
-            # Deleta a linha do fluxo de caixa
-            run_query("DELETE FROM fluxo_caixa WHERE id = ?", (id_mov,))
-            
-    st.success(f"✔️ {len(lista_ids)} baixa(s) revertida(s) com sucesso!")
-    import time; time.sleep(1.5); st.rerun()
+    try:
+        with db_transaction() as conn:
+            cursor = conn.cursor()
+            for id_mov in lista_ids:
+                # Resgata o tipo e fonte_id do fluxo de caixa
+                df_fc = fetch_all_tx(cursor, "SELECT tipo, fonte_id, descricao, valor FROM fluxo_caixa WHERE id = ?", (id_mov,))
+                if not df_fc.empty:
+                    tipo = df_fc.iloc[0]['tipo']
+                    fonte_id = df_fc.iloc[0]['fonte_id']
+                    descricao = df_fc.iloc[0]['descricao']
+                    valor = df_fc.iloc[0]['valor']
+                    
+                    # Se for um título baixado
+                    if pd.notna(fonte_id):
+                        fonte_id = int(fonte_id)
+                        if tipo == 'Saída':
+                            # Reverte contas a pagar
+                            run_query_tx(cursor, "UPDATE contas_a_pagar SET status = 'PENDENTE', data_pagamento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
+                        elif tipo == 'Entrada':
+                            # Reverte contas a receber
+                            run_query_tx(cursor, "UPDATE contas_a_receber SET status = 'PENDENTE', data_recebimento = NULL, conta_bancaria_id = NULL WHERE id = ?", (fonte_id,))
+                        
+                    # Deleta a linha do fluxo de caixa
+                    run_query_tx(cursor, "DELETE FROM fluxo_caixa WHERE id = ?", (id_mov,))
+                    
+        st.success(f"✔️ {len(lista_ids)} baixa(s) revertida(s) com sucesso!")
+        import time; time.sleep(1.5); st.rerun()
+    except Exception as e:
+        st.error(f"⚠️ Erro ao reverter baixa: {e}")
 
 
 @st.dialog("Lançamento Direto Bloqueado")

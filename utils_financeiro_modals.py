@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 import calendar
 import uuid
 import re
-from database import fetch_all, run_query, gerar_comissao_se_necessario
+from database import fetch_all, run_query, db_transaction, run_query_tx, fetch_all_tx, gerar_comissao_se_necessario
 
 def add_months(sourcedate, months):
     month = sourcedate.month - 1 + months
@@ -198,65 +198,76 @@ def dialog_confirmar_baixa_lote_pagar(ids_selecionados, df_all_contas, opcoes_ba
             st.error("Por favor, selecione a Conta Bancária de saída para realizar a baixa.")
         else:
             conta_id = opcoes_bancos[conta_saida]
-        
-        for _, r in df_selecionadas.iterrows():
-            c_id = int(r['id'])
-            v_base = float(r['Valor'])
-            
-            # Obtém o credor unificado de forma resiliente
-            credor = r.get('Credor', r.get('Fornecedor', ''))
-            credor = str(credor) if pd.notna(credor) and str(credor).strip() not in ('', 'None', 'nan') else ""
-            credor = credor.replace("🔴 [BLOQUEADO FALTAM CANHOTOS] ", "").strip()
-            
-            if not credor:
-                df_forn_info = fetch_all("""
-                    SELECT f.nome_fantasia, f.nome, cl.nome as cliente_nome
-                    FROM contas_a_pagar cp
-                    LEFT JOIN fornecedores f ON cp.fornecedor_id = f.id
-                    LEFT JOIN clientes cl ON cp.cliente_id = cl.id
-                    WHERE cp.id = ?
-                """, (c_id,))
-                if not df_forn_info.empty:
-                    fi = df_forn_info.iloc[0]
-                    if pd.notna(fi['nome_fantasia']) and str(fi['nome_fantasia']).strip():
-                        credor = str(fi['nome_fantasia']).strip()
-                    elif pd.notna(fi['nome']) and str(fi['nome']).strip():
-                        credor = str(fi['nome']).strip()
-                    elif pd.notna(fi['cliente_nome']) and str(fi['cliente_nome']).strip():
-                        credor = str(fi['cliente_nome']).strip()
-            
-            if not credor:
-                credor = "Fornecedor / Credor"
-            
-            df_cap_cli = fetch_all("SELECT cliente_id FROM contas_a_pagar WHERE id=?", (c_id,))
-            cap_cli_id = int(df_cap_cli.iloc[0]['cliente_id']) if not df_cap_cli.empty and pd.notna(df_cap_cli.iloc[0]['cliente_id']) else None
+            try:
+                with db_transaction() as conn:
+                    cursor = conn.cursor()
+                    for _, r in df_selecionadas.iterrows():
+                        c_id = int(r['id'])
+                        v_base = float(r['Valor'])
 
-            val_efetivo = valor_pago if is_partial else v_base
-            
-            if is_partial:
-                saldo = v_base - val_efetivo
-                df_orig = fetch_all("SELECT * FROM contas_a_pagar WHERE id = ?", (c_id,))
-                if not df_orig.empty:
-                    orig = df_orig.iloc[0]
-                    forn_id_orig = int(orig['fornecedor_id']) if pd.notna(orig['fornecedor_id']) else None
-                    pc_id_orig = int(orig['plano_conta_id']) if pd.notna(orig['plano_conta_id']) else None
-                    desc_orig = orig['descricao'] if pd.notna(orig['descricao']) else ""
-                    venc_orig = orig['data_vencimento']
-                    doc_orig = orig['numero_documento'] if pd.notna(orig['numero_documento']) else None
-                    cli_id_orig = int(orig['cliente_id']) if pd.notna(orig['cliente_id']) else None
-                    
-                    # Insere o saldo restante
-                    run_query("INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, descricao, valor, data_vencimento, status, numero_documento, cliente_id) VALUES (?, ?, ?, ?, ?, 'PENDENTE', ?, ?)",
-                              (forn_id_orig, pc_id_orig, f"{desc_orig} (Saldo Parcial)", saldo, venc_orig, doc_orig, cli_id_orig))
+                        # Guarda de Idempotência: ignora se a conta já tiver sido marcada como PAGO
+                        df_chk = fetch_all_tx(cursor, "SELECT status FROM contas_a_pagar WHERE id = ?", (c_id,))
+                        if not df_chk.empty and str(df_chk.iloc[0]['status']).strip().upper() == 'PAGO':
+                            continue
+                        
+                        # Obtém o credor unificado de forma resiliente
+                        credor = r.get('Credor', r.get('Fornecedor', ''))
+                        credor = str(credor) if pd.notna(credor) and str(credor).strip() not in ('', 'None', 'nan') else ""
+                        credor = credor.replace("🔴 [BLOQUEADO FALTAM CANHOTOS] ", "").strip()
+                        
+                        if not credor:
+                            df_forn_info = fetch_all_tx(cursor, """
+                                SELECT f.nome_fantasia, f.nome, cl.nome as cliente_nome
+                                FROM contas_a_pagar cp
+                                LEFT JOIN fornecedores f ON cp.fornecedor_id = f.id
+                                LEFT JOIN clientes cl ON cp.cliente_id = cl.id
+                                WHERE cp.id = ?
+                            """, (c_id,))
+                            if not df_forn_info.empty:
+                                fi = df_forn_info.iloc[0]
+                                if pd.notna(fi['nome_fantasia']) and str(fi['nome_fantasia']).strip():
+                                    credor = str(fi['nome_fantasia']).strip()
+                                elif pd.notna(fi['nome']) and str(fi['nome']).strip():
+                                    credor = str(fi['nome']).strip()
+                                elif pd.notna(fi['cliente_nome']) and str(fi['cliente_nome']).strip():
+                                    credor = str(fi['cliente_nome']).strip()
+                        
+                        if not credor:
+                            credor = "Fornecedor / Credor"
+                        
+                        df_cap_cli = fetch_all_tx(cursor, "SELECT cliente_id FROM contas_a_pagar WHERE id=?", (c_id,))
+                        cap_cli_id = int(df_cap_cli.iloc[0]['cliente_id']) if not df_cap_cli.empty and pd.notna(df_cap_cli.iloc[0]['cliente_id']) else None
 
-            run_query("UPDATE contas_a_pagar SET status='PAGO', data_pagamento=?, conta_bancaria_id=?, valor=? WHERE id=?", 
-                      (d_pgto.strftime("%Y-%m-%d"), conta_id, val_efetivo, c_id))
-            
-            run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado, cliente_id) VALUES (?, 'Saída', ?, ?, ?, ?, ?, FALSE, ?)",
-                      (d_pgto.strftime("%Y-%m-%d"), plant, f"PGTO Credor: {credor} - Fat: {fat}", val_efetivo, c_id, conta_id, cap_cli_id))
-                      
-        st.success(f"✔️ {len(df_selecionadas)} contas liquidadas e debitadas do banco {conta_saida} com sucesso!")
-        import time; time.sleep(1.5); st.rerun()
+                        val_efetivo = valor_pago if is_partial else v_base
+                        fat = r.get('Histórico', r.get('Descrição/Fatura', ''))
+                        plant = r.get('Planta de Custo', r.get('Categoria', 'Gasto'))
+                        
+                        if is_partial:
+                            saldo = v_base - val_efetivo
+                            df_orig = fetch_all_tx(cursor, "SELECT * FROM contas_a_pagar WHERE id = ?", (c_id,))
+                            if not df_orig.empty:
+                                orig = df_orig.iloc[0]
+                                forn_id_orig = int(orig['fornecedor_id']) if pd.notna(orig['fornecedor_id']) else None
+                                pc_id_orig = int(orig['plano_conta_id']) if pd.notna(orig['plano_conta_id']) else None
+                                desc_orig = orig['descricao'] if pd.notna(orig['descricao']) else ""
+                                venc_orig = orig['data_vencimento']
+                                doc_orig = orig['numero_documento'] if pd.notna(orig['numero_documento']) else None
+                                cli_id_orig = int(orig['cliente_id']) if pd.notna(orig['cliente_id']) else None
+                                
+                                # Insere o saldo restante
+                                run_query_tx(cursor, "INSERT INTO contas_a_pagar (fornecedor_id, plano_conta_id, descricao, valor, data_vencimento, status, numero_documento, cliente_id) VALUES (?, ?, ?, ?, ?, 'PENDENTE', ?, ?)",
+                                          (forn_id_orig, pc_id_orig, f"{desc_orig} (Saldo Parcial)", saldo, venc_orig, doc_orig, cli_id_orig))
+
+                        run_query_tx(cursor, "UPDATE contas_a_pagar SET status='PAGO', data_pagamento=?, conta_bancaria_id=?, valor=? WHERE id=? AND status != 'PAGO'", 
+                                  (d_pgto.strftime("%Y-%m-%d"), conta_id, val_efetivo, c_id))
+                        
+                        run_query_tx(cursor, "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado, cliente_id) VALUES (?, 'Saída', ?, ?, ?, ?, ?, FALSE, ?)",
+                                  (d_pgto.strftime("%Y-%m-%d"), plant, f"PGTO Credor: {credor} (Fornecedor) - Fat: {fat}", val_efetivo, c_id, conta_id, cap_cli_id))
+                                  
+                st.success(f"✔️ {len(df_selecionadas)} contas liquidadas e debitadas do banco {conta_saida} com sucesso!")
+                import time; time.sleep(1.5); st.rerun()
+            except Exception as e:
+                st.error(f"⚠️ Erro ao liquidar lote de contas a pagar: {e}")
 
 @st.dialog("Renegociar com Fornecedor", width="large")
 def dialog_renegociar_pagar():
@@ -750,47 +761,57 @@ def dialog_confirmar_baixa_lote_receber(ids_selecionados, df_receber, opcoes_ban
             st.error("Por favor, selecione uma Conta Bancária de Destino válida.")
         else:
             bCid = opcoes_bancos[banco_destino]
-            
-            for _, r in df_selecionadas.iterrows():
-                rr_id = int(r['id'])
-                v_base = float(r['Valor'])
-                cli = primeiro_valor_valido(r, ['Cliente', 'Cliente_Fantasia', 'Cliente_Razao'], 'Diversos')
-                fat = primeiro_valor_valido(r, ['N. Doc', 'Histórico'], '')
-                
-                val_efetivo = valor_pago if is_partial else v_base
-                
-                if is_partial:
-                    saldo = v_base - val_efetivo
-                    df_orig = fetch_all("SELECT * FROM contas_a_receber WHERE id = ?", (rr_id,))
-                    if not df_orig.empty:
-                        orig = df_orig.iloc[0]
-                        c_id_orig = int(orig['cliente_id']) if pd.notna(orig['cliente_id']) else None
-                        v_id_orig = int(orig['venda_id']) if pd.notna(orig['venda_id']) else None
-                        pc_id_orig = int(orig['plano_conta_id']) if pd.notna(orig['plano_conta_id']) else None
-                        desc_orig = orig['descricao'] if pd.notna(orig['descricao']) else ""
-                        venc_orig = orig['data_vencimento']
-                        dt_emissao_orig = orig['data_emissao'] if 'data_emissao' in orig and pd.notna(orig['data_emissao']) else date.today().strftime("%Y-%m-%d")
-                        doc_orig = orig['numero_documento'] if pd.notna(orig['numero_documento']) else None
+            try:
+                with db_transaction() as conn:
+                    cursor = conn.cursor()
+                    for _, r in df_selecionadas.iterrows():
+                        rr_id = int(r['id'])
+                        v_base = float(r['Valor'])
                         
-                        # Insere o saldo restante
-                        run_query("INSERT INTO contas_a_receber (cliente_id, venda_id, plano_conta_id, descricao, valor, data_emissao, data_vencimento, status, numero_documento) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDENTE', ?)",
-                                  (c_id_orig, v_id_orig, pc_id_orig, f"{desc_orig} (Saldo Parcial)", saldo, dt_emissao_orig, venc_orig, doc_orig))
-                
-                # Atualiza o original com val_efetivo
-                run_query("UPDATE contas_a_receber SET status='RECEBIDO', data_recebimento=?, conta_bancaria_id=?, valor=? WHERE id=?",
-                          (dt_rec.strftime("%Y-%m-%d"), bCid, val_efetivo, rr_id))
-                
-                df_v = fetch_all("SELECT venda_id FROM contas_a_receber WHERE id = ?", (rr_id,))
-                if not df_v.empty and pd.notna(df_v.iloc[0]['venda_id']):
-                    vid = int(df_v.iloc[0]['venda_id'])
-                    gerar_comissao_se_necessario(vid, 'LIQUIDAÇÃO', cli)
-                    
-                desc_final = f"REC. Cliente {cli}: {fat}"
-                run_query("INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, FALSE)",
-                          (dt_rec.strftime("%Y-%m-%d"), desc_final, val_efetivo, rr_id, bCid))
-                          
-            st.success(f"✔️ {len(df_selecionadas)} recebimentos injetados no Fluxo do banco {banco_destino}!")
-            import time; time.sleep(1.5); st.rerun()
+                        # Guarda de Idempotência: ignora se o título já tiver sido marcado como RECEBIDO
+                        df_chk = fetch_all_tx(cursor, "SELECT status FROM contas_a_receber WHERE id = ?", (rr_id,))
+                        if not df_chk.empty and str(df_chk.iloc[0]['status']).strip().upper() == 'RECEBIDO':
+                            continue
+
+                        cli = primeiro_valor_valido(r, ['Cliente', 'Cliente_Fantasia', 'Cliente_Razao'], 'Diversos')
+                        fat = primeiro_valor_valido(r, ['N. Doc', 'Histórico'], '')
+                        
+                        val_efetivo = valor_pago if is_partial else v_base
+                        
+                        if is_partial:
+                            saldo = v_base - val_efetivo
+                            df_orig = fetch_all_tx(cursor, "SELECT * FROM contas_a_receber WHERE id = ?", (rr_id,))
+                            if not df_orig.empty:
+                                orig = df_orig.iloc[0]
+                                c_id_orig = int(orig['cliente_id']) if pd.notna(orig['cliente_id']) else None
+                                v_id_orig = int(orig['venda_id']) if pd.notna(orig['venda_id']) else None
+                                pc_id_orig = int(orig['plano_conta_id']) if pd.notna(orig['plano_conta_id']) else None
+                                desc_orig = orig['descricao'] if pd.notna(orig['descricao']) else ""
+                                venc_orig = orig['data_vencimento']
+                                dt_emissao_orig = orig['data_emissao'] if 'data_emissao' in orig and pd.notna(orig['data_emissao']) else date.today().strftime("%Y-%m-%d")
+                                doc_orig = orig['numero_documento'] if pd.notna(orig['numero_documento']) else None
+                                
+                                # Insere o saldo restante
+                                run_query_tx(cursor, "INSERT INTO contas_a_receber (cliente_id, venda_id, plano_conta_id, descricao, valor, data_emissao, data_vencimento, status, numero_documento) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDENTE', ?)",
+                                          (c_id_orig, v_id_orig, pc_id_orig, f"{desc_orig} (Saldo Parcial)", saldo, dt_emissao_orig, venc_orig, doc_orig))
+                        
+                        # Atualiza o original com val_efetivo
+                        run_query_tx(cursor, "UPDATE contas_a_receber SET status='RECEBIDO', data_recebimento=?, conta_bancaria_id=?, valor=? WHERE id=? AND status != 'RECEBIDO'",
+                                  (dt_rec.strftime("%Y-%m-%d"), bCid, val_efetivo, rr_id))
+                        
+                        df_v = fetch_all_tx(cursor, "SELECT venda_id FROM contas_a_receber WHERE id = ?", (rr_id,))
+                        if not df_v.empty and pd.notna(df_v.iloc[0]['venda_id']):
+                            vid = int(df_v.iloc[0]['venda_id'])
+                            gerar_comissao_se_necessario(vid, 'LIQUIDAÇÃO', cli)
+                            
+                        desc_final = f"REC. Cliente {cli}: {fat}"
+                        run_query_tx(cursor, "INSERT INTO fluxo_caixa (data, tipo, categoria, descricao, valor, fonte_id, conta_bancaria_id, conciliado) VALUES (?, 'Entrada', 'Receita Com Vendas', ?, ?, ?, ?, FALSE)",
+                                  (dt_rec.strftime("%Y-%m-%d"), desc_final, val_efetivo, rr_id, bCid))
+                                  
+                st.success(f"✔️ {len(df_selecionadas)} recebimentos injetados no Fluxo do banco {banco_destino}!")
+                import time; time.sleep(1.5); st.rerun()
+            except Exception as e:
+                st.error(f"⚠️ Erro ao registrar recebimento em lote: {e}")
 
 @st.dialog("Editar Duplicata a Receber", width="large")
 def dialog_editar_receber(id_selecionado):
