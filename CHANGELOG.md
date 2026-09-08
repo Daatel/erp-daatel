@@ -1,3 +1,13 @@
+## v2.5.3 — 2026-09-08 (Sessão: Reformulação para DRE Gerencial & Nota Explicativa de Investimentos)
+
+### 🏛️ Demonstrativo Gerencial do Resultado (`pages/10_DRE.py`)
+- **Reposicionamento Conceitual para DRE Gerencial:** Atualizados o título da aba e da página para `DRE Gerencial`, alinhando a ferramenta à tomada de decisão executiva da diretoria da fábrica.
+- **Seção VII — Resultado Gerencial Líquido:** Renomeada a Seção VII para `VII. Resultado Gerencial Líquido (pós-Investimentos e CAPEX)`.
+- **Nota Explicativa da Diretoria:** Adicionada a legenda gerencial exata definida pela diretoria:
+  `📌 Visão Gerencial: Do lucro operacional são deduzidos os desembolsos de investimentos (compra de máquinas, etc.) efetuados no mês.`
+
+---
+
 ## v2.5.2 — 2026-09-08 (Sessão: Remoção do Falso Caixa no DRE / Conciliação Rígida Competência DRE vs Extrato Razão)
 
 ### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)

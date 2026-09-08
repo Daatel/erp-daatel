@@ -424,7 +424,7 @@ def modal_auditoria_lancamentos(conta_label, sel_mes_ano):
 
 # -------- RENDERIZAÇÃO VISUAL ---------
 
-tab1, tab2 = st.tabs(["DRE", "Ponto de Equilíbrio (Break-Even)"])
+tab1, tab2 = st.tabs(["DRE Gerencial", "Ponto de Equilíbrio (Break-Even)"])
 
 with tab1:
     st.markdown("<div class='dre-wrapper'>", unsafe_allow_html=True)
@@ -649,14 +649,25 @@ with tab1:
     </div>
     """)
     
-    st.markdown("<div class='dre-sec-header'>VII. Conciliação de Resultado (Competência DRE vs Caixa Real)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='dre-sec-header'>VII. Resultado Gerencial Líquido (pós-Investimentos e CAPEX)</div>", unsafe_allow_html=True)
     
-    st.info(f"""
-    💡 **Conciliação Contábil & Financeira (Agosto/2026):**
-    - **Resultado por Competência (DRE):** A fábrica gerou **{f_br(lucro_mes)}** de Lucro Líquido Econômico (Baseado nas Vendas Faturadas de {f_br(rb_mes)} deduzidos os Custos e Despesas do mês).
-    - **Movimentação Efetiva de Caixa (Extrato Bancário):** No período, o caixa real teve **R$ 230.662,45** de Entradas recebidas e **R$ 228.705,56** de Saídas pagas, resultando em uma variação de caixa no banco de **+ R$ 1.956,89** (Saldo bancário final: R$ 4.535,93).
-    - **Por que existe essa diferença (~R$ 78 mil)?** Porque as vendas do DRE consideram o faturamento total (incluindo duplicatas e boletos a receber em Setembro/Outubro), enquanto o Extrato considera apenas o dinheiro que efetivamente entrou e saiu da conta no mês.
+    render_html(f"""
+    <div class='dre-row'>
+        <div class='dre-label'>Lucro Líquido Operacional (Competência)</div>
+        <div class='dre-val'>{f_br(lucro_mes)}</div>
+    </div>
+    <div class='dre-row'>
+        <div class='dre-label'><b>(-) Desembolsos de Investimentos</b> *(Compra de Máquinas, Equipamentos e Imobilizado)*</div>
+        <div class='dre-val'>- {f_br(capex_mes)}</div>
+    </div>
+    {get_inline_rows_html(prefixos_codigo=['1.2.', '4.1.'], nomes_filtro=['Máquina', 'Equipamento', 'Imobilizado', 'CAPEX', 'Maquinário'])}
+    <div class='dre-row-total'>
+        <div class='dre-label'><b>(=) RESULTADO GERENCIAL LÍQUIDO DA FÁBRICA</b></div>
+        <div class='dre-val-total'>{f_br(caixa_livre_mes)}</div>
+    </div>
     """)
+    
+    st.caption("📌 **Visão Gerencial:** Do lucro operacional são deduzidos os desembolsos de investimentos (compra de máquinas, etc.) efetuados no mês.")
         
     st.markdown("</div>", unsafe_allow_html=True)
 
