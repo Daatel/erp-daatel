@@ -1,3 +1,13 @@
+## v2.4.4 — 2026-09-08 (Sessão: Cabeçalho Técnico de Custos Fixos, Eliminação de Expanders & Abertura Inline por Plano de Contas)
+
+### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
+- **Título Técnico Estrito:** Renomeada a Seção III de `"III. O Peso Existencial (Despesas Engessadas)"` para `"III. Custos Fixos"`.
+- **Eliminação dos Botões de Detalhamento (`st.expander`):** Removidos todos os botões de expander/retrátil do DRE, eliminando a necessidade de cliques manuais para conferência.
+- **Detalhamento Inline no Plano de Contas:** Todas as subcontas do Plano de Contas (`2.3.1` a `3.1.4`) são apresentadas diretamente em linhas filhas estruturadas (`.dre-row-sub`) de forma nativa e visível no demonstrativo.
+- **Ajuste de Competência dos Custos Fixos:** Corrigido o filtro de datas para consultar diretamente as despesas do mês selecionado (com vencimento no próprio mês), eliminando discrepâncias no valor consolidado de Custos Fixos.
+
+---
+
 ## v2.4.3 — 2026-09-08 (Sessão: Remoção de Ícones/Emojis, Separação de Fretes e Comissões & Ajuste de Largura da Tabela DRE)
 
 ### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)

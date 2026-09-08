@@ -53,7 +53,7 @@ h1 {
     justify-content: space-between;
     align-items: center;
     padding: 6px 12px 6px 28px;
-    border-bottom: 1px dashed #f1f5f9;
+    border-bottom: 1px dashed #e2e8f0;
     font-size: 0.90rem;
     color: #475569;
     background-color: #fafafa;
@@ -113,13 +113,6 @@ h1 {
     width: 150px;
     margin-left: 20px;
 }
-.stExpander {
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 8px !important;
-    margin-top: 6px !important;
-    margin-bottom: 12px !important;
-    max-width: 960px !important;
-}
 </style>
 <h1>Demonstrativo do Resultado do Exercício (DRE)</h1>
 """, unsafe_allow_html=True)
@@ -168,7 +161,7 @@ dt_vd_devol_inicio_str = p_mes.start_time.strftime("%Y-%m-%d")
 dt_vd_devol_fim_str = p_mes.end_time.strftime("%Y-%m-%d")
 
 dt_cap_inicio_str = p_mes.start_time.strftime("%Y-%m-%d")
-dt_cap_fim_str = (p_mes + 1).end_time.strftime("%Y-%m-%d")
+dt_cap_fim_str = p_mes.end_time.strftime("%Y-%m-%d")
 
 # --- QUERY DAS VENDAS ---
 df_vd = fetch_all("""
@@ -215,12 +208,7 @@ df_cap = fetch_all("""
 
 if not df_cap.empty:
     df_cap['data_vencimento'] = pd.to_datetime(df_cap['data_vencimento'], errors='coerce')
-    df_cap['venc_month'] = df_cap['data_vencimento'].dt.to_period('M')
-    
-    is_fixed = df_cap['codigo'].str.startswith(('2.3.', '3.1.'), na=False) & ~df_cap['codigo'].str.startswith('2.3.6', na=False)
-    
-    df_cap['ref_month'] = df_cap['venc_month']
-    df_cap.loc[is_fixed, 'ref_month'] = df_cap.loc[is_fixed, 'venc_month'] - 1
+    df_cap['ref_month'] = df_cap['data_vencimento'].dt.to_period('M')
 else:
     df_cap = pd.DataFrame(columns=['valor', 'descricao', 'codigo', 'pc_cat', 'pc_nome', 'ref_month'])
 
@@ -269,7 +257,7 @@ outros_fab_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.1.', na
 
 cmv_tot_mes = mp_val_mes + emb_mes + outros_fab_mes
 
-# Nível 4: Despesas Comerciais Variáveis (Separados: Comissões e Fretes)
+# Nível 4: Despesas Comerciais Variáveis
 comi_mes = float(df_vd_mes['comissao_valor'].sum()) if not df_vd_mes.empty else 0.0
 frete_mes = float(df_vd_mes['custo_frete_rateado'].sum()) if not df_vd_mes.empty else 0.0
 acordos_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.2.2', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
@@ -284,7 +272,7 @@ mc_mes = rl_mes - cmv_tot_mes - desp_com_mes
 mc_perc = (mc_mes / rl_mes * 100) if rl_mes > 0 else 0.0
 mc_kg_mes = mc_mes / rl_kg_mes if rl_kg_mes > 0 else 0.0
 
-# Despesas Fixas
+# Custos Fixos
 df_mes_val = float(df_cap_mes[df_cap_mes['codigo'].str.startswith(('2.3.', '3.1.'), na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
 pro_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('3.1.4', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
 
@@ -312,32 +300,40 @@ caixa_livre_mes = lucro_mes + depr_mes - capex_mes
 # Ponto de Equilíbrio
 break_even = (df_mes_val / (mc_perc / 100)) if mc_perc > 0 else 0.0
 
-# --- FUNÇÃO AUXILIAR DE DRILL-DOWN PELO PLANO DE CONTAS ---
-def render_drilldown(titulo, prefixos_codigo=None, nomes_filtro=None):
-    df_m = df_cap_mes.copy()
-    if df_m.empty:
-        st.caption("Sem lançamentos no período.")
-        return
-        
-    cond_m = pd.Series([False] * len(df_m), index=df_m.index)
+# --- FUNÇÃO AUXILIAR DE DETALHAMENTO INLINE PELO PLANO DE CONTAS ---
+def get_inline_rows_html(prefixos_codigo=None, nomes_filtro=None, ignorar_codigos=None):
+    if df_cap_mes.empty:
+        return ""
+    cond = pd.Series([False] * len(df_cap_mes), index=df_cap_mes.index)
     if prefixos_codigo:
         for pfix in prefixos_codigo:
-            cond_m |= df_m['codigo'].str.startswith(pfix, na=False)
-            
+            cond |= df_cap_mes['codigo'].str.startswith(pfix, na=False)
     if nomes_filtro:
         for nfilt in nomes_filtro:
-            cond_m |= df_m['pc_nome'].str.contains(nfilt, case=False, na=False)
+            cond |= df_cap_mes['pc_nome'].str.contains(nfilt, case=False, na=False)
             
-    res_m = df_m[cond_m].groupby(['codigo', 'pc_nome'])['valor'].sum().reset_index()
-    if res_m.empty:
-        st.info("Nenhum lançamento no Plano de Contas para este grupo no período.")
-        return
+    if ignorar_codigos:
+        for icod in ignorar_codigos:
+            cond &= ~df_cap_mes['codigo'].str.startswith(icod, na=False)
+            
+    df_filtered = df_cap_mes[cond]
+    if df_filtered.empty:
+        return ""
         
-    res_m = res_m.sort_values(by='codigo')
-    res_m.columns = ['Código', 'Plano de Contas', 'Valor (R$)']
-    res_m['Valor (R$)'] = res_m['Valor (R$)'].apply(f_br)
+    grouped = df_filtered.groupby(['codigo', 'pc_nome'])['valor'].sum().reset_index().sort_values(by='codigo')
     
-    st.dataframe(res_m, hide_index=True, use_container_width=True)
+    rows_html = ""
+    for _, r in grouped.iterrows():
+        cod = r['codigo']
+        nome = r['pc_nome']
+        val = float(r['valor'])
+        rows_html += f"""
+        <div class='dre-row-sub'>
+            <div class='dre-label'><b>{cod} - {nome}</b></div>
+            <div class='dre-val'>{f_br(val)}</div>
+        </div>
+        """
+    return rows_html
 
 # -------- RENDERIZAÇÃO VISUAL ---------
 
@@ -391,9 +387,10 @@ with tab1:
         <div class='dre-val'>{f_br(dev_mes)}</div>
     </div>
     <div class='dre-row'>
-        <div class='dre-label'><b>3. (-) Impostos sobre Venda (Vencimento no Mês - 2.1.3)</b></div>
+        <div class='dre-label'><b>3. (-) Impostos sobre Venda (2.1.3)</b></div>
         <div class='dre-val'>{f_br(imp_venda_mes)}</div>
     </div>
+    """ + get_inline_rows_html(prefixos_codigo=['2.1.3']) + f"""
     <div class='dre-row-total'>
         <div class='dre-label'>
             (=) RECEITA LÍQUIDA REAL
@@ -404,10 +401,7 @@ with tab1:
     </div>
     """, unsafe_allow_html=True)
     
-    with st.expander("Detalhar Deduções e Impostos no Plano de Contas"):
-        render_drilldown("Deduções e Impostos", prefixos_codigo=['2.1.3'])
-        
-    st.markdown("<div class='dre-sec-header'>II. Motores de Custo Variável & CMV Fabril</div>", unsafe_allow_html=True)
+    st.markdown("<div class='dre-sec-header'>II. Custos Variáveis e CMV</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # II. CMV FABRIL REMODELADO & CUSTOS VARIÁVEIS
@@ -434,7 +428,7 @@ with tab1:
         <div class='dre-label'><b>4.3 (-) Outros Custos Fabris Diretos</b></div>
         <div class='dre-val'>{f_br(outros_fab_mes)}</div>
     </div>
-    """ if outros_fab_mes > 0 else "") + f"""
+    """ if outros_fab_mes > 0 else "") + get_inline_rows_html(prefixos_codigo=['2.1.'], ignorar_codigos=['2.1.1', '2.1.2', '2.1.3']) + f"""
     
     <div class='dre-row-subtotal' style='margin-top: 10px;'>
         <div class='dre-label'><b>5. Despesas Comerciais Variáveis</b></div>
@@ -464,6 +458,7 @@ with tab1:
         <div class='dre-label'><b>5.6 (-) Serviços de Promotores de Vendas (2.2.4)</b></div>
         <div class='dre-val'>{f_br(promotores_mes)}</div>
     </div>
+    """ + get_inline_rows_html(prefixos_codigo=['2.2.']) + f"""
     
     <div class='dre-row-total'>
         <div class='dre-label'>
@@ -475,28 +470,18 @@ with tab1:
     </div>
     """, unsafe_allow_html=True)
     
-    with st.expander("Detalhar Custos e Despesas Variáveis no Plano de Contas"):
-        render_drilldown("Custos Variáveis e Comerciais", prefixos_codigo=['2.1.', '2.2.'])
-        
-    st.markdown("<div class='dre-sec-header'>III. O Peso Existencial (Despesas Engessadas)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='dre-sec-header'>III. Custos Fixos</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
-    # III. DESPESAS FIXAS
+    # III. CUSTOS FIXOS (Abertura direta pelo Plano de Contas)
     # -------------------------------------------------------------------------
     st.markdown(f"""
-    <div class='dre-row'>
-        <div class='dre-label'><b>6. (-) Desp. Fixas Totais (Vencimento no Mês Seguinte)</b></div>
-        <div class='dre-val'>{f_br(df_mes_val)}</div>
+    <div class='dre-row-subtotal'>
+        <div class='dre-label'><b>6. (-) Custos Fixos Totais</b></div>
+        <div class='dre-val-total'>{f_br(df_mes_val)}</div>
     </div>
-    <div class='dre-row-sub'>
-        <div class='dre-label'><i>Dessa Fila: (-) Pró-Labore (Salário Sócio)</i></div>
-        <div class='dre-val'><i>{f_br(pro_mes)}</i></div>
-    </div>
-    """, unsafe_allow_html=True)
+    """ + get_inline_rows_html(prefixos_codigo=['2.3.', '3.1.']), unsafe_allow_html=True)
     
-    with st.expander("Detalhar Despesas Fixas no Plano de Contas"):
-        render_drilldown("Despesas Fixas", prefixos_codigo=['2.3.', '3.1.'])
-        
     st.markdown("<div class='dre-sec-header'>IV. Resultado Operacional (EBITDA)</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
@@ -534,12 +519,9 @@ with tab1:
         <div class='dre-label'><b>10. (-) JCP (Juros s/ Capital Próprio)</b></div>
         <div class='dre-val'>{f_br(jcp_mes)}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """ + get_inline_rows_html(prefixos_codigo=['3.2.'], nomes_filtro=['Depreciação', 'Impostos sobre Lucro', 'IRPJ', 'CSLL', 'Financiamento', 'Juros', 'JCP']), unsafe_allow_html=True)
     
-    with st.expander("Detalhar Fatores Não-Operacionais e Financeiros no Plano de Contas"):
-        render_drilldown("Fatores Financeiros", prefixos_codigo=['3.2.'], nomes_filtro=['Depreciação', 'Impostos sobre Lucro', 'IRPJ', 'CSLL', 'Financiamento', 'Juros', 'JCP'])
-        
-    st.markdown("<div class='dre-sec-header'>VI. Lucratividade do Exercício (Competência)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='dre-sec-header'>VI. Lucro Líquido do Exercício</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # VI. LUCRO LÍQUIDO & DIVIDENDOS
@@ -562,7 +544,7 @@ with tab1:
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("<div class='dre-sec-header'>VII. Geração Líquida de Caixa & Investimentos (CAPEX / Maquinário)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='dre-sec-header'>VII. Geração Líquida de Caixa (CAPEX / Maquinário)</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # VII. GERAÇÃO LÍQUIDA DE CAIXA & MAQUINÁRIO (CAPEX)
@@ -580,14 +562,12 @@ with tab1:
         <div class='dre-label'><b>(-) Investimentos em Maquinário & Equipamentos</b> *(CAPEX Pago no Mês)*</div>
         <div class='dre-val'>- {f_br(capex_mes)}</div>
     </div>
+    """ + get_inline_rows_html(prefixos_codigo=['1.2.', '4.1.'], nomes_filtro=['Máquina', 'Equipamento', 'Imobilizado', 'CAPEX', 'Maquinário']) + f"""
     <div class='dre-row-total'>
         <div class='dre-label'><b>(=) RESULTADO LÍQUIDO DE CAIXA DA OPERAÇÃO</b></div>
         <div class='dre-val-total'>{f_br(caixa_livre_mes)}</div>
     </div>
     """, unsafe_allow_html=True)
-    
-    with st.expander("Detalhar Compras de Maquinário / CAPEX no Plano de Contas"):
-        render_drilldown("Investimentos e Maquinário", prefixos_codigo=['1.2.', '4.1.'], nomes_filtro=['Máquina', 'Equipamento', 'Imobilizado', 'CAPEX', 'Maquinário'])
         
     st.markdown("</div>", unsafe_allow_html=True)
 
