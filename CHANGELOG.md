@@ -1,3 +1,12 @@
+## v2.7.0 — 2026-09-08 (Sessão: Botões de Exportação Excel .xlsx e PDF no RGC + Correção PostgreSQL)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Exportação Excel (`.xlsx`):** Adicionado botão `📊 Exportar RGC (Excel .xlsx)` no topo do relatório. Gera uma planilha Excel nativa (`openpyxl`) completa, formatada em moeda brasileira (`R$ #,##0.00`), com estilos visuais para Abertura (azul), EBITDA, Margem, CAPEX (amarelo) e Fechamento (verde), incluindo o detalhamento analítico das contas.
+- **Exportação PDF (`.pdf`):** Adicionado botão `📄 Exportar RGC (PDF)` no topo do relatório. Gera um relatório executivo em PDF nativo (`fpdf2`), com design corporativo em tabela estruturada, cabeçalho da empresa, carimbo de data/período de apuração e formatação de valores.
+- **Compatibilidade PostgreSQL (Supabase):** Corrigida consulta SQL de estoque para tratamento estrito do campo booleano `is_materia_prima`, prevenindo o erro `operator does not exist: boolean = integer`.
+
+---
+
 ## v2.6.3 — 2026-09-08 (Sessão: Tratamento de Tags Físicas de Matéria-Prima no RGC)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)

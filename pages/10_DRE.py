@@ -1,12 +1,210 @@
 import streamlit as st
 import pandas as pd
 import calendar
+import io
 from datetime import timedelta, date
 from database import fetch_all
 from estilo import carregar_estilo
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from fpdf import FPDF
 
 st.set_page_config(page_title="Relatório Gerencial de Caixa", page_icon="🏛️", layout="wide")
 carregar_estilo()
+
+def gerar_excel_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, ent_outros, dev_mes, imp_venda_mes, rl_mes, cmv_tot_mes, mp_val_mes, emb_mes, outros_fab_mes, desp_com_mes, comi_mes, frete_mes, acordos_mes, descarga_mes, degust_mes, promotores_mes, mc_mes, df_mes_val, ebitda_mes, depr_mes, imp_lucro_mes, finan_mes, jcp_mes, lucro_mes, div_mes, retido_mes, capex_mes, caixa_livre_mes, saldo_final_caixa, df_sai_mes):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "RGC"
+
+    title_font = Font(name='Calibri', size=13, bold=True, color='FFFFFF')
+    title_fill = PatternFill(start_color='0F172A', end_color='0F172A', fill_type='solid')
+    hdr_font = Font(name='Calibri', size=11, bold=True, color='0F172A')
+    hdr_fill = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+    ini_font = Font(name='Calibri', size=11, bold=True, color='0369A1')
+    ini_fill = PatternFill(start_color='E0F2FE', end_color='E0F2FE', fill_type='solid')
+    tot_font = Font(name='Calibri', size=11, bold=True, color='0F172A')
+    tot_fill = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+    cpx_font = Font(name='Calibri', size=11, bold=True, color='854D0E')
+    cpx_fill = PatternFill(start_color='FEF08A', end_color='FEF08A', fill_type='solid')
+    fim_font = Font(name='Calibri', size=12, bold=True, color='15803D')
+    fim_fill = PatternFill(start_color='DCFCE7', end_color='DCFCE7', fill_type='solid')
+
+    thin_border = Border(
+        left=Side(style='thin', color='CBD5E1'),
+        right=Side(style='thin', color='CBD5E1'),
+        top=Side(style='thin', color='CBD5E1'),
+        bottom=Side(style='thin', color='CBD5E1')
+    )
+
+    ws.merge_cells('A1:C1')
+    ws['A1'] = f'DAATEL ERP - RELATÓRIO GERENCIAL DE CAIXA (RGC) - {sel_mes_ano}'
+    ws['A1'].font = title_font
+    ws['A1'].fill = title_fill
+    ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
+
+    ws.append([])
+    ws.append(['Código / Ref.', 'Descrição da Conta / Movimentação', 'Valor (R$)'])
+    for col in ['A3', 'B3', 'C3']:
+        ws[col].font = hdr_font
+        ws[col].fill = hdr_fill
+
+    data_rows = [
+        ('INICIAL', '(+) SALDO INICIAL CONSOLIDADO DE CAIXA (Abertura)', saldo_inicial_caixa, 'ini'),
+        ('1.0', '1. Receita Operacional Realizada', rb_mes, 'subtotal'),
+        ('1.1.1', '  1.1 Entradas de Vendas de Alho In Natura', ent_nat, 'normal'),
+        ('1.1.2', '  1.2 Entradas de Vendas de Alho Descascado', ent_desc, 'normal'),
+        ('1.3', '  1.3 Outras Receitas Operacionais Recebidas', ent_outros, 'normal') if ent_outros > 0 else None,
+        ('2.0', '2. (-) Devoluções / Abatimentos Realizados', dev_mes, 'normal'),
+        ('2.1.3', '3. (-) Impostos sobre Venda Pagos', imp_venda_mes, 'normal'),
+        ('RL', '(=) RECEITA LÍQUIDA DE CAIXA', rl_mes, 'total'),
+        ('4.0', '4. Custo Total de Fabricação / CMV Pago', cmv_tot_mes, 'subtotal'),
+        ('2.1.1', '  4.1 (-) Matéria-Prima Paga (Alho in Natura)', mp_val_mes, 'normal'),
+        ('2.1.2', '  4.2 (-) Embalagens & Insumos Pagos', emb_mes, 'normal'),
+        ('5.0', '5. Despesas Comerciais Variáveis Pagas', desp_com_mes, 'subtotal'),
+        ('2.1.4', '  5.1 (-) Comissões de Vendas Pagas', comi_mes, 'normal'),
+        ('2.1.5', '  5.2 (-) Fretes de Entrega Pagos', frete_mes, 'normal'),
+        ('2.2.2', '  5.3 (-) Acordos de Rede & Rebates Pagos', acordos_mes, 'normal'),
+        ('2.2.0', '  5.4 (-) Taxas de Descarga Pagas', descarga_mes, 'normal'),
+        ('2.2.1', '  5.5 (-) Degustações e Amostras Pagas', degust_mes, 'normal'),
+        ('2.2.4', '  5.6 (-) Promotores de Vendas Pagos', promotores_mes, 'normal'),
+        ('MC', '(=) MARGEM DE CONTRIBUIÇÃO LÍQUIDA DE CAIXA', mc_mes, 'total'),
+        ('6.0', '6. (-) Custos e Despesas Fixas Totais Pagas', df_mes_val, 'subtotal'),
+    ]
+
+    if not df_sai_mes.empty:
+        is_cf = df_sai_mes['codigo'].str.startswith(('2.3.', '3.1.'), na=False) | ((df_sai_mes['codigo'] == 'OUTROS') & ~df_sai_mes['codigo'].str.startswith(('3.2.', '3.3.', '1.2.', '4.1.'), na=False))
+        df_cf = df_sai_mes[is_cf & ~df_sai_mes['codigo'].str.startswith(('3.2.', '3.3.', '1.2.', '4.1.'), na=False)]
+        if not df_cf.empty:
+            grp_cf = df_cf.groupby(['codigo', 'pc_nome'])['valor'].sum().reset_index().sort_values(by='codigo')
+            for _, r in grp_cf.iterrows():
+                data_rows.append((str(r['codigo']), f"    {r['codigo']} - {r['pc_nome']}", float(r['valor']), "detail"))
+
+    data_rows.extend([
+        ("EBITDA", "(=) EBITDA DE CAIXA (Resultado Operacional)", ebitda_mes, "total"),
+        ("3.2.1", "9. (-) Juros e Financiamentos Pagos", finan_mes, "normal"),
+        ("3.2.0", "8. (-) Impostos sobre Lucro Pagos (IRPJ/CSLL)", imp_lucro_mes, "normal"),
+        ("GER", "(=) GERAÇÃO LÍQUIDA DE CAIXA OPERACIONAL", lucro_mes, "subtotal"),
+        ("DIV", "12. (-) Dividendos (Saque/Distribuição Efetivada)", div_mes, "normal"),
+        ("RET", "(=) GERAÇÃO RETIDA DE CAIXA OPERACIONAL", retido_mes, "total"),
+        ("CAPEX", "(-) Desembolsos de Investimentos Pagos (CAPEX / Máquinas)", capex_mes, "normal"),
+        ("VAR", "(=) GERAÇÃO / REDUÇÃO LÍQUIDA DE CAIXA NO MÊS", caixa_livre_mes, "capex"),
+        ("FINAL", "(=) SALDO FINAL CONSOLIDADO DE CAIXA (Fechamento)", saldo_final_caixa, "fim")
+    ])
+
+    for row in data_rows:
+        if row is None: continue
+        cod, desc, val, rtype = row
+        ws.append([cod, desc, val])
+        curr_row = ws.max_row
+        ws.cell(row=curr_row, column=3).number_format = 'R$ #,##0.00'
+        c1 = ws.cell(row=curr_row, column=1)
+        c2 = ws.cell(row=curr_row, column=2)
+        c3 = ws.cell(row=curr_row, column=3)
+        for c in (c1, c2, c3): c.border = thin_border
+        if rtype == 'ini':
+            for c in (c1, c2, c3): c.font = ini_font; c.fill = ini_fill
+        elif rtype == 'total':
+            for c in (c1, c2, c3): c.font = tot_font; c.fill = tot_fill
+        elif rtype == 'subtotal':
+            for c in (c1, c2, c3): c.font = hdr_font; c.fill = hdr_fill
+        elif rtype == 'capex':
+            for c in (c1, c2, c3): c.font = cpx_font; c.fill = cpx_fill
+        elif rtype == 'fim':
+            for c in (c1, c2, c3): c.font = fim_font; c.fill = fim_fill
+
+    ws.column_dimensions['A'].width = 18
+    ws.column_dimensions['B'].width = 58
+    ws.column_dimensions['C'].width = 22
+
+    output_excel = io.BytesIO()
+    wb.save(output_excel)
+    return output_excel.getvalue()
+
+
+def gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, ent_outros, dev_mes, imp_venda_mes, rl_mes, cmv_tot_mes, mp_val_mes, emb_mes, outros_fab_mes, desp_com_mes, comi_mes, frete_mes, acordos_mes, descarga_mes, degust_mes, promotores_mes, mc_mes, df_mes_val, ebitda_mes, depr_mes, imp_lucro_mes, finan_mes, jcp_mes, lucro_mes, div_mes, retido_mes, capex_mes, caixa_livre_mes, saldo_final_caixa, df_sai_mes):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    pdf.set_font('Helvetica', 'B', 13)
+    pdf.set_fill_color(15, 23, 42)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 10, f"DAATEL ERP - RELATÓRIO GERENCIAL DE CAIXA (RGC)", align='C', fill=True, new_x='LMARGIN', new_y='NEXT')
+    
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_text_color(71, 85, 105)
+    pdf.cell(0, 7, f"Período de Apuração: {sel_mes_ano} | Regime 100% Caixa (Extrato Real)", align='C', new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(3)
+
+    pdf.set_font('Helvetica', 'B', 10)
+    pdf.set_fill_color(224, 242, 254)
+    pdf.set_text_color(3, 105, 161)
+    pdf.cell(135, 8, " (+) SALDO INICIAL CONSOLIDADO DE CAIXA (Abertura)", border=1, fill=True)
+    pdf.cell(55, 8, f"R$ {saldo_inicial_caixa:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."), border=1, align='R', fill=True, new_x='LMARGIN', new_y='NEXT')
+
+    pdf.set_text_color(15, 23, 42)
+
+    rows = [
+        ("1. Receita Operacional Realizada", rb_mes, "subtotal"),
+        ("  1.1 Entradas de Alho In Natura", ent_nat, "normal"),
+        ("  1.2 Entradas de Alho Descascado", ent_desc, "normal"),
+        ("2. (-) Devoluções / Abatimentos Realizados", dev_mes, "normal"),
+        ("3. (-) Impostos sobre Venda Pagos", imp_venda_mes, "normal"),
+        ("(=) RECEITA LÍQUIDA DE CAIXA", rl_mes, "total"),
+        ("4. Custo Total de Fabricação / CMV Pago", cmv_tot_mes, "subtotal"),
+        ("  4.1 (-) Matéria-Prima Paga (Alho in Natura)", mp_val_mes, "normal"),
+        ("  4.2 (-) Embalagens & Insumos Pagos", emb_mes, "normal"),
+        ("5. Despesas Comerciais Variáveis Pagas", desp_com_mes, "subtotal"),
+        ("  5.2 (-) Fretes de Entrega Pagos", frete_mes, "normal"),
+        ("(=) MARGEM DE CONTRIBUIÇÃO LÍQUIDA DE CAIXA", mc_mes, "total"),
+        ("6. (-) Custos e Despesas Fixas Totais Pagas", df_mes_val, "subtotal"),
+    ]
+
+    if not df_sai_mes.empty:
+        is_cf = df_sai_mes['codigo'].str.startswith(('2.3.', '3.1.'), na=False) | ((df_sai_mes['codigo'] == 'OUTROS') & ~df_sai_mes['codigo'].str.startswith(('3.2.', '3.3.', '1.2.', '4.1.'), na=False))
+        df_cf = df_sai_mes[is_cf & ~df_sai_mes['codigo'].str.startswith(('3.2.', '3.3.', '1.2.', '4.1.'), na=False)]
+        if not df_cf.empty:
+            grp_cf = df_cf.groupby(['codigo', 'pc_nome'])['valor'].sum().reset_index().sort_values(by='codigo')
+            for _, r in grp_cf.iterrows():
+                rows.append((f"    {r['codigo']} - {r['pc_nome']}", float(r['valor']), "detail"))
+
+    rows.extend([
+        ("(=) EBITDA DE CAIXA (Resultado Operacional)", ebitda_mes, "total"),
+        ("9. (-) Juros e Financiamentos Pagos", finan_mes, "normal"),
+        ("8. (-) Impostos sobre Lucro Pagos (IRPJ/CSLL)", imp_lucro_mes, "normal"),
+        ("(=) GERAÇÃO LÍQUIDA DE CAIXA OPERACIONAL", lucro_mes, "subtotal"),
+        ("12. (-) Dividendos (Saque/Distribuição Efetivada)", div_mes, "normal"),
+        ("(=) GERAÇÃO RETIDA DE CAIXA OPERACIONAL", retido_mes, "total"),
+        ("(-) Desembolsos de Investimentos Pagos (CAPEX)", capex_mes, "normal"),
+        ("(=) GERAÇÃO / REDUÇÃO LÍQUIDA DE CAIXA NO MÊS", caixa_livre_mes, "capex"),
+    ])
+
+    for r in rows:
+        desc, val, rtype = r
+        val_str = f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        if rtype in ("subtotal", "total"):
+            pdf.set_font('Helvetica', 'B', 9)
+            pdf.set_fill_color(241, 245, 249)
+        elif rtype == "capex":
+            pdf.set_font('Helvetica', 'B', 9)
+            pdf.set_fill_color(254, 240, 138)
+        else:
+            pdf.set_font('Helvetica', '', 8.5)
+            pdf.set_fill_color(255, 255, 255)
+
+        pdf.cell(135, 6, f" {desc}", border=1, fill=True)
+        pdf.cell(55, 6, val_str, border=1, align='R', fill=True, new_x='LMARGIN', new_y='NEXT')
+
+    pdf.ln(2)
+    pdf.set_font('Helvetica', 'B', 10)
+    pdf.set_fill_color(220, 252, 231)
+    pdf.set_text_color(21, 128, 61)
+    pdf.cell(135, 8, " (=) SALDO FINAL CONSOLIDADO DE CAIXA (Fechamento)", border=1, fill=True)
+    pdf.cell(55, 8, f"R$ {saldo_final_caixa:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."), border=1, align='R', fill=True, new_x='LMARGIN', new_y='NEXT')
+
+    pdf_bytes = pdf.output()
+    return bytes(pdf_bytes) if isinstance(pdf_bytes, bytearray) else pdf_bytes
 
 st.markdown("""
 <style>
@@ -220,7 +418,7 @@ if mp_kg_mes == 0:
         FROM estoque_movimentos em
         JOIN produtos p ON em.produto_id = p.id
         WHERE UPPER(em.tipo_movimento) = 'ENTRADA'
-          AND (p.is_materia_prima = TRUE OR p.is_materia_prima = 1)
+          AND (p.is_materia_prima IS TRUE OR CAST(p.is_materia_prima AS TEXT) = '1')
           AND em.data >= ? AND em.data <= ?
     """, (dt_vd_devol_inicio_str, dt_vd_devol_fim_str))
     if df_est_mp is not None and not df_est_mp.empty:
@@ -423,6 +621,27 @@ with col_hdr_audit:
     active_rubrica = st.session_state.pop("active_audit_rubrica", None)
     if active_rubrica:
         modal_auditoria_lancamentos(active_rubrica, sel_mes_ano)
+
+# --- BOTOES DE EXPORTACAO (EXCEL & PDF) ---
+col_exp_1, col_exp_2, _ = st.columns([1.3, 1.3, 1.4])
+with col_exp_1:
+    excel_bytes = gerar_excel_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, ent_outros, dev_mes, imp_venda_mes, rl_mes, cmv_tot_mes, mp_val_mes, emb_mes, outros_fab_mes, desp_com_mes, comi_mes, frete_mes, acordos_mes, descarga_mes, degust_mes, promotores_mes, mc_mes, df_mes_val, ebitda_mes, depr_mes, imp_lucro_mes, finan_mes, jcp_mes, lucro_mes, div_mes, retido_mes, capex_mes, caixa_livre_mes, saldo_final_caixa, df_sai_mes)
+    st.download_button(
+        label="📊 Exportar RGC (Excel .xlsx)",
+        data=excel_bytes,
+        file_name=f"Relatorio_Gerencial_Caixa_{sel_mes_ano.replace('/', '_')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+with col_exp_2:
+    pdf_bytes = gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, ent_outros, dev_mes, imp_venda_mes, rl_mes, cmv_tot_mes, mp_val_mes, emb_mes, outros_fab_mes, desp_com_mes, comi_mes, frete_mes, acordos_mes, descarga_mes, degust_mes, promotores_mes, mc_mes, df_mes_val, ebitda_mes, depr_mes, imp_lucro_mes, finan_mes, jcp_mes, lucro_mes, div_mes, retido_mes, capex_mes, caixa_livre_mes, saldo_final_caixa, df_sai_mes)
+    st.download_button(
+        label="📄 Exportar RGC (PDF)",
+        data=pdf_bytes,
+        file_name=f"Relatorio_Gerencial_Caixa_{sel_mes_ano.replace('/', '_')}.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
 
 # -------------------------------------------------------------------------
 # ABERTURA DO CAIXA (SALDO INICIAL)
