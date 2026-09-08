@@ -1,3 +1,11 @@
+## v2.4.5 — 2026-09-08 (Sessão: Correção da Renderização de HTML no DRE / Remoção de Blocos de Código em Markdown)
+
+### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
+- **Correção da Renderização HTML (`render_html`):** Criada a função `render_html()` que sanitiza e remove os espaços de indentação no início das linhas de blocos HTML multilinhas antes de enviá-los ao `st.markdown()`. Isso impede que o parser de Markdown do Streamlit interprete o HTML como bloco de código formatado em cinza (`<pre><code>`).
+- **Nivelamento de Sub-linhas Inline:** Ajustada a função `get_inline_rows_html()` para gerar strings HTML em linha única, garantindo a renderização visual perfeita dos detalhamentos do Plano de Contas diretamente na grid DRE.
+
+---
+
 ## v2.4.4 — 2026-09-08 (Sessão: Cabeçalho Técnico de Custos Fixos, Eliminação de Expanders & Abertura Inline por Plano de Contas)
 
 ### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)

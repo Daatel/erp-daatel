@@ -327,12 +327,7 @@ def get_inline_rows_html(prefixos_codigo=None, nomes_filtro=None, ignorar_codigo
         cod = r['codigo']
         nome = r['pc_nome']
         val = float(r['valor'])
-        rows_html += f"""
-        <div class='dre-row-sub'>
-            <div class='dre-label'><b>{cod} - {nome}</b></div>
-            <div class='dre-val'>{f_br(val)}</div>
-        </div>
-        """
+        rows_html += f"<div class='dre-row-sub'><div class='dre-label'><b>{cod} - {nome}</b></div><div class='dre-val'>{f_br(val)}</div></div>"
     return rows_html
 
 # -------- RENDERIZAÇÃO VISUAL ---------
@@ -357,7 +352,7 @@ with tab1:
     # -------------------------------------------------------------------------
     # I. RECEITA E DEDUÇÕES (Tabela Financeira Executiva Limpa)
     # -------------------------------------------------------------------------
-    st.markdown(f"""
+    render_html(f"""
     <div class='dre-row-subtotal'>
         <div class='dre-label'>
             <b>1. Receita Operacional Bruta ({sel_mes_ano})</b>
@@ -390,7 +385,7 @@ with tab1:
         <div class='dre-label'><b>3. (-) Impostos sobre Venda (2.1.3)</b></div>
         <div class='dre-val'>{f_br(imp_venda_mes)}</div>
     </div>
-    """ + get_inline_rows_html(prefixos_codigo=['2.1.3']) + f"""
+    {get_inline_rows_html(prefixos_codigo=['2.1.3'])}
     <div class='dre-row-total'>
         <div class='dre-label'>
             (=) RECEITA LÍQUIDA REAL
@@ -399,14 +394,14 @@ with tab1:
         </div>
         <div class='dre-val-total'>{f_br(rl_mes)}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
     
     st.markdown("<div class='dre-sec-header'>II. Custos Variáveis e CMV</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # II. CMV FABRIL REMODELADO & CUSTOS VARIÁVEIS
     # -------------------------------------------------------------------------
-    st.markdown(f"""
+    render_html(f"""
     <div class='dre-row-subtotal'>
         <div class='dre-label'><b>4. Custo Total de Fabricação / CMV</b></div>
         <div class='dre-val-total'>{f_br(cmv_tot_mes)}</div>
@@ -423,13 +418,8 @@ with tab1:
         <div class='dre-label'><b>4.2 (-) Embalagens & Insumos de Acondicionamento (2.1.2)</b></div>
         <div class='dre-val'>{f_br(emb_mes)}</div>
     </div>
-    """ + (f"""
-    <div class='dre-row-sub'>
-        <div class='dre-label'><b>4.3 (-) Outros Custos Fabris Diretos</b></div>
-        <div class='dre-val'>{f_br(outros_fab_mes)}</div>
-    </div>
-    """ if outros_fab_mes > 0 else "") + get_inline_rows_html(prefixos_codigo=['2.1.'], ignorar_codigos=['2.1.1', '2.1.2', '2.1.3']) + f"""
-    
+    {"<div class='dre-row-sub'><div class='dre-label'><b>4.3 (-) Outros Custos Fabris Diretos</b></div><div class='dre-val'>" + f_br(outros_fab_mes) + "</div></div>" if outros_fab_mes > 0 else ""}
+    {get_inline_rows_html(prefixos_codigo=['2.1.'], ignorar_codigos=['2.1.1', '2.1.2', '2.1.3'])}
     <div class='dre-row-subtotal' style='margin-top: 10px;'>
         <div class='dre-label'><b>5. Despesas Comerciais Variáveis</b></div>
         <div class='dre-val-total'>{f_br(desp_com_mes)}</div>
@@ -458,8 +448,7 @@ with tab1:
         <div class='dre-label'><b>5.6 (-) Serviços de Promotores de Vendas (2.2.4)</b></div>
         <div class='dre-val'>{f_br(promotores_mes)}</div>
     </div>
-    """ + get_inline_rows_html(prefixos_codigo=['2.2.']) + f"""
-    
+    {get_inline_rows_html(prefixos_codigo=['2.2.'])}
     <div class='dre-row-total'>
         <div class='dre-label'>
             (=) MARGEM DE CONTRIBUIÇÃO LÍQUIDA
@@ -468,26 +457,27 @@ with tab1:
         </div>
         <div class='dre-val-total'>{f_br(mc_mes)}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
     
     st.markdown("<div class='dre-sec-header'>III. Custos Fixos</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # III. CUSTOS FIXOS (Abertura direta pelo Plano de Contas)
     # -------------------------------------------------------------------------
-    st.markdown(f"""
+    render_html(f"""
     <div class='dre-row-subtotal'>
         <div class='dre-label'><b>6. (-) Custos Fixos Totais</b></div>
         <div class='dre-val-total'>{f_br(df_mes_val)}</div>
     </div>
-    """ + get_inline_rows_html(prefixos_codigo=['2.3.', '3.1.']), unsafe_allow_html=True)
+    {get_inline_rows_html(prefixos_codigo=['2.3.', '3.1.'])}
+    """)
     
     st.markdown("<div class='dre-sec-header'>IV. Resultado Operacional (EBITDA)</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # IV. EBITDA
     # -------------------------------------------------------------------------
-    st.markdown(f"""
+    render_html(f"""
     <div class='dre-row-total'>
         <div class='dre-label'>
             (=) EBITDA (Resultado Operacional)
@@ -495,14 +485,14 @@ with tab1:
         </div>
         <div class='dre-val-total'>{f_br(ebitda_mes)}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
     
     st.markdown("<div class='dre-sec-header'>V. Fatores Não-Operacionais e Financeiros</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # V. FATORES FINANCEIROS & LUCRO LÍQUIDO
     # -------------------------------------------------------------------------
-    st.markdown(f"""
+    render_html(f"""
     <div class='dre-row'>
         <div class='dre-label'><b>7. (-) Depreciação / Amortização (Gasto Não-Caixa)</b></div>
         <div class='dre-val'>{f_br(depr_mes)}</div>
@@ -519,14 +509,15 @@ with tab1:
         <div class='dre-label'><b>10. (-) JCP (Juros s/ Capital Próprio)</b></div>
         <div class='dre-val'>{f_br(jcp_mes)}</div>
     </div>
-    """ + get_inline_rows_html(prefixos_codigo=['3.2.'], nomes_filtro=['Depreciação', 'Impostos sobre Lucro', 'IRPJ', 'CSLL', 'Financiamento', 'Juros', 'JCP']), unsafe_allow_html=True)
+    {get_inline_rows_html(prefixos_codigo=['3.2.'], nomes_filtro=['Depreciação', 'Impostos sobre Lucro', 'IRPJ', 'CSLL', 'Financiamento', 'Juros', 'JCP'])}
+    """)
     
     st.markdown("<div class='dre-sec-header'>VI. Lucro Líquido do Exercício</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # VI. LUCRO LÍQUIDO & DIVIDENDOS
     # -------------------------------------------------------------------------
-    st.markdown(f"""
+    render_html(f"""
     <div class='dre-row-subtotal'>
         <div class='dre-label'>
             <b>11. (=) LUCRO LÍQUIDO TOTAL GERADO</b>
@@ -542,14 +533,14 @@ with tab1:
         <div class='dre-label'><b>(=) LUCRO RETIDO (PATRIMÔNIO CNPJ)</b></div>
         <div class='dre-val-total'>{f_br(retido_mes)}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
     
     st.markdown("<div class='dre-sec-header'>VII. Geração Líquida de Caixa (CAPEX / Maquinário)</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # VII. GERAÇÃO LÍQUIDA DE CAIXA & MAQUINÁRIO (CAPEX)
     # -------------------------------------------------------------------------
-    st.markdown(f"""
+    render_html(f"""
     <div class='dre-row'>
         <div class='dre-label'>Lucro Líquido Contábil (Competência)</div>
         <div class='dre-val'>{f_br(lucro_mes)}</div>
@@ -562,12 +553,12 @@ with tab1:
         <div class='dre-label'><b>(-) Investimentos em Maquinário & Equipamentos</b> *(CAPEX Pago no Mês)*</div>
         <div class='dre-val'>- {f_br(capex_mes)}</div>
     </div>
-    """ + get_inline_rows_html(prefixos_codigo=['1.2.', '4.1.'], nomes_filtro=['Máquina', 'Equipamento', 'Imobilizado', 'CAPEX', 'Maquinário']) + f"""
+    {get_inline_rows_html(prefixos_codigo=['1.2.', '4.1.'], nomes_filtro=['Máquina', 'Equipamento', 'Imobilizado', 'CAPEX', 'Maquinário'])}
     <div class='dre-row-total'>
         <div class='dre-label'><b>(=) RESULTADO LÍQUIDO DE CAIXA DA OPERAÇÃO</b></div>
         <div class='dre-val-total'>{f_br(caixa_livre_mes)}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
         
     st.markdown("</div>", unsafe_allow_html=True)
 
