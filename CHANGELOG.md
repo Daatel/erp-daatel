@@ -1,3 +1,10 @@
+## v2.4.6 — 2026-09-08 (Sessão: Fix NameError render_html em pages/10_DRE.py)
+
+### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
+- **Fix NameError `render_html`:** Inserida a declaração explícita da função `render_html()` no escopo global de `pages/10_DRE.py`, resolvendo a exceção de runtime no Streamlit Cloud.
+
+---
+
 ## v2.4.5 — 2026-09-08 (Sessão: Correção da Renderização de HTML no DRE / Remoção de Blocos de Código em Markdown)
 
 ### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)

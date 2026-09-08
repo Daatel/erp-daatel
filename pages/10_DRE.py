@@ -300,7 +300,11 @@ caixa_livre_mes = lucro_mes + depr_mes - capex_mes
 # Ponto de Equilíbrio
 break_even = (df_mes_val / (mc_perc / 100)) if mc_perc > 0 else 0.0
 
-# --- FUNÇÃO AUXILIAR DE DETALHAMENTO INLINE PELO PLANO DE CONTAS ---
+# --- FUNÇÃO AUXILIAR DE RENDERIZAÇÃO E DETALHAMENTO INLINE PELO PLANO DE CONTAS ---
+def render_html(html_str):
+    cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
+    st.markdown(cleaned, unsafe_allow_html=True)
+
 def get_inline_rows_html(prefixos_codigo=None, nomes_filtro=None, ignorar_codigos=None):
     if df_cap_mes.empty:
         return ""
