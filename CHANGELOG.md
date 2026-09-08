@@ -1,3 +1,13 @@
+## v2.4.0 — 2026-09-08 (Sessão: Remodelação do DRE Fabril, Drill-Down por Plano de Contas & Geração de Caixa CAPEX)
+
+### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
+- **Indicadores Físicos de Vendas (Kg & R$/Kg):** Adicionada exibição do volume total vendido em Kg (`f_kg`) e preço médio por Kg (`f_pm`) no Faturamento Bruto e na Receita Líquida.
+- **CMV Fabril Remodelado (Opção B - Subgrupos Fabris):** Subdivisão do CMV em Matéria-Prima Comprada (exibindo Kg comprados, R$ total e R$/Kg médio de aquisição), Embalagens/Insumos (2.1.2) e Outros Custos Fabris.
+- **Desdobramento ao Nível do Plano de Contas (Drill-Down Interativo):** Adicionados expansores sanfonados (`st.expander`) em todos os grandes grupos do DRE para detalhar cada lançamento pelo código e nome do Plano de Contas (com comparativo Mês Atual vs Média 90 dias).
+- **Novo Bloco VII — Geração Líquida de Caixa & CAPEX (Maquinário):** Criada seção de conciliação executiva ao final do DRE ajustando o Lucro Líquido por Competência pela Reversão da Depreciação (não-caixa) e dedução das parcelas/investimentos em Maquinário e Equipamentos (CAPEX), entregando o **Resultado Líquido de Caixa da Operação**.
+
+---
+
 ## v2.3.1 — 2026-09-08 (Sessão: Atomicidade Transacional & Idempotência em Liquidações Financeiras)
 
 ### 💵 Financeiro & Tesouraria (`utils_financeiro_modals.py`, `pages/9_Financeiro.py`)
