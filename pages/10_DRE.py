@@ -334,6 +334,88 @@ def get_inline_rows_html(prefixos_codigo=None, nomes_filtro=None, ignorar_codigo
         rows_html += f"<div class='dre-row-sub'><div class='dre-label'><b>{cod} - {nome}</b></div><div class='dre-val'>{f_br(val)}</div></div>"
     return rows_html
 
+# --- MODAL DE AUDITORIA DE LANÇAMENTOS (INSPEÇÃO DE NÚMEROS) ---
+@st.dialog("🔍 Auditoria de Lançamentos Contábeis", width="large")
+def modal_auditoria_lancamentos(conta_label, sel_mes_ano):
+    st.caption(f"Exibindo extrato analítico com todos os títulos e registros que compõem **{conta_label}** em **{sel_mes_ano}**.")
+    
+    dt_inc = dt_vd_devol_inicio_str
+    dt_fim = dt_vd_devol_fim_str
+    
+    if "1.1" in conta_label and "NF" in conta_label:
+        df_a = fetch_all("""
+            SELECT data AS "Emissão", id AS "Nº Venda", cliente_id AS "Cliente ID",
+                   quantidade AS "Volume (Kg)", valor_total AS "Valor (R$)"
+            FROM vendas
+            WHERE status = 'FATURADO' AND data >= ? AND data <= ?
+              AND (tipo_documento LIKE '%NF%' OR tipo_documento LIKE '%Nota%')
+            ORDER BY data DESC
+        """, (dt_inc, dt_fim))
+    elif "1.2" in conta_label and "DAV" in conta_label:
+        df_a = fetch_all("""
+            SELECT data AS "Emissão", id AS "Nº Venda", cliente_id AS "Cliente ID",
+                   quantidade AS "Volume (Kg)", valor_total AS "Valor (R$)"
+            FROM vendas
+            WHERE status = 'FATURADO' AND data >= ? AND data <= ?
+              AND (tipo_documento NOT LIKE '%NF%' AND tipo_documento NOT LIKE '%Nota%')
+            ORDER BY data DESC
+        """, (dt_inc, dt_fim))
+    elif "Devoluções" in conta_label:
+        df_a = fetch_all("""
+            SELECT data AS "Data", motivo AS "Motivo", cliente_id AS "Cliente ID",
+                   valor_financeiro_abatido AS "Valor (R$)"
+            FROM devolucoes
+            WHERE data >= ? AND data <= ?
+            ORDER BY data DESC
+        """, (dt_inc, dt_fim))
+    elif "4.1" in conta_label and "Matéria-Prima" in conta_label:
+        df_a = fetch_all("""
+            SELECT data AS "Data", fornecedor_id AS "Fornecedor ID",
+                   peso_kg AS "Volume (Kg)", valor_total AS "Valor (R$)"
+            FROM compras_materia_prima
+            WHERE data >= ? AND data <= ?
+            ORDER BY data DESC
+        """, (dt_inc, dt_fim))
+    else:
+        cod_alvo = conta_label.split(' - ')[0].strip()
+        df_a = fetch_all("""
+            SELECT c.data_vencimento AS "Vencimento", c.data_pagamento AS "Data Pgto",
+                   c.numero_documento AS "Doc / Título", c.descricao AS "Descrição",
+                   c.status AS "Status", c.valor AS "Valor (R$)"
+            FROM contas_a_pagar c
+            JOIN planos_de_contas pc ON c.plano_conta_id = pc.id
+            WHERE c.data_vencimento >= ? AND c.data_vencimento <= ?
+              AND pc.codigo LIKE ?
+            ORDER BY c.data_vencimento ASC
+        """, (dt_inc, dt_fim, f"{cod_alvo}%"))
+        
+    if df_a is None or df_a.empty:
+        st.info(f"Nenhum lançamento individual encontrado para **{conta_label}** no período de {sel_mes_ano}.")
+    else:
+        tot_val = float(df_a['Valor (R$)'].sum()) if 'Valor (R$)' in df_a.columns else 0.0
+        tot_reg = len(df_a)
+        
+        mc1, mc2 = st.columns(2)
+        mc1.metric("Qtd. Lançamentos", tot_reg)
+        mc2.metric("Soma Total Auditada", f_br(tot_val))
+        
+        df_disp = df_a.copy()
+        if 'Valor (R$)' in df_disp.columns:
+            df_disp['Valor (R$)'] = df_disp['Valor (R$)'].apply(lambda x: f_br(float(x)) if pd.notnull(x) else "R$ 0,00")
+        if 'Volume (Kg)' in df_disp.columns:
+            df_disp['Volume (Kg)'] = df_disp['Volume (Kg)'].apply(lambda x: f_kg(float(x)) if pd.notnull(x) else "0,0 Kg")
+            
+        st.dataframe(df_disp, use_container_width=True, hide_index=True)
+        
+        csv_data = df_a.to_csv(index=False).encode('utf-8')
+        cod_clean = conta_label.split(' - ')[0].replace('.', '_')
+        st.download_button(
+            label="📥 Baixar Extrato de Auditoria (CSV)",
+            data=csv_data,
+            file_name=f"auditoria_{cod_clean}_{sel_mes_ano.replace('/', '_')}.csv",
+            mime="text/csv"
+        )
+
 # -------- RENDERIZAÇÃO VISUAL ---------
 
 tab1, tab2 = st.tabs(["DRE", "Ponto de Equilíbrio (Break-Even)"])
@@ -341,7 +423,7 @@ tab1, tab2 = st.tabs(["DRE", "Ponto de Equilíbrio (Break-Even)"])
 with tab1:
     st.markdown("<div class='dre-wrapper'>", unsafe_allow_html=True)
     
-    col_hdr_title, col_hdr_sel = st.columns([2.2, 1.2])
+    col_hdr_title, col_hdr_sel, col_hdr_audit = st.columns([1.5, 0.9, 1.2])
     with col_hdr_title:
         st.markdown("<div class='dre-sec-header'>I. Faturamento Bruto</div>", unsafe_allow_html=True)
     with col_hdr_sel:
@@ -352,6 +434,28 @@ with tab1:
             key="sel_mes_ano_tab1",
             on_change=sync_tab1
         )
+    with col_hdr_audit:
+        opcoes_audit = [
+            "🔍 Auditar Rubrica / Conta...",
+            "1.1 - Vendas por Nota Fiscal (NF)",
+            "1.2 - Vendas por DAV (Pedido)",
+            "2 - Devoluções e Abatimentos",
+            "4.1 - Matéria-Prima (Alho in Natura)"
+        ]
+        if not df_cap_mes.empty:
+            pcs_mes = df_cap_mes[['codigo', 'pc_nome']].drop_duplicates().sort_values('codigo')
+            for _, r in pcs_mes.iterrows():
+                lbl = f"{r['codigo']} - {r['pc_nome']}"
+                if lbl not in opcoes_audit:
+                    opcoes_audit.append(lbl)
+                    
+        rubrica_sel = st.selectbox(
+            "🔍 Inspecionar Conta:",
+            opcoes_audit,
+            key="sel_audit_rubrica"
+        )
+        if rubrica_sel and rubrica_sel != "🔍 Auditar Rubrica / Conta...":
+            modal_auditoria_lancamentos(rubrica_sel, sel_mes_ano)
     
     # -------------------------------------------------------------------------
     # I. RECEITA E DEDUÇÕES (Tabela Financeira Executiva Limpa)

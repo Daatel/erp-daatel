@@ -1,3 +1,13 @@
+## v2.5.0 — 2026-09-08 (Sessão: Modal de Inspeção Auditável de Lançamentos Contábeis / DRE Drill-Down)
+
+### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
+- **Modal de Auditoria de Lançamentos (`st.dialog`):** Implementado o inspetor de números em janela flutuante overlay (`modal_auditoria_lancamentos`), permitindo auditar a composição exata de qualquer rubrica do DRE.
+- **Seletor de Inspeção `🔍 Inspecionar Conta`:** Posicionado no cabeçalho executivo da página, permite selecionar qualquer rubrica (`1.1 Vendas NF`, `1.2 Vendas DAV`, `2 Devoluções`, `4.1 Matéria-Prima` ou subcontas do Plano de Contas `2.3.*`, `3.1.*`, etc.) para abrir instantaneamente o extrato analítico em tela.
+- **Detalhamento Analítico:** Apresenta quantidade de registros, soma total auditada (R$), datas de vencimento/pagamento, fornecedores, clientes, descrições e status de pagamento.
+- **Exportação de Conciliação (CSV):** Incluído botão para baixar o extrato auditado diretamente em formato CSV para auditoria e conciliação contábil.
+
+---
+
 ## v2.4.6 — 2026-09-08 (Sessão: Fix NameError render_html em pages/10_DRE.py)
 
 ### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
