@@ -253,13 +253,19 @@ if mp_val_mes == 0 and not df_cap_mes.empty:
 mp_pm_mes = mp_val_mes / mp_kg_mes if mp_kg_mes > 0 else 0.0
 
 emb_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.1.2', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
-outros_fab_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.1.', na=False) & ~df_cap_mes['codigo'].str.startswith(('2.1.1', '2.1.2', '2.1.3'), na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
+outros_fab_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.1.', na=False) & ~df_cap_mes['codigo'].str.startswith(('2.1.1', '2.1.2', '2.1.3', '2.1.4', '2.1.5'), na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
 
 cmv_tot_mes = mp_val_mes + emb_mes + outros_fab_mes
 
 # Nível 4: Despesas Comerciais Variáveis
-comi_mes = float(df_vd_mes['comissao_valor'].sum()) if not df_vd_mes.empty else 0.0
-frete_mes = float(df_vd_mes['custo_frete_rateado'].sum()) if not df_vd_mes.empty else 0.0
+comi_vd_val = float(df_vd_mes['comissao_valor'].sum()) if not df_vd_mes.empty else 0.0
+comi_cap_val = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.1.4', na=False) | df_cap_mes['pc_nome'].str.contains('Comissão|Comissões', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
+comi_mes = max(comi_vd_val, comi_cap_val)
+
+frete_vd_val = float(df_vd_mes['custo_frete_rateado'].sum()) if not df_vd_mes.empty else 0.0
+frete_cap_val = float(df_cap_mes[df_cap_mes['codigo'].str.startswith(('2.1.5', '2.2.3', '2.2.5'), na=False) | df_cap_mes['pc_nome'].str.contains('Frete', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
+frete_mes = max(frete_vd_val, frete_cap_val)
+
 acordos_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.2.2', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
 descarga_mes = float(df_vd_mes['custo_descarga'].sum()) if not df_vd_mes.empty else 0.0
 degust_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.2.1', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
@@ -527,7 +533,7 @@ with tab1:
         <div class='dre-val'>{f_br(emb_mes)}</div>
     </div>
     {"<div class='dre-row-sub'><div class='dre-label'><b>4.3 (-) Outros Custos Fabris Diretos</b></div><div class='dre-val'>" + f_br(outros_fab_mes) + "</div></div>" if outros_fab_mes > 0 else ""}
-    {get_inline_rows_html(prefixos_codigo=['2.1.'], ignorar_codigos=['2.1.1', '2.1.2', '2.1.3'])}
+    {get_inline_rows_html(prefixos_codigo=['2.1.'], ignorar_codigos=['2.1.1', '2.1.2', '2.1.3', '2.1.4', '2.1.5'])}
     <div class='dre-row-subtotal' style='margin-top: 10px;'>
         <div class='dre-label'><b>5. Despesas Comerciais Variáveis</b></div>
         <div class='dre-val-total'>{f_br(desp_com_mes)}</div>
@@ -556,7 +562,7 @@ with tab1:
         <div class='dre-label'><b>5.6 (-) Serviços de Promotores de Vendas (2.2.4)</b></div>
         <div class='dre-val'>{f_br(promotores_mes)}</div>
     </div>
-    {get_inline_rows_html(prefixos_codigo=['2.2.'])}
+    {get_inline_rows_html(prefixos_codigo=['2.2.', '2.1.4', '2.1.5'])}
     <div class='dre-row-total'>
         <div class='dre-label'>
             (=) MARGEM DE CONTRIBUIÇÃO LÍQUIDA

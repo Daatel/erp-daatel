@@ -1,3 +1,12 @@
+## v2.5.1 — 2026-09-08 (Sessão: Reclassificação Estrita de Fretes e Comissões / Correção de CMV e Despesas Comerciais)
+
+### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
+- **Reclassificação de Fretes de Vendas (Código 2.1.5):** A conta `2.1.5 - Fretes sobre Vendas (Entregas)` foi removida da Seção 4 (`4.3 Outros Custos Fabris Diretos / CMV`) e alocada corretamente na Seção 5 (`5.2 (-) Fretes de Entrega - Logística de Saída`).
+- **Reclassificação de Comissões de Vendas (Código 2.1.4):** A conta `2.1.4 - Comissões de Vendas` foi removida da Seção 4 e alocada na Seção 5 (`5.1 (-) Comissões de Vendas`).
+- **Consolidação de Lançamentos de Vendas e Contas a Pagar:** A apuração de fretes e comissões passa a considerar tanto o custo de frete/comissão das vendas quanto os títulos lançados no Contas a Pagar (`contas_a_pagar`), garantindo que despesas comerciais variáveis fiquem 100% visíveis no grupo 5.
+
+---
+
 ## v2.5.0 — 2026-09-08 (Sessão: Modal de Inspeção Auditável de Lançamentos Contábeis / DRE Drill-Down)
 
 ### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
