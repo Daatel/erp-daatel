@@ -1,3 +1,12 @@
+## v2.4.3 — 2026-09-08 (Sessão: Remoção de Ícones/Emojis, Separação de Fretes e Comissões & Ajuste de Largura da Tabela DRE)
+
+### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
+- **Remoção Completa de Emojis/Ícones:** Removidos todos os ícones decorativos de seções, linhas, tags e subtotais, mantendo uma tipografia limpa, austera e 100% corporativa.
+- **Separação de Comissões e Fretes (5.1 e 5.2):** Desmembradas as despesas comerciais em `5.1 (-) Comissões de Vendas` (comissões de vendedores/representantes) e `5.2 (-) Fretes de Entrega (Logística de Saída)` (custo de frete rateado), organizando o restante em 5.3 a 5.6.
+- **Aproximação dos Valores dos Lançamentos:** Adicionada a classe CSS `.dre-wrapper` com largura máxima de `960px` (`max-width: 960px`), eliminando a grande lacuna em branco no centro da tela e aproximando a coluna de números das descrições.
+
+---
+
 ## v2.4.2 — 2026-09-08 (Sessão: Desdobramento NF vs DAV & Redesign Visual Executivo da DRE)
 
 ### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
