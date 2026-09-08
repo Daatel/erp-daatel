@@ -1,3 +1,16 @@
+## v2.6.0 — 2026-09-08 (Sessão: Relatório Gerencial de Caixa - RGC 100% Regime de Caixa & Eliminação de Abas)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py` & `app.py`)
+- **Mudança de Paradigma (RGC 100% Regime de Caixa):** Migração completa da DRE de competência/mista para o **Relatório Gerencial de Caixa (RGC)**, apurando exclusivamente entradas e saídas de caixa efetivamente realizadas (títulos pagos no `contas_a_pagar` via `UPPER(status) = 'PAGO'`).
+- **Eliminação de Títulos Pendentes:** Zerada a distorção no relatório gerencial causada por títulos pendentes (como R$ 24.000,00 de máquinas a pagar), garantindo total fidelidade ao extrato bancário.
+- **Pilares de Abertura e Fechamento de Caixa:**
+  - **(+) SALDO INICIAL CONSOLIDADO DE CAIXA (Abertura do Mês):** Calculado no topo do relatório a partir do saldo acumulado do `fluxo_caixa` anterior ao 1º dia do mês selecionado.
+  - **(=) SALDO FINAL CONSOLIDADO DE CAIXA (Fechamento do Mês):** Calculado ao final do relatório adicionando a Geração Líquida de Caixa no Mês ao Saldo Inicial (`Saldo Inicial + Geração Líquida = Saldo Final`).
+- **Eliminação de Abas e Redesign de Tela Única:** Removido o container `st.tabs` para renderização em visão única executiva. O Ponto de Equilíbrio (Break-Even) foi realocado em um painel expansível no rodapé.
+- **Atualização de Menu e Título:** Menu lateral em `app.py` atualizado para **`Demonstrativo de Caixa`** e título principal para **`Relatório Gerencial de Caixa (RGC)`**.
+
+---
+
 ## v2.5.5 — 2026-09-08 (Sessão: Correção da Dupla Dedução de Manutenção / Filtro Estrito de CAPEX)
 
 ### 🏛️ Demonstrativo Gerencial do Resultado (`pages/10_DRE.py`)
