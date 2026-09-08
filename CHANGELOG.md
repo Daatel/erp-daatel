@@ -1,3 +1,12 @@
+## v2.4.1 — 2026-09-08 (Sessão: Simplificação Visual da DRE & Reposicionamento do Seletor de Mês)
+
+### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
+- **Aba DRE:** Renomeada a primeira aba de `"DRE Tático de Fábrica"` para simplesmente `"DRE"`.
+- **Eliminação da Coluna de Média Trimestral:** Removida a coluna de 90 dias, mantendo a DRE focada exclusivamente em **1 única coluna de valores** para o mês selecionado.
+- **Reposicionamento do Seletor Temporal:** Removido o seleto de mês em largura total no topo da página e inserido o seletor `Selecione o Mês/Ano:` posicionado **diretamente sobre a coluna de números** no cabeçalho.
+
+---
+
 ## v2.4.0 — 2026-09-08 (Sessão: Remodelação do DRE Fabril, Drill-Down por Plano de Contas & Geração de Caixa CAPEX)
 
 ### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
