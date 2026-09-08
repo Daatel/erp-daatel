@@ -1,3 +1,11 @@
+## v2.6.3 — 2026-09-08 (Sessão: Tratamento de Tags Físicas de Matéria-Prima no RGC)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Ajuste de Tags Físicas da Matéria-Prima (Linha 4.1):** Ajustada a renderização das tags de volume (Kg) e custo médio (R$/Kg) do alho in natura. Quando a compra for inserida diretamente no Contas a Pagar/Fluxo de Caixa (sem nota física lançada no módulo de Compras), a interface exibe a tag `<span class='dre-tag'>Lançamentos no Contas a Pagar</span>` em vez de mostrar a tag confusa de `0,0 Kg / R$ 0,00/Kg`.
+- **Busca Secundária de Estoque:** Adicionada consulta às entradas físicas do módulo de estoque para recuperar o volume em Kg caso o módulo de compras legado não tenha sido preenchido no mês.
+
+---
+
 ## v2.6.2 — 2026-09-08 (Sessão: Auto-Reset do Seletor de Inspeção de Contas / Limpeza do State)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)

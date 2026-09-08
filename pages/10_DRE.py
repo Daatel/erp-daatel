@@ -213,7 +213,25 @@ cmv_tot_mes = mp_val_mes + emb_mes + outros_fab_mes
 
 df_mp_mes = fetch_all("SELECT peso_kg FROM compras_materia_prima WHERE data >= ? AND data <= ?", (dt_vd_devol_inicio_str, dt_vd_devol_fim_str))
 mp_kg_mes = float(df_mp_mes['peso_kg'].sum()) if (df_mp_mes is not None and not df_mp_mes.empty) else 0.0
+
+if mp_kg_mes == 0:
+    df_est_mp = fetch_all("""
+        SELECT em.quantidade
+        FROM estoque_movimentos em
+        JOIN produtos p ON em.produto_id = p.id
+        WHERE UPPER(em.tipo_movimento) = 'ENTRADA'
+          AND (p.is_materia_prima = TRUE OR p.is_materia_prima = 1)
+          AND em.data >= ? AND em.data <= ?
+    """, (dt_vd_devol_inicio_str, dt_vd_devol_fim_str))
+    if df_est_mp is not None and not df_est_mp.empty:
+        mp_kg_mes = float(df_est_mp['quantidade'].sum())
+
 mp_pm_mes = mp_val_mes / mp_kg_mes if mp_kg_mes > 0 else 0.0
+
+if mp_kg_mes > 0:
+    tags_mp_html = f"<span class='dre-tag'>Compras: {f_kg(mp_kg_mes)}</span><span class='dre-tag'>Custo Médio: {f_pm(mp_pm_mes)}</span>"
+else:
+    tags_mp_html = "<span class='dre-tag'>Lançamentos no Contas a Pagar</span>"
 
 # --- 3. DESPESAS COMERCIAIS VARIÁVEIS PAGAS ---
 comi_mes = float(df_sai_mes[df_sai_mes['codigo'].str.startswith('2.1.4', na=False) | df_sai_mes['pc_nome'].str.contains('Comissão|Comissões', case=False, na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
@@ -477,8 +495,7 @@ render_html(f"""
 <div class='dre-row-sub'>
     <div class='dre-label'>
         <b>4.1 (-) Matéria-Prima Paga (Alho in Natura)</b>
-        <span class='dre-tag'>Compras: {f_kg(mp_kg_mes)}</span>
-        <span class='dre-tag'>Custo Médio: {f_pm(mp_pm_mes)}</span>
+        {tags_mp_html}
     </div>
     <div class='dre-val'>{f_br(mp_val_mes)}</div>
 </div>
