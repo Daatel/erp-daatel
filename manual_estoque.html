@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Manual — Módulo de Estoque | ERP Fábrica de Alho</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; color:#1e293b; background:#fff; font-size:14px; }
+
+  .cover { background:linear-gradient(135deg,#01743d 0%,#014d29 100%); color:#fff; min-height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:40px; text-align:center; border-radius:0 0 32px 32px; margin-bottom:36px; }
+  .cover .emoji { font-size:52px; margin-bottom:12px; }
+  .cover h1 { font-size:28px; font-weight:800; letter-spacing:-0.5px; }
+  .cover h2 { font-size:16px; font-weight:400; opacity:.85; margin-top:8px; }
+  .cover .badge { background:rgba(255,255,255,0.2); border-radius:20px; padding:4px 16px; font-size:12px; margin-top:16px; }
+
+  .page { max-width:760px; margin:0 auto; padding:0 32px 48px; }
+
+  h3 { font-size:17px; font-weight:700; color:#01743d; margin:28px 0 10px; border-left:4px solid #01743d; padding-left:10px; }
+  h4 { font-size:14px; font-weight:700; color:#292d77; margin:16px 0 6px; }
+  p  { line-height:1.75; color:#374151; margin-bottom:10px; }
+  ul { margin-left:18px; margin-bottom:10px; }
+  li { line-height:1.8; color:#374151; }
+
+  .tip  { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .warn { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .tip strong, .warn strong { display:block; margin-bottom:4px; }
+
+  /* CARDS ABAS */
+  .destinos { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin:16px 0 24px; }
+  .destino-card { border-radius:12px; padding:16px; text-align:center; }
+  .destino-card .icon { font-size:28px; margin-bottom:6px; }
+  .destino-card h5 { font-size:13px; font-weight:700; margin-bottom:4px; }
+  .destino-card p  { font-size:12px; margin:0; }
+  .d-mp   { background:#eff6ff; border:1.5px solid #93c5fd; }
+  .d-rv   { background:#fef3c7; border:1.5px solid #fcd34d; }
+  .d-ci   { background:#f3e8ff; border:1.5px solid #d8b4fe; }
+
+  .footer { text-align:center; color:#94a3b8; font-size:12px; padding:24px 0 16px; border-top:1px solid #e2e8f0; margin-top:40px; }
+
+  @media print {
+    body { font-size:13px; }
+    .cover { border-radius:0 0 20px 20px; }
+    .page { padding:0 20px 32px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="emoji">📦</div>
+  <h1>Módulo de Estoque</h1>
+  <h2>Posição de saldos, rastreabilidade e ajustes de inventário</h2>
+  <div class="badge">ERP Fábrica de Alho · Manual do Usuário</div>
+</div>
+
+<div class="page">
+
+  <h3>O que é este módulo?</h3>
+  <p>O módulo de Estoque é o guarda-livros físico da fábrica. Ele nunca fica desatualizado porque os outros módulos (Compras, Produção, Faturamento) inserem e retiram mercadorias daqui de forma automática.</p>
+  <p>Sua função nesta tela é <strong>monitorar</strong> os níveis críticos, fazer <strong>ajustes manuais</strong> de perdas ou sobras e puxar <strong>extratos</strong> de rastreabilidade (auditoria).</p>
+
+  <h3>A Estrutura das 3 Abas</h3>
+
+  <div class="destinos">
+    <div class="destino-card d-mp">
+      <div class="icon">📊</div>
+      <h5>Aba 1: Posição</h5>
+      <p>Dashboard geral para você ver o que tem na casa. Mostra linhas vermelhas (alertas de ruptura) para itens com estoque abaixo do mínimo definido.</p>
+    </div>
+    <div class="destino-card d-rv">
+      <div class="icon">✍️</div>
+      <h5>Aba 2: Lançamentos</h5>
+      <p>Onde o encarregado dá baixa ou entrada manual quando há diferença de inventário físico vs sistema.</p>
+    </div>
+    <div class="destino-card d-ci">
+      <div class="icon">📜</div>
+      <h5>Aba 3: Extrato</h5>
+      <p>A auditoria. Mostra quem mexeu no quê, qual módulo inseriu e os motivos (ex: Expedição de Venda Lote 12).</p>
+    </div>
+  </div>
+
+  <h3>Lançamentos Manuais: A Mágica Contábil</h3>
+  <p>Sempre que o estoquista precisa "sumir" ou "aparecer" com um item (porque apodreceu, porque foi dado de amostra, ou sobrou na balança), ele usa a aba de <strong>Lançamentos Manuais</strong>.</p>
+  
+  <p>O encarregado não precisa saber de contabilidade, mas o ERP é inteligente! Ele foi arquitetado com <strong>Motivos Amarrados ao DRE</strong>. Quando o operador seleciona o motivo da baixa, o sistema injeta o prejuízo financeiro oculto direto na conta certa da empresa.</p>
+
+  <div class="tip">
+    <strong>💡 Como as baixas refletem no financeiro:</strong>
+    <ul>
+      <li><strong>Amostras e Brindes:</strong> Vai para a linha de "Despesas com Marketing" no DRE.</li>
+      <li><strong>Avaria / Quebra no Manuseio:</strong> Vai como "Custo Variável com Perdas" no DRE.</li>
+      <li><strong>Consumo Interno:</strong> Vai para "Despesas Administrativas".</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <strong>⚠️ Sigilo Financeiro</strong>
+    O encarregado do estoque nunca vê preços, R$, ou o tamanho do DRE. Para ele, o sistema exibe apenas as caixas físicas. Toda a matemática financeira corre pelas tubulações seguras até o Dashboard da Diretoria.
+  </div>
+
+  <h3>Dúvidas Frequentes</h3>
+
+  <h4>Por que o estoque ficou negativo?</h4>
+  <p>O Módulo de Faturamento permite vender "no escuro" para não travar caminhões. Se houver venda de mercadoria que não teve a produção apontada, o saldo de produto acabado ficará negativo. Basta o encarregado de Produção lançar o lote do dia que o saldo empata e volta a ficar positivo ou zero.</p>
+
+  <h4>Como configuro o Alerta Vermelho?</h4>
+  <p>O alerta "Abaixo do Mínimo" obedece a margem de segurança cadastrada em cada produto. Para alterar esse limite, vá em <strong>Cadastros > Produtos</strong> e altere o campo "Estoque Mínimo de Segurança".</p>
+
+  <div class="footer">
+    ERP Fábrica de Alho · Módulo de Estoque · Versão 2.0 · Abril 2026
+  </div>
+
+</div>
+</body>
+</html>

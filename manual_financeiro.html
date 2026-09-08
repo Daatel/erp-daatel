@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Manual — Tesouraria e Financeiro | ERP Fábrica de Alho</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; color:#1e293b; background:#fff; font-size:14px; }
+
+  .cover { background:linear-gradient(135deg,#01743d 0%,#014d29 100%); color:#fff; min-height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:40px; text-align:center; border-radius:0 0 32px 32px; margin-bottom:36px; }
+  .cover .emoji { font-size:52px; margin-bottom:12px; }
+  .cover h1 { font-size:28px; font-weight:800; letter-spacing:-0.5px; }
+  .cover h2 { font-size:16px; font-weight:400; opacity:.85; margin-top:8px; }
+  .cover .badge { background:rgba(255,255,255,0.2); border-radius:20px; padding:4px 16px; font-size:12px; margin-top:16px; }
+
+  .page { max-width:760px; margin:0 auto; padding:0 32px 48px; }
+
+  h3 { font-size:17px; font-weight:700; color:#01743d; margin:28px 0 10px; border-left:4px solid #01743d; padding-left:10px; }
+  h4 { font-size:14px; font-weight:700; color:#292d77; margin:16px 0 6px; }
+  p  { line-height:1.75; color:#374151; margin-bottom:10px; }
+  ul { margin-left:18px; margin-bottom:10px; }
+  li { line-height:1.8; color:#374151; }
+
+  .tip  { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .warn { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .tip strong, .warn strong { display:block; margin-bottom:4px; }
+
+  /* CARDS ABAS */
+  .destinos { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:16px 0 24px; }
+  .destino-card { border-radius:12px; padding:16px; text-align:center; }
+  .destino-card .icon { font-size:28px; margin-bottom:6px; }
+  .destino-card h5 { font-size:13px; font-weight:700; margin-bottom:4px; }
+  .destino-card p  { font-size:12px; margin:0; }
+  .d-mp   { background:#eff6ff; border:1.5px solid #93c5fd; }
+  .d-rv   { background:#f0fdf4; border:1.5px solid #86efac; }
+  .d-ci   { background:#fef3c7; border:1.5px solid #fcd34d; }
+  .d-er   { background:#fee2e2; border:1.5px solid #fca5a5; }
+
+  .footer { text-align:center; color:#94a3b8; font-size:12px; padding:24px 0 16px; border-top:1px solid #e2e8f0; margin-top:40px; }
+
+  @media print {
+    body { font-size:13px; }
+    .cover { border-radius:0 0 20px 20px; }
+    .page { padding:0 20px 32px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="emoji">💸</div>
+  <h1>Tesouraria e Financeiro</h1>
+  <h2>O Centro de Comando de Receitas, Despesas e Conciliação</h2>
+  <div class="badge">ERP Fábrica de Alho · Manual do Usuário</div>
+</div>
+
+<div class="page">
+
+  <h3>O que é este módulo?</h3>
+  <p>Enquanto todos os outros módulos trabalham com "promessas de dinheiro", a Tesouraria lida com o <strong>dinheiro real no banco</strong>. É aqui que você controla a inadimplência na praça, enxerga se vai faltar caixa para pagar a folha daqui a 30 dias, e faz a liquidação mágica de dezenas de boletos em 1 segundo.</p>
+
+  <h3>O Tour pelas 4 Abas</h3>
+
+  <div class="destinos">
+    <div class="destino-card d-ci">
+      <div class="icon">📊</div>
+      <h5>Aba 1: Radar Executivo 30 Dias</h5>
+      <p>Um gráfico DRE evolutivo que soma todo o dinheiro do banco + patrimônio físico (estoque). Mostra os picos de pagamentos futuros.</p>
+    </div>
+    <div class="destino-card d-er">
+      <div class="icon">🔻</div>
+      <h5>Aba 2: Contas a Pagar (Saída)</h5>
+      <p>Todos os boletos gerados automaticamente pelo setor de Compras ficam aqui aguardando você dar baixa para os fornecedores.</p>
+    </div>
+    <div class="destino-card d-rv">
+      <div class="icon">🟢</div>
+      <h5>Aba 3: Contas a Receber (Entrada)</h5>
+      <p>Todos os recebíveis gerados automaticamente pela Logística na hora da expedição das mercadorias aos Clientes.</p>
+    </div>
+    <div class="destino-card d-mp">
+      <div class="icon">🏦</div>
+      <h5>Aba 4: Conciliação Bancária</h5>
+      <p>O Robô Importador de CSV. Ele varre o extrato do seu banco e audita sozinho se bate com os registros do ERP.</p>
+    </div>
+  </div>
+
+  <h3>Como funciona a Baixa em Lote? (Ganho de Produtividade)</h3>
+  <p>Nos ERPs antigos, para pagar 30 boletos vencidos, você tinha que clicar 30 vezes em janelas chatas, demorando meia hora. <strong>No Empório do Alho o sistema trabalha com Lotes e Checkboxes!</strong></p>
+
+  <p><strong>A Rotina do Tesoureiro:</strong></p>
+  <ol>
+    <li>Na segunda-feira, olhe o extrato do seu banco na tela do lado e abra a aba de "Contas a Pagar".</li>
+    <li>O sistema exibe uma "Data Grid" (planilha interativa) com todos os Fornecedores pedindo pagamento.</li>
+    <li>Vá "ticando" (marcando a caixinha) em todos os boletos que você confirmou no extrato que foram pagos.</li>
+    <li>Selecione o <strong>Banco</strong> de onde saiu o montante (Ex: Santander).</li>
+    <li>Clique em "Confirmar Baixa em Lote". Em 1 segundo, o sistema cria dezenas de saídas no Fluxo de Caixa limpo e joga o status para PAGO.</li>
+  </ol>
+
+  <div class="warn">
+    <strong>⚠️ E se teve juros ou multa?</strong>
+    A Baixa em Lote assume o valor BASE (original) da nota. Se na hora de ticar os fornecedores você notou que o Banco descontou um valor maior por causa de juros, você só precisa clicar na célula "Valor" daquela nota específica, editar para o número novo, e então confirmar o lote!
+  </div>
+
+  <h3>Robô Conciliador de Extrato (CSV)</h3>
+  <p>Para o fechamento mensal ficar redondo, a última aba serve para fazer auditoria. Vá no internet banking do Itaú/Caixa, baixe o extrato em formato `.CSV` e faça upload na aba 4.</p>
+  <p>O Robô do ERP vai varrer cada linha de centavos do banco e tentar achar o "gêmeo" pendente no ERP. Ao cruzar valores idênticos que nunca foram conferidos, ele exibe um aviso: <em>"Achei 25 movimentações idênticas. Conciliar Agora?"</em>. Um clique carimba o mês como fechado e blindado de erros humanos.</p>
+
+  <div class="footer">
+    ERP Fábrica de Alho · Módulo Financeiro · Versão 2.0 · Abril 2026
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Manual — Módulo de Compras | ERP Empório do Alho</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; color:#1e293b; background:#fff; font-size:14px; }
+
+  .cover { background:linear-gradient(135deg,#01743d 0%,#014d29 100%); color:#fff; min-height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:40px; text-align:center; border-radius:0 0 32px 32px; margin-bottom:36px; }
+  .cover .emoji { font-size:52px; margin-bottom:12px; }
+  .cover h1 { font-size:28px; font-weight:800; letter-spacing:-0.5px; }
+  .cover h2 { font-size:16px; font-weight:400; opacity:.85; margin-top:8px; }
+  .cover .badge { background:rgba(255,255,255,0.2); border-radius:20px; padding:4px 16px; font-size:12px; margin-top:16px; }
+
+  .page { max-width:760px; margin:0 auto; padding:0 32px 48px; }
+
+  h3 { font-size:17px; font-weight:700; color:#01743d; margin:28px 0 10px; border-left:4px solid #01743d; padding-left:10px; }
+  h4 { font-size:14px; font-weight:700; color:#292d77; margin:16px 0 6px; }
+  p  { line-height:1.75; color:#374151; margin-bottom:10px; }
+  ul { margin-left:18px; margin-bottom:10px; }
+  li { line-height:1.8; color:#374151; }
+
+  .tip  { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .warn { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .tip strong, .warn strong { display:block; margin-bottom:4px; }
+
+  /* FLUXO VISUAL */
+  .flow { display:flex; flex-direction:column; align-items:center; gap:0; margin:24px 0 32px; }
+  .flow-step { display:flex; align-items:flex-start; gap:14px; width:100%; max-width:620px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin-bottom:0; }
+  .flow-step .num { background:#01743d; color:#fff; font-weight:800; font-size:13px; border-radius:8px; min-width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+  .flow-step .content strong { font-size:14px; font-weight:700; color:#1e293b; }
+  .flow-step .content span { font-size:13px; color:#64748b; display:block; margin-top:2px; }
+  .flow-arrow { font-size:22px; color:#01743d; margin:2px 0; }
+
+  /* DESTINOS */
+  .destinos { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin:16px 0 24px; }
+  .destino-card { border-radius:12px; padding:16px; text-align:center; }
+  .destino-card .icon { font-size:28px; margin-bottom:6px; }
+  .destino-card h5 { font-size:13px; font-weight:700; margin-bottom:4px; }
+  .destino-card p  { font-size:12px; margin:0; }
+  .d-mp   { background:#f0fdf4; border:1.5px solid #86efac; }
+  .d-rv   { background:#eff6ff; border:1.5px solid #93c5fd; }
+  .d-ci   { background:#fef3c7; border:1.5px solid #fcd34d; }
+
+  /* FISCAL */
+  .fiscal-box { background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px; padding:16px 20px; margin:16px 0; }
+  .fiscal-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px dashed #e2e8f0; }
+  .fiscal-row:last-child { border-bottom:none; font-weight:700; color:#01743d; }
+  .fiscal-row .label { color:#475569; }
+  .fiscal-row .valor { font-weight:600; }
+
+  /* EXEMPLO */
+  .example { background:#fff; border:2px solid #01743d; border-radius:12px; padding:20px; margin:24px 0; }
+  .example h4 { color:#01743d; margin-top:0; font-size:15px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin:10px 0; }
+  th { background:#01743d; color:#fff; padding:8px 10px; text-align:left; }
+  td { padding:7px 10px; border-bottom:1px solid #f1f5f9; }
+  tr:nth-child(even) td { background:#f8fafc; }
+  .total-row td { font-weight:700; background:#f0fdf4 !important; }
+
+  .footer { text-align:center; color:#94a3b8; font-size:12px; padding:24px 0 16px; border-top:1px solid #e2e8f0; margin-top:40px; }
+
+  @media print {
+    body { font-size:13px; }
+    .cover { border-radius:0 0 20px 20px; }
+    .page { padding:0 20px 32px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="emoji">🛒</div>
+  <h1>Módulo de Compras</h1>
+  <h2>Como registrar Notas Fiscais de Entrada no sistema</h2>
+  <div class="badge">ERP Empório do Alho · Manual do Usuário</div>
+</div>
+
+<div class="page">
+
+  <h3>O que é este módulo?</h3>
+  <p>O módulo de Compras é onde você registra <strong>tudo o que a fábrica compra</strong> de fornecedores: alho in natura, embalagens, materiais de limpeza, papelaria — qualquer nota fiscal de entrada passa por aqui.</p>
+  <p>Ao registrar uma compra, o sistema automaticamente:</p>
+  <ul>
+    <li>✅ Dá entrada nos produtos no <strong>Estoque</strong></li>
+    <li>✅ Gera as <strong>duplicatas</strong> (boletos) no Financeiro</li>
+    <li>✅ Atualiza o <strong>custo do produto</strong> para o DRE</li>
+  </ul>
+
+  <div class="tip">
+    <strong>💡 Pré-requisito importante</strong>
+    Antes de lançar uma compra, certifique-se de que o <strong>fornecedor</strong> e os <strong>produtos</strong> da nota já estão cadastrados no sistema (menu Cadastros). O sistema não permitirá continuar sem eles.
+  </div>
+
+  <h3>Visão Geral do Fluxo</h3>
+  <p>O esquema abaixo mostra como uma Nota Fiscal de Entrada percorre o sistema — do registro até chegar ao Estoque, à Produção, às Vendas e ao Financeiro:</p>
+
+  <div style="width:100%;overflow-x:auto;margin:16px 0 28px;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px;background:#fafafa;">
+    <svg
+       viewBox="0 0 1200 850"
+       style="background-color: white; font-family: 'Inter', 'Roboto', sans-serif; width:100%; height:auto; display:block;"
+       version="1.1"
+       xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrowGreen" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#01743d"/>
+        </marker>
+        <marker id="arrowBlue" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#292d77"/>
+        </marker>
+        <marker id="arrowGold" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#d45500"/>
+        </marker>
+      </defs>
+      <text x="600" y="50" font-size="32" font-weight="bold" text-anchor="middle" fill="#333333">Módulo de Compras</text>
+      <path d="M 600 130 L 600 170" stroke="#333" stroke-width="2" fill="none"/>
+      <path d="M 530.38496,129.97045 529.93305,169.16396 328,167.28769 V 200" stroke="#01743d" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
+      <path d="M 600 170 L 600 200" stroke="#292d77" stroke-width="2" fill="none" marker-end="url(#arrowBlue)"/>
+      <path d="m 668.48907,128.59841 0.43065,40.04366 230.14685,-0.12998 L 900,200" stroke="#d45500" stroke-width="2" fill="none" marker-end="url(#arrowGold)"/>
+      <path d="M 600 280 L 600 400" stroke="#292d77" stroke-width="2" fill="none" marker-end="url(#arrowBlue)"/>
+      <path d="m 508.24786,472.94035 1.31893,44.80606 -184.07298,-0.24706 0.67277,32.22816" stroke="#01743d" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
+      <path d="m 400,580 h 132 l -1.15507,-64.08793 115.90375,1.31664 -1.54217,-47.31944" stroke="#01743d" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
+      <path d="M 700 450 L 700 550" stroke="#292d77" stroke-width="2" fill="none" marker-end="url(#arrowBlue)"/>
+      <path d="m 900,280 0.59746,271.19491" stroke="#d45500" stroke-width="2" fill="none" marker-end="url(#arrowGold)"/>
+      <path d="M 700 610 L 700 660 L 600 660 L 600 700" stroke="#292d77" stroke-width="2" fill="none" marker-end="url(#arrowBlue)"/>
+      <path d="m 900,610 2,130 H 752" stroke="#d45500" stroke-width="2" fill="none" marker-end="url(#arrowGold)"/>
+      <!-- NF Box -->
+      <rect x="475" y="80" width="250" height="50" rx="8" fill="#ffffff" stroke="#01743d" stroke-width="2"/>
+      <text x="598" y="100" font-size="18" font-weight="bold" text-anchor="middle" fill="#333333">
+        <tspan x="598" y="100">Nota Fiscal de</tspan>
+        <tspan x="598" dy="22">Entrada (NF)</tspan>
+      </text>
+      <!-- MP -->
+      <rect x="221.52225" y="200" width="227.30081" height="80" rx="6" fill="#ffffff" stroke="#01743d" stroke-width="2"/>
+      <text x="336" y="235" font-size="18" font-weight="bold" text-anchor="middle" fill="#000000">Matéria-Prima</text>
+      <text x="336" y="260" font-size="14" text-anchor="middle" fill="#000000">Ex.: Alho, Embalagens, Sacos</text>
+      <!-- Revenda -->
+      <rect x="475" y="200" width="250" height="80" rx="8" fill="#ffffff" stroke="#292d77" stroke-width="2"/>
+      <text x="600" y="235" font-size="18" font-weight="bold" text-anchor="middle" fill="#000000">Produto p/ Revenda</text>
+      <text x="600" y="260" font-size="14" text-anchor="middle" fill="#000000">Produtos prontos</text>
+      <!-- Consumo Interno -->
+      <rect x="778" y="200" width="225.64612" height="80" rx="6" fill="#ffffff" stroke="#d45500" stroke-width="2"/>
+      <text x="888" y="235" font-size="18" font-weight="bold" text-anchor="middle" fill="#000000">Consumo Interno</text>
+      <text x="888" y="260" font-size="14" text-anchor="middle" fill="#000000">Ex.: Limpeza, Escritório</text>
+      <!-- Estoque -->
+      <rect x="454.13916" y="320" width="294.97018" height="150" rx="6" fill="#1062b3"/>
+      <text x="600" y="355" font-size="22" font-weight="bold" text-anchor="middle" fill="#ffffff">ESTOQUE</text>
+      <rect x="482.99069" y="385.84558" width="104.55338" height="60.308849" rx="3" fill="#c6ebd6" stroke="#01743d" stroke-width="0.7"/>
+      <text x="534" y="411" font-size="18" font-weight="bold" text-anchor="middle" fill="#004f00">
+        <tspan x="534" y="411">Matéria</tspan>
+        <tspan x="534" dy="22">Prima</tspan>
+      </text>
+      <rect x="619.2981" y="383.8428" width="102.86908" height="60.314407" rx="3" fill="#cddbfa" stroke="#292d77" stroke-width="0.7"/>
+      <text x="672" y="419" font-size="18" font-weight="bold" text-anchor="middle" fill="#292d77">Produtos</text>
+      <!-- Produção -->
+      <rect x="228" y="550" width="200" height="60" rx="8" fill="#004f00"/>
+      <text x="328" y="585" font-size="18" font-weight="bold" text-anchor="middle" fill="#ffffff">PRODUÇÃO</text>
+      <!-- Vendas -->
+      <rect x="576" y="550" width="200" height="60" rx="8" fill="#292d77"/>
+      <text x="676" y="585" font-size="18" font-weight="bold" text-anchor="middle" fill="#ffffff">VENDAS</text>
+      <!-- DRE -->
+      <rect x="806" y="550" width="200" height="60" rx="8" fill="#d45500"/>
+      <text x="906" y="575" font-size="18" font-weight="bold" text-anchor="middle" fill="#ffffff">DRE</text>
+      <text x="906" y="595" font-size="12" text-anchor="middle" fill="#ffffff">Fora do estoque</text>
+      <!-- Financeiro -->
+      <rect x="456" y="700" width="292.20352" height="80" rx="7" fill="#004f00"/>
+      <text x="600" y="735" font-size="20" font-weight="bold" text-anchor="middle" fill="#ffffff">FINANCEIRO</text>
+      <text x="600" y="760" font-size="14" text-anchor="middle" fill="#ffffff">Duplicatas geradas automaticamente</text>
+      <!-- Labels -->
+      <text x="383.75073" y="513" font-size="14" fill="#333333">
+        <tspan x="383.75073" y="513">Requisição</tspan>
+        <tspan x="383.75073" dy="17">de Estoque</tspan>
+      </text>
+      <text x="454.57501" y="576" font-size="14" fill="#333333">
+        <tspan x="454.57501" y="576">Produto</tspan>
+        <tspan x="454.57501" dy="17">Acabado</tspan>
+      </text>
+    </svg>
+  </div>
+
+  <h3>Passo a Passo — Como lançar uma Nota Fiscal</h3>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="num">1</div>
+      <div class="content">
+        <strong>Cabeçalho da Nota</strong>
+        <span>Informe: data de emissão, fornecedor, tipo de documento (NF, REC, etc.) e número da nota.</span>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step">
+      <div class="num">2</div>
+      <div class="content">
+        <strong>Adicionar Itens da Nota</strong>
+        <span>Para cada produto na nota: selecione do catálogo, informe o destino, quantidade e preço. Uma nota pode ter quantos itens precisar.</span>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step">
+      <div class="num">3</div>
+      <div class="content">
+        <strong>Impostos (ICMS e IPI)</strong>
+        <span>Para itens que vão ao estoque, informe o valor de ICMS e IPI destacados na nota. O sistema calcula automaticamente o custo real.</span>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step">
+      <div class="num">4</div>
+      <div class="content">
+        <strong>Gerar Duplicatas</strong>
+        <span>Clique em "Gerar pelo Prazo do Fornecedor" para criar automaticamente os boletos, ou defina um parcelamento customizado.</span>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step">
+      <div class="num">5</div>
+      <div class="content">
+        <strong>Confirmar e Registrar</strong>
+        <span>Marque a caixa de confirmação e clique em "Registrar NF". O sistema grava tudo de uma vez: estoque, financeiro e histórico.</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>Os 3 Destinos de um Item</h3>
+  <p>Cada produto adicionado a uma nota precisa ter um <strong>destino</strong>. O destino define o que o sistema faz com aquele item:</p>
+
+  <div class="destinos">
+    <div class="destino-card d-mp">
+      <div class="icon">🌾</div>
+      <h5>Matéria-Prima / Produção</h5>
+      <p>Vai para o estoque e depois é requisitado pelo módulo de Produção para fabricar os produtos.</p>
+      <p><em>Ex: Alho in natura, embalagens, sacos PP</em></p>
+    </div>
+    <div class="destino-card d-rv">
+      <div class="icon">📦</div>
+      <h5>Produto para Revenda</h5>
+      <p>Vai para o estoque e depois sai pelo módulo de Vendas, sendo faturado para um cliente.</p>
+      <p><em>Ex: Produto comprado pronto para revender</em></p>
+    </div>
+    <div class="destino-card d-ci">
+      <div class="icon">🧹</div>
+      <h5>Consumo Interno</h5>
+      <p>Não vai ao estoque. O custo é registrado direto no financeiro da empresa.</p>
+      <p><em>Ex: Material de limpeza, papelaria, café</em></p>
+    </div>
+  </div>
+
+  <h3>Entendendo os Impostos (ICMS e IPI)</h3>
+  <p>A fábrica opera no regime de <strong>Lucro Presumido</strong>. Nesse regime, para compras de matéria-prima e produtos para revenda, parte dos impostos pagos <strong>volta como crédito</strong> — ou seja, não é custo real da empresa.</p>
+
+  <div class="fiscal-box">
+    <div class="fiscal-row">
+      <span class="label">Preço bruto na NF (o que você paga ao fornecedor)</span>
+      <span class="valor">R$ 10.000,00</span>
+    </div>
+    <div class="fiscal-row" style="color:#dc2626;">
+      <span class="label">(-) ICMS recuperável (destacado na nota)</span>
+      <span class="valor" style="color:#dc2626;">- R$ 1.200,00</span>
+    </div>
+    <div class="fiscal-row" style="color:#dc2626;">
+      <span class="label">(-) IPI recuperável (quando houver)</span>
+      <span class="valor" style="color:#dc2626;">- R$ 0,00</span>
+    </div>
+    <div class="fiscal-row">
+      <span class="label">= Custo real que entra no estoque</span>
+      <span class="valor">R$ 8.800,00</span>
+    </div>
+  </div>
+
+  <div class="warn">
+    <strong>⚠️ Atenção</strong>
+    Os boletos são gerados pelo <strong>valor bruto</strong> (o que você deve ao fornecedor, R$ 10.000,00). O custo menor (R$ 8.800,00) é usado apenas para valorizar o estoque e calcular o lucro real no DRE.
+  </div>
+
+  <div class="tip">
+    <strong>💡 Para Consumo Interno</strong>
+    Itens de consumo interno (limpeza, escritório) não têm crédito fiscal — os campos de ICMS e IPI não aparecem. O custo inteiro vai direto para as despesas da empresa.
+  </div>
+
+  <h3>Exemplo Prático Completo</h3>
+
+  <div class="example">
+    <h4>🧾 NF 004521 — Fornecedor: Cooperativa Central do Alho</h4>
+    <p style="color:#64748b; font-size:13px; margin-bottom:12px;">Data: 25/04/2026 · Prazo: 30/60 dias</p>
+
+    <table>
+      <thead>
+        <tr><th>Produto</th><th>Destino</th><th>Qtd</th><th>Preço Bruto</th><th>ICMS</th><th>Custo Líq.</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Alho In Natura</td>
+          <td>🌾 Produção</td>
+          <td>500 kg</td>
+          <td>R$ 8,00/kg</td>
+          <td>R$ 480,00</td>
+          <td>R$ 7,04/kg</td>
+        </tr>
+        <tr>
+          <td>Saco PP 1kg</td>
+          <td>🌾 Produção</td>
+          <td>1.000 un</td>
+          <td>R$ 0,45/un</td>
+          <td>R$ 27,00</td>
+          <td>R$ 0,42/un</td>
+        </tr>
+        <tr>
+          <td>Detergente</td>
+          <td>🧹 Interno</td>
+          <td>5 L</td>
+          <td>R$ 12,00/L</td>
+          <td>—</td>
+          <td>R$ 12,00/L</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="3"><strong>Totais</strong></td>
+          <td><strong>R$ 4.567,00</strong></td>
+          <td><strong>R$ 507,00</strong></td>
+          <td><strong>R$ 4.060,00</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <p style="margin-top:12px; font-size:13px;"><strong>Duplicatas geradas (sobre valor bruto R$ 4.567,00):</strong></p>
+    <ul style="font-size:13px; margin-top:6px;">
+      <li>Parcela 1: R$ 2.283,50 — vencimento 25/05/2026 (30 dias)</li>
+      <li>Parcela 2: R$ 2.283,50 — vencimento 24/06/2026 (60 dias)</li>
+    </ul>
+  </div>
+
+  <h3>O que acontece depois que você confirma?</h3>
+  <p>Assim que você clica em <strong>"Registrar NF"</strong>, o sistema faz automaticamente:</p>
+  <ul>
+    <li>🟢 <strong>Estoque</strong>: 500 kg de Alho e 1.000 Sacos PP entram no estoque</li>
+    <li>🟢 <strong>Custo do Produto</strong>: o sistema atualiza o custo de cada produto com o último preço pago</li>
+    <li>🟢 <strong>Financeiro</strong>: 2 boletos criados em Contas a Pagar com os vencimentos corretos</li>
+    <li>🟢 <strong>DRE</strong>: o custo da compra aparece automaticamente no demonstrativo de resultado</li>
+    <li>⚫ O Detergente <strong>não</strong> entra no estoque — vai direto como despesa operacional</li>
+  </ul>
+
+  <h3>Dúvidas Frequentes</h3>
+
+  <h4>Posso lançar uma compra sem número de nota fiscal?</h4>
+  <p>Sim. Se você deixar o campo em branco, o sistema gera um número automático (ex: AUT-04251632). Mas é recomendável sempre informar o número real da NF.</p>
+
+  <h4>E se eu errar um item depois de confirmar?</h4>
+  <p>O cabeçalho da nota (data, número, fornecedor) pode ser corrigido no próprio módulo de Compras, no final da página. Para corrigir valores ou datas dos boletos já gerados, acesse o módulo <strong>Financeiro → Contas a Pagar</strong>.</p>
+
+  <h4>Como sei que o estoque foi atualizado?</h4>
+  <p>Acesse o módulo <strong>Estoque</strong> no menu lateral. Os itens da compra (com destino Matéria-Prima ou Revenda) aparecerão com saldo positivo.</p>
+
+  <h4>Embalagens são matéria-prima ou produto?</h4>
+  <p>Embalagens que são usadas no processo produtivo (como sacos para embalar o alho) devem ser cadastradas como <strong>Matéria-Prima</strong> e ter o destino <strong>"Matéria-Prima / Produção"</strong> na nota. Elas entram no estoque e são requisitadas pelo módulo de Produção.</p>
+
+  <div class="footer">
+    ERP Empório do Alho · Módulo de Compras · Versão 2.0 · Abril 2026
+  </div>
+
+</div>
+</body>
+</html>

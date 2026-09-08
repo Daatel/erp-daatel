@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Manual — Módulo de Produção | ERP Fábrica de Alho</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; color:#1e293b; background:#fff; font-size:14px; }
+
+  .cover { background:linear-gradient(135deg,#01743d 0%,#014d29 100%); color:#fff; min-height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:40px; text-align:center; border-radius:0 0 32px 32px; margin-bottom:36px; }
+  .cover .emoji { font-size:52px; margin-bottom:12px; }
+  .cover h1 { font-size:28px; font-weight:800; letter-spacing:-0.5px; }
+  .cover h2 { font-size:16px; font-weight:400; opacity:.85; margin-top:8px; }
+  .cover .badge { background:rgba(255,255,255,0.2); border-radius:20px; padding:4px 16px; font-size:12px; margin-top:16px; }
+
+  .page { max-width:760px; margin:0 auto; padding:0 32px 48px; }
+
+  h3 { font-size:17px; font-weight:700; color:#01743d; margin:28px 0 10px; border-left:4px solid #01743d; padding-left:10px; }
+  h4 { font-size:14px; font-weight:700; color:#292d77; margin:16px 0 6px; }
+  p  { line-height:1.75; color:#374151; margin-bottom:10px; }
+  ul { margin-left:18px; margin-bottom:10px; }
+  li { line-height:1.8; color:#374151; }
+
+  .tip  { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .warn { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .tip strong, .warn strong { display:block; margin-bottom:4px; }
+
+  .flow { display:flex; flex-direction:column; align-items:center; gap:0; margin:24px 0 32px; }
+  .flow-step { display:flex; align-items:flex-start; gap:14px; width:100%; max-width:620px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin-bottom:0; }
+  .flow-step .num { background:#01743d; color:#fff; font-weight:800; font-size:13px; border-radius:8px; min-width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+  .flow-step .content strong { font-size:14px; font-weight:700; color:#1e293b; }
+  .flow-step .content span { font-size:13px; color:#64748b; display:block; margin-top:2px; }
+  .flow-arrow { font-size:22px; color:#01743d; margin:2px 0; }
+
+  .footer { text-align:center; color:#94a3b8; font-size:12px; padding:24px 0 16px; border-top:1px solid #e2e8f0; margin-top:40px; }
+
+  @media print {
+    body { font-size:13px; }
+    .cover { border-radius:0 0 20px 20px; }
+    .page { padding:0 20px 32px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="emoji">🏭</div>
+  <h1>Módulo de Produção</h1>
+  <h2>Como apontar os lotes fabricados e perdas de máquina</h2>
+  <div class="badge">ERP Fábrica de Alho · Manual do Usuário</div>
+</div>
+
+<div class="page">
+
+  <h3>O que é este módulo?</h3>
+  <p>O módulo de Produção é o coração da fábrica. É aqui que o encarregado informa o que foi colocado na máquina (Matéria-Prima) e o que saiu pronto do outro lado da esteira (Produto Acabado).</p>
+  <p>Por razões de segurança e sigilo, <strong>não há informações financeiras (R$) nesta tela</strong>. O encarregado lida apenas com tempo (horas), produtos (insumos) e quantidades físicas (kg/unidades).</p>
+
+  <div class="tip">
+    <strong>💡 A Mágica por trás da tela</strong>
+    Embora o encarregado não veja os custos, quando ele confirma o lote, o sistema calcula nos bastidores o custo exato das matérias-primas, rateia o Custo Operacional (Overhead) pelo tempo que a máquina ficou ligada e <strong>descobre o Custo Unitário exato</strong> do produto fabricado para uso no DRE.
+  </div>
+
+  <h3>Passo a Passo — Apontamento de Lote</h3>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="num">1</div>
+      <div class="content">
+        <strong>Setup de Lote e Tempo</strong>
+        <span>Informe a data de produção, que horas a linha de montagem começou e que horas ela parou. O tempo total será usado pelo robô do ERP para embutir as despesas diárias da fábrica no produto.</span>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step">
+      <div class="num">2</div>
+      <div class="content">
+        <strong>A Receita (Matérias-Primas consumidas)</strong>
+        <span>Liste todos os insumos puxados do estoque para fabricar este lote (ex: Alho Sujo, Saco de 1Kg, Fita, Rótulo). Você pode clicar em "Adicionar mais um ingrediente" quantas vezes precisar.</span>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step">
+      <div class="num">3</div>
+      <div class="content">
+        <strong>O Volume Gerado (Produto Acabado)</strong>
+        <span>Informe qual Produto Final saiu pronto da máquina e a quantidade útil que será empacotada.</span>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step">
+      <div class="num">4</div>
+      <div class="content">
+        <strong>Perdas Físicas</strong>
+        <span>Se houve cascas, sujeira ou quebra, você pode registrar o peso perdido. O sistema é inteligente: ele <strong>encarece</strong> o produto final para cobrir a perda automaticamente, então a fábrica não toma prejuízo oculto.</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>Dúvidas Frequentes</h3>
+
+  <h4>Preciso informar o preço dos ingredientes?</h4>
+  <p>Não. O sistema lê o preço que o setor de Compras pagou nas notas fiscais, absorve o crédito de imposto e usa esse valor limpo para formar o preço de custo interno.</p>
+
+  <h4>Como saber se o meu lançamento deu certo?</h4>
+  <p>Ao clicar em "Cravar Lote", o sistema exibe um Resumo de Produção (com a duração e volume gerado) e dá <strong>baixa automática nos insumos</strong> e <strong>entrada automática no estoque do produto acabado</strong>. Você pode ir no Módulo "Estoque > Extrato" e verá a transação com a etiqueta "Lote OP #123".</p>
+
+  <div class="warn">
+    <strong>⚠️ Atenção a Receitas Incompletas</strong>
+    Não produza informando apenas o Alho. Lembre-se de adicionar como Insumo (Passo 2) todos os invólucros usados (Saco Plástico, Etiquetas), para que o estoque de embalagens também baixe corretamente!
+  </div>
+
+  <div class="footer">
+    ERP Fábrica de Alho · Módulo de Produção · Versão 2.0 · Abril 2026
+  </div>
+
+</div>
+</body>
+</html>

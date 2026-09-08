@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Manual — Faturamento e SEFAZ | ERP Fábrica de Alho</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; color:#1e293b; background:#fff; font-size:14px; }
+
+  .cover { background:linear-gradient(135deg,#01743d 0%,#014d29 100%); color:#fff; min-height:260px; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:40px; text-align:center; border-radius:0 0 32px 32px; margin-bottom:36px; }
+  .cover .emoji { font-size:52px; margin-bottom:12px; }
+  .cover h1 { font-size:28px; font-weight:800; letter-spacing:-0.5px; }
+  .cover h2 { font-size:16px; font-weight:400; opacity:.85; margin-top:8px; }
+  .cover .badge { background:rgba(255,255,255,0.2); border-radius:20px; padding:4px 16px; font-size:12px; margin-top:16px; }
+
+  .page { max-width:760px; margin:0 auto; padding:0 32px 48px; }
+
+  h3 { font-size:17px; font-weight:700; color:#01743d; margin:28px 0 10px; border-left:4px solid #01743d; padding-left:10px; }
+  h4 { font-size:14px; font-weight:700; color:#292d77; margin:16px 0 6px; }
+  p  { line-height:1.75; color:#374151; margin-bottom:10px; }
+  ul { margin-left:18px; margin-bottom:10px; }
+  li { line-height:1.8; color:#374151; }
+
+  .tip  { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .warn { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .tip strong, .warn strong { display:block; margin-bottom:4px; }
+
+  .flow { display:flex; flex-direction:column; align-items:center; gap:0; margin:24px 0 32px; }
+  .flow-step { display:flex; align-items:flex-start; gap:14px; width:100%; max-width:620px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin-bottom:0; }
+  .flow-step .num { background:#01743d; color:#fff; font-weight:800; font-size:13px; border-radius:8px; min-width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+  .flow-step .content strong { font-size:14px; font-weight:700; color:#1e293b; }
+  .flow-step .content span { font-size:13px; color:#64748b; display:block; margin-top:2px; }
+  .flow-arrow { font-size:22px; color:#01743d; margin:2px 0; }
+
+  .footer { text-align:center; color:#94a3b8; font-size:12px; padding:24px 0 16px; border-top:1px solid #e2e8f0; margin-top:40px; }
+
+  @media print {
+    body { font-size:13px; }
+    .cover { border-radius:0 0 20px 20px; }
+    .page { padding:0 20px 32px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="emoji">📦</div>
+  <h1>Faturamento e Expedição</h1>
+  <h2>Processamento em lote, baixas e Exportador SEFAZ</h2>
+  <div class="badge">ERP Fábrica de Alho · Manual do Usuário</div>
+</div>
+
+<div class="page">
+
+  <h3>O que é este módulo?</h3>
+  <p>Enquanto o Comercial capta a intenção de venda, o <strong>Faturamento</strong> é o "gatilho atômico". É aqui que o operador de expedição diz: "Estou carregando o caminhão com essas mercadorias".</p>
+  <p>Esse módulo é responsável por três grandes reações no sistema de uma vez só: Baixar o Alho físico do Estoque, criar o Título de cobrança no Financeiro e compilar os dados para a Nota Fiscal da SEFAZ.</p>
+
+  <h3>1. Fila de Faturamento (Baixa em Lote)</h3>
+  <p>Nesta aba, todos os pedidos captados pelos vendedores aparecem como "Pendente" em uma planilha interativa de Data Grid.</p>
+  
+  <div class="tip">
+    <strong>💡 O "Farol de Estoque"</strong>
+    Ao lado de cada linha, o ERP cruza a necessidade do pedido com o saldo instantâneo do barracão:
+    <br><br>
+    🟢 <strong>OK:</strong> Pode mandar bala.<br>
+    🟡 <strong>Parcial:</strong> Você tem um pouco, mas faltam sacos para terminar este lote.<br>
+    🔴 <strong>Sem Saldo:</strong> Não há estoque físico do produto final no ERP.
+  </div>
+
+  <div class="warn">
+    <strong>⚠️ Faturando "no Vermelho"</strong>
+    A Diretoria autorizou o faturamento a descoberto. Se você marcar os <em>Checkboxes</em> de pedidos que estão com a bolinha Vermelha e mandar processar, o sistema vai aceitar! Ele deixará o estoque do barracão negativo provisoriamente, garantindo que o caminhão não fique preso esperando nota enquanto o pessoal da produção termina de digitar os lotes atrasados.
+  </div>
+
+  <h3>2. Exportador Fiscal SEFAZ (Inovação)</h3>
+  <p>Diga adeus a digitar notas fiscais do zero no programa gratuito do governo. A segunda aba do módulo cuida disso.</p>
+  <ul>
+    <li>O ERP busca tudo o que foi de fato faturado (expedido) no mês.</li>
+    <li>Aplica automaticamente o NCM do Alho (0703.20.90).</li>
+    <li>Aplica uma Inteligência de <strong>CFOP Dinâmico</strong>: Se o cliente que comprou é da mesma Unidade Federativa (UF) que a fábrica, ele carimba código 5101. Se for de outro estado, ele carimba 6101.</li>
+    <li>E, em um segundo, gera um arquivo padronizado `.CSV` / `.TXT` para o setor fiscal baixar e importar no Emissor SEFAZ.</li>
+  </ul>
+
+  <h3>3. Logística Reversa (Devoluções e Calotes)</h3>
+  <p>A aba final deste módulo resolve um dos maiores ralos de dinheiro: <strong>Deu ruim no cliente.</strong></p>
+  <p>Seja porque o alho mofou/ficou esponjoso na gôndola e precisou trocar, ou se a carga chegou amassada. Você lança aqui a Devolução de Mercadoria.</p>
+  <p>Ao aprovar uma Sangria por logística reversa, o sistema gera instantaneamente uma saída de dinheiro no <strong>Fluxo de Caixa / DRE</strong> categorizado como "Custo Operacional de Logística Reversa". A matemática bate 100%.</p>
+
+  <div class="footer">
+    ERP Fábrica de Alho · Módulo de Faturamento · Versão 2.0 · Abril 2026
+  </div>
+
+</div>
+</body>
+</html>

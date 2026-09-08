@@ -1,0 +1,20 @@
+[theme]
+
+# Cor primária — verde escuro do Empório do Alho
+# Usada em botões primários, links, checkboxes, sliders
+primaryColor = "#01743d"
+
+# Fundo principal da página — off-white levemente quente
+# Evita o branco puro que cansa a vista em uso prolongado
+backgroundColor = "#f9f8f4"
+
+# Fundo de cards, sidebars, inputs, expanders
+# Branco puro cria contraste claro contra o backgroundColor
+secondaryBackgroundColor = "#ffffff"
+
+# Cor do texto principal — grafite escuro, não preto puro
+# Mais suave que #000000, mais legível que azul
+textColor = "#1a1a18"
+
+# Fonte — sans serif padrão do sistema (Inter/Segoe/SF Pro conforme OS)
+font = "sans serif"

@@ -1,0 +1,4 @@
+[CONTA] ID #1 - 'BRADESCO' (Saldo Inicial: R$ 0.00)
+[SALDO APURADO] Data 2026-07-31: R$ 1,961.54
+[DIFERENCA] Para saldo desejado (R$ 1,961.54): R$ -0.00
+[OK] O saldo ja esta exatamente igual a R$ 1.961,54 em 31/07/2026.

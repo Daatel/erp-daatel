@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Manual de Implantação — Passo a Passo de Cadastros | ERP Empório do Alho</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    color: #333;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: #f3f4f6;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .container {
+    max-width: 950px;
+    margin: 40px auto;
+    background: #fff;
+    padding: 50px;
+    border-radius: 16px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  }
+  .header {
+    background: linear-gradient(135deg, #01743d 0%, #004d1f 100%);
+    color: white;
+    padding: 45px;
+    border-radius: 12px;
+    margin-bottom: 40px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::after {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .header h1 { margin: 0; font-size: 2.6em; font-weight: 800; letter-spacing: -0.5px; }
+  .header p { margin: 10px 0 0; opacity: 0.9; font-size: 1.25em; font-weight: 400; }
+  .badge {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 6px 18px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    margin-top: 15px;
+  }
+  h2 { color: #292d77; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-top: 45px; font-weight: 750; }
+  h3 { color: #01743d; margin-top: 35px; font-weight: 600; }
+  p { font-size: 1.05em; color: #4b5563; }
+  
+  /* Timeline / Roadmap */
+  .timeline {
+    position: relative;
+    margin: 40px 0;
+    padding-left: 30px;
+    border-left: 4px solid #e5e7eb;
+  }
+  .timeline-item {
+    position: relative;
+    margin-bottom: 35px;
+  }
+  .timeline-item::before {
+    content: "";
+    position: absolute;
+    left: -39px;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #01743d;
+    border: 4px solid #fff;
+    box-shadow: 0 0 0 3px #01743d;
+  }
+  .timeline-item.dependent::before {
+    background: #292d77;
+    box-shadow: 0 0 0 3px #292d77;
+  }
+  .timeline-title {
+    font-weight: 700;
+    font-size: 1.15em;
+    margin: 0 0 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .timeline-title .step-number {
+    font-size: 0.8em;
+    background: #edf7f1;
+    color: #01743d;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .timeline-title.dependent .step-number {
+    background: #eef2ff;
+    color: #292d77;
+  }
+  .timeline-desc {
+    margin: 0;
+    font-size: 0.98em;
+    color: #555;
+  }
+
+  .tip-box {
+    background: #edf7f1;
+    border-left: 5px solid #01743d;
+    padding: 20px;
+    border-radius: 0 10px 10px 0;
+    margin: 25px 0;
+  }
+  .tip-box h4 { margin: 0 0 8px 0; color: #014c28; font-size: 1.1em; }
+  
+  .warning-box {
+    background: #fffbeb;
+    border-left: 5px solid #f59e0b;
+    padding: 20px;
+    border-radius: 0 10px 10px 0;
+    margin: 25px 0;
+  }
+  .warning-box h4 { margin: 0 0 8px 0; color: #92400e; font-size: 1.1em; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 25px;
+    margin: 30px 0;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+  }
+  .card.green { border-top: 5px solid #01743d; }
+  .card.blue { border-top: 5px solid #292d77; }
+  .card h4 { margin: 0 0 12px 0; color: #292d77; font-size: 1.2em; font-weight: 700; }
+  
+  .card ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #4b5563;
+    font-size: 0.95em;
+  }
+  .card li {
+    margin-bottom: 8px;
+  }
+
+  .footer {
+    text-align: center;
+    margin-top: 60px;
+    padding-top: 30px;
+    border-top: 1px solid #e5e7eb;
+    color: #9ca3af;
+    font-size: 0.9em;
+  }
+  
+  @media print {
+    body { background-color: white; }
+    .container { box-shadow: none; padding: 0; margin: 0; }
+    .header { padding: 35px; }
+    .card:hover { transform: none; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>Manual de Implantação e Fluxo de Cadastros</h1>
+    <p>Guia Passo a Passo Oficial do ERP Empório do Alho</p>
+    <div class="badge">Módulo de Cadastros Base • Versão 1.1 (Foco em Produção/Supabase)</div>
+  </div>
+
+  <h2>1. Introdução ao Fluxo de Cadastros</h2>
+  <p>Para que o ERP Empório do Alho funcione sem travamentos de banco de dados ou incoerência nas telas de vendas, produção e relatórios de DRE, os cadastros precisam ser alimentados seguindo uma <strong>ordem de precedência estrita</strong>. Este manual orienta a equipe de implantação e a gerência sobre como estruturar a base de dados do zero.</p>
+  
+  <div class="tip-box">
+    <h4>💡 O Segredo da Integração Financeira e Operacional</h4>
+    O ERP é totalmente interligado: a <strong>Ficha Técnica</strong> consome os <strong>Produtos</strong>; o <strong>Lote de Produção</strong> lê a Ficha Técnica e dá baixa física nas Matérias-Primas; a <strong>Venda</strong> fatura o Produto Acabado e gera comissões para o <strong>Representante Comercial</strong>. Seguir a ordem abaixo evita erros de seletores vazios nas telas.
+  </div>
+
+  <h2>2. Linha do Tempo da Implantação (A Ordem Correta)</h2>
+  
+  <div class="timeline">
+    <!-- FASE 1 -->
+    <div class="timeline-item">
+      <div class="timeline-title"><span class="step-number">Passo 1</span> 🏢 Minha Empresa</div>
+      <p class="timeline-desc">Preenchimento dos dados fiscais da sua empresa (Dona do Sistema) para emissão de relatórios e PDFs com sua marca e dados atualizados.</p>
+    </div>
+    
+    <div class="timeline-item">
+      <div class="timeline-title"><span class="step-number">Passo 2</span> 📦 Produtos (Matérias-Primas e Acabados)</div>
+      <p class="timeline-desc">Cadastro físico de tudo o que entra e sai da fábrica. É a fundação do estoque e das fichas de fabricação.</p>
+    </div>
+    
+    <div class="timeline-item">
+      <div class="timeline-title"><span class="step-number">Passo 3</span> 👥 Colaboradores (Vendedores/Representantes)</div>
+      <p class="timeline-desc">Definição do RH. Essencial para associar os representantes comerciais que emitirão pedidos nas ruas.</p>
+    </div>
+    
+    <div class="timeline-item">
+      <div class="timeline-title"><span class="step-number">Passo 4</span> 🏦 Contas Bancárias & Plano de Contas</div>
+      <p class="timeline-desc">Configuração financeira essencial para classificar receitas e despesas e habilitar a conciliação automática.</p>
+    </div>
+    
+    <div class="timeline-item">
+      <div class="timeline-title"><span class="step-number">Passo 5</span> ⛓️ Redes e Grupos de Clientes</div>
+      <p class="timeline-desc">Criação de categorias comerciais para organizar vendas de atacado, redes de supermercados ou clientes avulsos.</p>
+    </div>
+    
+    <div class="timeline-item">
+      <div class="timeline-title"><span class="step-number">Passo 6</span> 🌾 Fornecedores</div>
+      <p class="timeline-desc">Cadastro dos produtores de alho cru, distribuidores de embalagens, rótulos e caixas master.</p>
+    </div>
+
+    <!-- FASE 2 -->
+    <div class="timeline-item dependent">
+      <div class="timeline-title dependent"><span class="step-number">Passo 7</span> 🛒 Clientes (Requer Passo 5)</div>
+      <p class="timeline-desc">Cadastro da carteira de clientes, agora vinculando-os obrigatoriamente a uma das Redes/Grupos previamente cadastrados.</p>
+    </div>
+    
+    <div class="timeline-item dependent">
+      <div class="timeline-title dependent"><span class="step-number">Passo 8</span> 🧪 Fichas Técnicas - BOM (Requer Passo 2)</div>
+      <p class="timeline-desc">A "receita" de produção. Vincula quais insumos e matérias-primas e em qual proporção exata são necessários para gerar uma unidade do produto final.</p>
+    </div>
+    
+    <div class="timeline-item dependent">
+      <div class="timeline-title dependent"><span class="step-number">Passo 9</span> 💰 Regras de Comissão (Requer Passos 2 e 3)</div>
+      <p class="timeline-desc">Definição de regras comerciais. Atribui percentuais específicos de ganho para representantes de acordo com o produto vendido.</p>
+    </div>
+  </div>
+
+  <h2>3. Detalhamento Operacional de Cada Cadastro</h2>
+  <p>Abaixo constam as regras que a equipe de preenchimento deve seguir em cada uma das abas do sistema:</p>
+
+  <div class="grid">
+    <!-- PRODUTOS -->
+    <div class="card green">
+      <h4>📦 1. Produtos</h4>
+      <ul>
+        <li><strong>Matérias-Primas:</strong> Cadastre itens como <em>Alho Cru, Sal, Acidulante, Embalagem Pote 500g, Rótulo</em> e marque a opção <strong>"É Matéria-Prima"</strong>.</li>
+        <li><strong>Produtos Finais:</strong> Cadastre itens que o cliente compra (ex: <em>Alho Frito 200g, Alho Descascado 1kg</em>) e deixe a opção <strong>"É Matéria-Prima" desmarcada</strong>.</li>
+        <li><strong>Unidade de Medida:</strong> Use padrões claros como <em>Kg, Unid, Fardo, Pct</em>.</li>
+      </ul>
+    </div>
+
+    <!-- COLABORADORES -->
+    <div class="card green">
+      <h4>👥 2. Colaboradores (RH)</h4>
+      <ul>
+        <li><strong>Regra do Cargo:</strong> Para que um funcionário apareça na tela de Lançamento de Pedidos ou nas Regras de Comissão, o cargo dele <strong>deve conter a palavra "Vendedor" ou "Representante"</strong> (ex: *Representante Comercial*, *Vendedor Interno*).</li>
+        <li><strong>Status:</strong> Mantenha como *ATIVO* para que conste nas telas de vendas correntes.</li>
+      </ul>
+    </div>
+
+    <!-- FINANCEIRO -->
+    <div class="card green">
+      <h4>🏦 3. Bancos & Contas</h4>
+      <ul>
+        <li><strong>Contas Bancárias:</strong> Cadastre as contas correntes reais da empresa e seus respectivos saldos iniciais.</li>
+        <li><strong>Plano de Contas:</strong> Estruture o plano de contas conforme as categorias de despesa e receita para que a DRE automática seja gerada com precisão absoluta.</li>
+      </ul>
+    </div>
+
+    <!-- CLIENTES -->
+    <div class="card blue">
+      <h4>🛒 4. Clientes</h4>
+      <ul>
+        <li><strong>Rede/Grupo:</strong> Vincule sempre o cliente a uma das redes previamente cadastradas (Passo 5).</li>
+        <li><strong>Faturamento:</strong> Configure corretamente o prazo de pagamento padrão do cliente (ex: *14/28 dias*, *À Vista*) para automatizar as contas a receber.</li>
+      </ul>
+    </div>
+
+    <!-- FICHAS TÉCNICAS -->
+    <div class="card blue">
+      <h4>🧪 5. Fichas Técnicas</h4>
+      <ul>
+        <li><strong>Rendimento Base:</strong> Defina a taxa média de rendimento (ex: <em>70%</em> de aproveitamento de alho descascado após retirar cascas e talos).</li>
+        <li><strong>Insumos Associados:</strong> Insira a quantidade líquida consumida por unidade do produto pronto (ex: *0.005 un* de caixa master por pote produzido).</li>
+      </ul>
+    </div>
+
+    <!-- REGRAS DE COMISSÃO -->
+    <div class="card blue">
+      <h4>💰 6. Regras de Comissão</h4>
+      <ul>
+        <li><strong>Associação Tripla:</strong> Você pode definir comissão por Vendedor, por Produto específico ou por Rede/Grupo de clientes atendidos.</li>
+        <li><strong>Priorização:</strong> O sistema calcula a comissão no fechamento do pedido automaticamente baseando-se nestas tabelas dinâmicas.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="warning-box">
+    <h4>⚠️ Atenção Redobrada ao Salvar Dados (Campos Booleanos)</h4>
+    Para assegurar a máxima estabilidade operacional em bancos na nuvem (PostgreSQL/Supabase):
+    <ul>
+      <li>Os botões de "Tique" (Checkbox) nas telas enviam dados booleanos reais (`True` ou `False`).</li>
+      <li>Evite cadastrar dados fictícios ou misturar caracteres de teste em campos numéricos (como colocar letras no campo de preço de venda base ou CNPJ).</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    <p>Fábrica de Alho — ERP Administrativo Integrado • Gestão Industrial & de Distribuição</p>
+    <p>© 2026 Empório do Alho. Todos os direitos reservados. Permitida a cópia para manuais internos de treinamento.</p>
+  </div>
+</div>
+
+</body>
+</html>

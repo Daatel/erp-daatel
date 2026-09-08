@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Manual — Módulo de Logística | ERP Empório do Alho</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    color: #333;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: #f9fafb;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 40px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  }
+  .header {
+    background: linear-gradient(135deg, #292d77 0%, #1e215d 100%);
+    color: white;
+    padding: 40px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    text-align: center;
+  }
+  .header h1 { margin: 0; font-size: 2.5em; font-weight: 800; }
+  .header p { margin: 10px 0 0; opacity: 0.9; font-size: 1.2em; }
+  .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+    margin-top: 15px;
+  }
+  h2 { color: #292d77; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-top: 40px; }
+  h3 { color: #01743d; margin-top: 30px; }
+  .tip-box {
+    background: #edf7f1;
+    border-left: 4px solid #01743d;
+    padding: 15px 20px;
+    border-radius: 0 8px 8px 0;
+    margin: 20px 0;
+  }
+  .warning-box {
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    padding: 15px 20px;
+    border-radius: 0 8px 8px 0;
+    margin: 20px 0;
+  }
+  .danger-box {
+    background: #fef2f2;
+    border-left: 4px solid #ef4444;
+    padding: 15px 20px;
+    border-radius: 0 8px 8px 0;
+    margin: 20px 0;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  }
+  .card.green { border-top: 4px solid #01743d; }
+  .card.blue { border-top: 4px solid #292d77; }
+  .card.red { border-top: 4px solid #ef4444; }
+  .card h4 { margin: 0 0 10px 0; color: #292d77; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+  }
+  th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  th { background-color: #292d77; color: white; font-weight: 600; }
+  tr:nth-child(even) { background-color: #f9fafb; }
+  .footer {
+    text-align: center;
+    margin-top: 50px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+    color: #6b7280;
+    font-size: 0.9em;
+  }
+  .svg-container {
+    width: 100%;
+    padding: 20px;
+    border: 2px dashed #ccc;
+    text-align: center;
+    color: #999;
+    background: #fdfdfd;
+    border-radius: 8px;
+    margin: 20px 0;
+  }
+  @media print {
+    body { background-color: white; }
+    .container { box-shadow: none; padding: 0; }
+    .header { padding: 30px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>Manual: Logística & Expedição</h1>
+    <p>A Ponte entre a Fábrica e o Cliente</p>
+    <div class="badge">Versão 1.1 • Atualizado com Trava de Canhotos</div>
+  </div>
+
+  <h2>1. O que é este módulo?</h2>
+  <p>O módulo de <strong>Logística</strong> é a última barreira de proteção do seu faturamento. Ele não serve apenas para dizer qual motorista levou qual caixa, mas realiza um cálculo invisível e sagrado chamado <strong>Rateio Dinâmico de Custo</strong>, garantindo que o lucro (EBITDA) no fechamento do DRE seja cirurgicamente exato.</p>
+  
+  <div class="tip-box">
+    <strong>💡 Por que o Rateio é importante?</strong> Se um caminhão leva R$ 10.000 em mercadorias e o frete da viagem custou R$ 1.000, o módulo distribui esse custo proporcionalmente pelas notas. Um mercadinho que comprou R$ 1.000 vai absorver 10% do frete (R$ 100) da viagem no seu DRE.
+  </div>
+
+  <h2>2. Despachando a Carga (Criar Manifesto)</h2>
+  <p>O fluxo de despacho segue quatro pilares na tela inicial da Logística:</p>
+  
+  <div class="grid">
+    <div class="card blue">
+      <h4>1. Definir Rota</h4>
+      <p>Data de saída, se a frota é própria ou de terceiro, e o nome do motorista e placa.</p>
+    </div>
+    <div class="card green">
+      <h4>2. Acerto Financeiro</h4>
+      <p>Se o frete é terceirizado, você digita o valor e o ERP gera a conta no Financeiro.</p>
+    </div>
+    <div class="card red">
+      <h4>3. Escolher as Notas</h4>
+      <p>Selecione todas as Notas Fiscais que estão no pátio e vão subir neste caminhão.</p>
+    </div>
+  </div>
+
+  <div class="warning-box">
+    <strong>⚠️ Fretes Gratuitos (Custo Zero):</strong> Você pode despachar cargas usando a frota própria sem gerar boleto para o financeiro. Basta lançar o frete como R$ 0,00 ou usar o fornecedor "-- INTERNO / NÃO GERAR PAGAR --".
+  </div>
+
+  <h2>3. A Trava de Segurança Mestra (Canhotos)</h2>
+  <p>O ERP não permite que o Financeiro seja feito de bobo. Quando você clica em "Liberar Caminhão", a conta a pagar da transportadora vai para o departamento financeiro <strong>Invisível e Bloqueada (🔒)</strong>.</p>
+  
+  <h3>Como destravar o pagamento?</h3>
+  <ol>
+    <li>Quando o motorista voltar da viagem, ele entregará os papéis (Recibos assinados).</li>
+    <li>Acesse a aba <strong>Borderô e Histórico</strong> no módulo de Logística.</li>
+    <li>Selecione o Manifesto que acabou de retornar (estará com status "EM TRÂNSITO").</li>
+    <li>Para cada nota fiscal enviada na viagem, faça o <strong>Upload da Foto ou PDF</strong> do canhoto.</li>
+    <li>Quando 100% dos canhotos estiverem no sistema, o botão verde <strong>"Confirmar Fechamento Total"</strong> será liberado.</li>
+  </ol>
+
+  <div class="danger-box">
+    O departamento financeiro não pode e não consegue efetuar a baixa de um boleto de frete se houver um único canhoto faltando. A governança da empresa depende dessa blindagem.
+  </div>
+
+  <h2>4. Auditoria de Contas a Pagar (O Visor Financeiro)</h2>
+  <p>Do lado da diretoria financeira, a paz reina. No módulo de <strong>Financeiro (Aba Contas a Pagar)</strong>, eles possuem um painel <strong>🔍 Auditar Canhotos</strong>.</p>
+  <ul>
+    <li>Ao clicar em um boleto de frete, o sistema puxa as imagens do servidor e mostra na tela.</li>
+    <li>Eles podem auditar visualmente a assinatura de todos os mercadinhos e clientes.</li>
+    <li>Se estiver tudo OK, o boleto desbloqueado aparecerá normalmente na lista de "Pagar Lote" para ser liquidado da conta bancária.</li>
+  </ul>
+
+  <!-- ESPAÇO PARA O ESQUEMA VISUAL -->
+  <h3>Fluxograma da Operação Logística</h3>
+  <p>O diagrama abaixo sintetiza o ciclo de vida de uma mercadoria após ser faturada, até o fechamento de caixa.</p>
+  
+  <div class="svg-container">
+    <p><em>(O arquivo markdown <code>fluxograma_logistica.md</code> descreve essa árvore técnica e de fluxo de dados de forma complementar.)</em></p>
+  </div>
+
+  <div class="footer">
+    <p>Garlic Factory ERP • Departamento de Operações e Supply Chain</p>
+  </div>
+</div>
+
+</body>
+</html>
