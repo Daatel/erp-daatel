@@ -1927,10 +1927,95 @@ try:
 
         container_metricas_p = st.container()
 
+        col_pf1, col_pf2, col_pf3, col_pb1, col_pb2, col_pb3, col_pb4 = st.columns([1.0, 1.3, 1.0, 0.9, 1.0, 0.9, 0.9])
+
+        with col_pf1:
+            status_filter_p = st.selectbox("Status", ["PENDENTE", "AGUARDANDO BAIXA", "PAGO", "TODAS"], key="pag_filt_mod")
+
+        with col_pf2:
+            busca_txt_p = st.text_input("Pesquisa - Nome/Fatura", placeholder="Buscar fornecedor...", key="pag_search_mod")
+            buscar_razao_p = st.checkbox("Buscar por Razão Social", key="pag_buscar_razao")
+
+        with col_pf3:
+            periodo_sel_p = st.selectbox(
+                "Período",
+                ["Este mês", "Hoje", "Últimos 7 dias", "Últimos 30 dias", "Personalizado", "Todas as Datas"],
+                key="pag_periodo_filter"
+            )
+
+        with col_pb1:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            if st.button("+ Lançamento", use_container_width=True, key="btn_lancar_p"):
+                dialog_lancar_pagar()
+
+        with col_pb2:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            if st.button("Renegociar", use_container_width=True, key="btn_reneg_p"):
+                dialog_renegociar_pagar()
+
+        with col_pb3:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            if st.button("Editar", use_container_width=True, key="btn_edit_p"):
+                df_editables = df_all_contas[df_all_contas['Status'] == 'PENDENTE']
+                if df_editables.empty:
+                    st.warning("Nenhuma conta pendente para editar.")
+                else:
+                    if 'selecionados_ids_p' in st.session_state and len(st.session_state['selecionados_ids_p']) == 1:
+                        dialog_editar_pagar(st.session_state['selecionados_ids_p'][0])
+                    else:
+                        st.warning("Selecione EXATAMENTE UMA conta pendente na tabela abaixo para editar.")
+
+        with col_pb4:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            btn_baixar_p = st.button("💸 Baixar", type="primary", use_container_width=True, key="btn_baixar_p")
+
+        # Cálculo de datas baseados no filtro de Período
+        dt_ini_p, dt_fi_p = date.today(), date.today()
+        filtrar_data_p = True
+
+        if periodo_sel_p == "Este mês":
+            import calendar
+            dt_ini_p = date(hoje.year, hoje.month, 1)
+            dt_fi_p = date(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
+        elif periodo_sel_p == "Hoje":
+            dt_ini_p = hoje
+            dt_fi_p = hoje
+        elif periodo_sel_p == "Últimos 7 dias":
+            dt_ini_p = hoje - timedelta(days=7)
+            dt_fi_p = hoje
+        elif periodo_sel_p == "Últimos 30 dias":
+            dt_ini_p = hoje - timedelta(days=30)
+            dt_fi_p = hoje
+        elif periodo_sel_p == "Personalizado":
+            col_pd1, col_pd2 = st.columns(2)
+            dt_ini_p = col_pd1.date_input("De", hoje - timedelta(days=30), key="pag_dt_ini")
+            dt_fi_p = col_pd2.date_input("Até", hoje, key="pag_dt_fi")
+        elif periodo_sel_p == "Todas as Datas":
+            filtrar_data_p = False
+
+        total_pendente_p = 0.0
+        total_vencido_p = 0.0
+        total_pago_mes_p = 0.0
+
+        if not df_all_contas.empty:
+            df_pend = df_all_contas[df_all_contas['Status'] == 'PENDENTE'].copy()
+            total_pendente_p = float(df_pend['Valor'].sum())
+            if not df_pend.empty:
+                df_pend['v_date'] = pd.to_datetime(df_pend['Vencimento']).dt.date
+                total_vencido_p = float(df_pend[df_pend['v_date'] < hoje]['Valor'].sum())
+
+            df_pago = df_all_contas[df_all_contas['Status'] == 'PAGO'].copy()
+            if not df_pago.empty:
+                df_pago['p_date'] = pd.to_datetime(df_pago['Data PGTO']).dt.date
+                if filtrar_data_p:
+                    total_pago_mes_p = float(df_pago[(df_pago['p_date'] >= dt_ini_p) & (df_pago['p_date'] <= dt_fi_p)]['Valor'].sum())
+                else:
+                    total_pago_mes_p = float(df_pago['Valor'].sum())
+
+        def formatar_moeda(val): return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
         with container_metricas_p:
-
             st.markdown(f"""
-
             <div style="display: flex; gap: 20px; font-size: 0.95rem; color: #475569; margin-top: 5px; margin-bottom: 15px; background-color: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
                 <div>Total Pendente (Global): <strong style="color: #b45309;">{formatar_moeda(total_pendente_p)}</strong></div>
                 <div style="color: #cbd5e1;">|</div>
@@ -1938,83 +2023,11 @@ try:
                 <div style="color: #cbd5e1;">|</div>
                 <div>Liquidados (Período): <strong style="color: #10b981;">{formatar_moeda(total_pago_mes_p)}</strong></div>
             </div>
-
             """, unsafe_allow_html=True)
 
-            
-
-        col_pf1, col_pf2, col_pb1, col_pb2, col_pb3, col_pb4 = st.columns([1.0, 1.4, 0.9, 1.0, 0.9, 0.9])
-
-        
-
-        with col_pf1:
-
-            status_filter_p = st.selectbox("Status", ["PENDENTE", "AGUARDANDO BAIXA", "PAGO", "TODAS"], key="pag_filt_mod")
-
-        with col_pf2:
-            busca_txt_p = st.text_input("Pesquisa - Nome/Fatura", placeholder="Buscar fornecedor...", key="pag_search_mod")
-            buscar_razao_p = st.checkbox("Buscar por Razão Social", key="pag_buscar_razao")
-
-            
-
-        with col_pb1:
-
-            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
-
-            if st.button("+ Lançamento", use_container_width=True, key="btn_lancar_p"):
-
-                dialog_lancar_pagar()
-
-                
-
-        with col_pb2:
-
-            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
-
-            if st.button("Renegociar", use_container_width=True, key="btn_reneg_p"):
-
-                dialog_renegociar_pagar()
-
-                
-
-        with col_pb3:
-
-            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
-
-            if st.button("Editar", use_container_width=True, key="btn_edit_p"):
-
-                df_editables = df_all_contas[df_all_contas['Status'] == 'PENDENTE']
-
-                if df_editables.empty:
-
-                    st.warning("Nenhuma conta pendente para editar.")
-
-                else:
-
-                    if 'selecionados_ids_p' in st.session_state and len(st.session_state['selecionados_ids_p']) == 1:
-
-                        dialog_editar_pagar(st.session_state['selecionados_ids_p'][0])
-
-                    else:
-
-                        st.warning("Selecione EXATAMENTE UMA conta pendente na tabela abaixo para editar.")
-
-
-
-        with col_pb4:
-
-            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
-
-            btn_baixar_p = st.button("💸 Baixar", type="primary", use_container_width=True, key="btn_baixar_p")
-
-
-
         if df_all_contas.empty:
-
             st.info("Nenhuma conta a pagar encontrada. Paz de espírito.")
-
         else:
-
             df_view_p = df_all_contas.copy()
             
             def format_doc_p(row):
@@ -2032,8 +2045,30 @@ try:
             df_view_p['Conta'] = df_view_p['Conta'].apply(lambda x: "-" if pd.isna(x) or str(x).strip() in ('None', 'nan', '') else str(x).strip())
 
             if status_filter_p != "TODAS":
-
                 df_view_p = df_view_p[df_view_p['Status'] == status_filter_p]
+
+            if filtrar_data_p:
+                def get_filter_date_p(row):
+                    if str(row.get('Status', '')).strip().upper() == 'PAGO':
+                        d_pgto_val = row.get('Data PGTO')
+                        if pd.notna(d_pgto_val) and str(d_pgto_val).strip() not in ('', 'None', 'nan'):
+                            try:
+                                return pd.to_datetime(d_pgto_val).date()
+                            except Exception:
+                                pass
+                    venc_val = row.get('Vencimento')
+                    if pd.notna(venc_val) and str(venc_val).strip() not in ('', 'None', 'nan'):
+                        try:
+                            return pd.to_datetime(venc_val).date()
+                        except Exception:
+                            pass
+                    return None
+
+                df_view_p['data_filtro'] = df_view_p.apply(get_filter_date_p, axis=1)
+                df_view_p = df_view_p[
+                    df_view_p['data_filtro'].isna() |
+                    ((df_view_p['data_filtro'] >= dt_ini_p) & (df_view_p['data_filtro'] <= dt_fi_p))
+                ].drop(columns=['data_filtro'])
 
                 
 
@@ -2191,10 +2226,100 @@ try:
 
         container_metricas_r = st.container()
 
+        col_rf1, col_rf2, col_rf3, col_rb1, col_rb2, col_rb3, col_rb4, col_rb5 = st.columns([1.0, 1.3, 1.0, 0.9, 0.9, 0.9, 0.8, 0.9])
+
+        with col_rf1:
+            status_filter_r = st.selectbox("Status", ["PENDENTE", "RECEBIDO", "TODAS"], key="rec_filt_mod")
+
+        with col_rf2:
+            busca_txt_r = st.text_input("Pesquisa - Nome/Fatura", placeholder="Buscar cliente...", key="rec_search_mod")
+            buscar_razao_r = st.checkbox("Buscar por Razão Social", key="rec_buscar_razao")
+
+        with col_rf3:
+            periodo_sel_r = st.selectbox(
+                "Período",
+                ["Este mês", "Hoje", "Últimos 7 dias", "Últimos 30 dias", "Personalizado", "Todas as Datas"],
+                key="rec_periodo_filter"
+            )
+
+        with col_rb1:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            if st.button("+ Lançamento", use_container_width=True, key="btn_lancar_r"):
+                dialog_lancar_receber()
+
+        with col_rb2:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            if st.button("Gerar Extrato", use_container_width=True, key="btn_extrato_r"):
+                dialog_fechamento_carteira()
+
+        with col_rb3:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            if st.button("Renegociar", use_container_width=True, key="btn_reneg_r"):
+                dialog_renegociar_receber()
+
+        with col_rb4:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            if st.button("Editar", use_container_width=True, key="btn_edit_r"):
+                df_editables_r = df_receber[df_receber['Status'] == 'PENDENTE']
+                if df_editables_r.empty:
+                    st.warning("Nenhuma conta a receber pendente.")
+                else:
+                    if 'selecionados_ids_r' in st.session_state and len(st.session_state['selecionados_ids_r']) == 1:
+                        dialog_editar_receber(st.session_state['selecionados_ids_r'][0])
+                    else:
+                        st.warning("Selecione EXATAMENTE UMA conta pendente na tabela abaixo para editar.")
+
+        with col_rb5:
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            btn_baixar_r = st.button("💸 Receber", type="primary", use_container_width=True, key="btn_baixar_r")
+
+        # Cálculo de datas baseados no filtro de Período
+        dt_ini_r, dt_fi_r = date.today(), date.today()
+        filtrar_data_r = True
+
+        if periodo_sel_r == "Este mês":
+            import calendar
+            dt_ini_r = date(hoje.year, hoje.month, 1)
+            dt_fi_r = date(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
+        elif periodo_sel_r == "Hoje":
+            dt_ini_r = hoje
+            dt_fi_r = hoje
+        elif periodo_sel_r == "Últimos 7 dias":
+            dt_ini_r = hoje - timedelta(days=7)
+            dt_fi_r = hoje
+        elif periodo_sel_r == "Últimos 30 dias":
+            dt_ini_r = hoje - timedelta(days=30)
+            dt_fi_r = hoje
+        elif periodo_sel_r == "Personalizado":
+            col_rd1, col_rd2 = st.columns(2)
+            dt_ini_r = col_rd1.date_input("De", hoje - timedelta(days=30), key="rec_dt_ini")
+            dt_fi_r = col_rd2.date_input("Até", hoje, key="rec_dt_fi")
+        elif periodo_sel_r == "Todas as Datas":
+            filtrar_data_r = False
+
+        total_a_receber_r = 0.0
+        total_vencido_r = 0.0
+        total_recebido_mes_r = 0.0
+
+        if not df_receber.empty:
+            df_pend_r = df_receber[df_receber['Status'] == 'PENDENTE'].copy()
+            total_a_receber_r = float(df_pend_r['Valor'].sum())
+            if not df_pend_r.empty:
+                df_pend_r['v_date'] = pd.to_datetime(df_pend_r['Vencimento']).dt.date
+                total_vencido_r = float(df_pend_r[df_pend_r['v_date'] < hoje]['Valor'].sum())
+
+            df_recebido_r = df_receber[df_receber['Status'] == 'RECEBIDO'].copy()
+            if not df_recebido_r.empty:
+                df_recebido_r['r_date'] = pd.to_datetime(df_recebido_r['Recebido Em']).dt.date
+                if filtrar_data_r:
+                    total_recebido_mes_r = float(df_recebido_r[(df_recebido_r['r_date'] >= dt_ini_r) & (df_recebido_r['r_date'] <= dt_fi_r)]['Valor'].sum())
+                else:
+                    total_recebido_mes_r = float(df_recebido_r['Valor'].sum())
+
+        def formatar_moeda(val): return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
         with container_metricas_r:
-
             st.markdown(f"""
-
             <div style="display: flex; gap: 20px; font-size: 0.95rem; color: #475569; margin-top: 5px; margin-bottom: 15px; background-color: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
                 <div>Total a Receber (Global): <strong style="color: #2563eb;">{formatar_moeda(total_a_receber_r)}</strong></div>
                 <div style="color: #cbd5e1;">|</div>
@@ -2202,93 +2327,11 @@ try:
                 <div style="color: #cbd5e1;">|</div>
                 <div>Recebidos (Período): <strong style="color: #10b981;">{formatar_moeda(total_recebido_mes_r)}</strong></div>
             </div>
-
             """, unsafe_allow_html=True)
 
-            
-
-        col_rf1, col_rf2, col_rb1, col_rb2, col_rb3, col_rb4, col_rb5 = st.columns([1.0, 1.4, 0.9, 0.9, 0.9, 0.8, 0.9])
-
-        
-
-        with col_rf1:
-
-            status_filter_r = st.selectbox("Status", ["PENDENTE", "RECEBIDO", "TODAS"], key="rec_filt_mod")
-
-        with col_rf2:
-            busca_txt_r = st.text_input("Pesquisa - Nome/Fatura", placeholder="Buscar cliente...", key="rec_search_mod")
-            buscar_razao_r = st.checkbox("Buscar por Razão Social", key="rec_buscar_razao")
-
-            
-
-        with col_rb1:
-
-            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
-
-            if st.button("+ Lançamento", use_container_width=True, key="btn_lancar_r"):
-
-                dialog_lancar_receber()
-
-                
-
-        with col_rb2:
-
-            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
-
-            if st.button("Gerar Extrato", use_container_width=True, key="btn_extrato_r"):
-
-                dialog_fechamento_carteira()
-
-                
-
-        with col_rb3:
-
-            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
-
-            if st.button("Renegociar", use_container_width=True, key="btn_reneg_r"):
-
-                dialog_renegociar_receber()
-
-                
-
-        with col_rb4:
-
-            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
-
-            if st.button("Editar", use_container_width=True, key="btn_edit_r"):
-
-                df_editables_r = df_receber[df_receber['Status'] == 'PENDENTE']
-
-                if df_editables_r.empty:
-
-                    st.warning("Nenhuma conta a receber pendente.")
-
-                else:
-
-                    if 'selecionados_ids_r' in st.session_state and len(st.session_state['selecionados_ids_r']) == 1:
-
-                        dialog_editar_receber(st.session_state['selecionados_ids_r'][0])
-
-                    else:
-
-                        st.warning("Selecione EXATAMENTE UMA conta pendente na tabela abaixo para editar.")
-
-
-
-        with col_rb5:
-
-            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
-
-            btn_baixar_r = st.button("💸 Receber", type="primary", use_container_width=True, key="btn_baixar_r")
-
-
-
         if df_receber.empty:
-
             st.info("Nenhuma fatura lançada na vida financeira da empresa ainda.")
-
         else:
-
             df_view_r = df_receber.copy()
             
             def format_doc_r(row):
@@ -2323,8 +2366,30 @@ try:
             df_view_r['Conta'] = df_view_r['Conta'].apply(lambda x: "-" if pd.isna(x) or str(x).strip() in ('None', 'nan', '') else str(x).strip())
 
             if status_filter_r != "TODAS":
-
                 df_view_r = df_view_r[df_view_r['Status'] == status_filter_r]
+
+            if filtrar_data_r:
+                def get_filter_date_r(row):
+                    if str(row.get('Status', '')).strip().upper() == 'RECEBIDO':
+                        d_rec_val = row.get('Recebido Em')
+                        if pd.notna(d_rec_val) and str(d_rec_val).strip() not in ('', 'None', 'nan'):
+                            try:
+                                return pd.to_datetime(d_rec_val).date()
+                            except Exception:
+                                pass
+                    venc_val = row.get('Vencimento')
+                    if pd.notna(venc_val) and str(venc_val).strip() not in ('', 'None', 'nan'):
+                        try:
+                            return pd.to_datetime(venc_val).date()
+                        except Exception:
+                            pass
+                    return None
+
+                df_view_r['data_filtro'] = df_view_r.apply(get_filter_date_r, axis=1)
+                df_view_r = df_view_r[
+                    df_view_r['data_filtro'].isna() |
+                    ((df_view_r['data_filtro'] >= dt_ini_r) & (df_view_r['data_filtro'] <= dt_fi_r))
+                ].drop(columns=['data_filtro'])
 
                 
 
@@ -2785,6 +2850,7 @@ try:
                 hide_index=True,
                 disabled=["id", "Data", "Banco", "Histórico", "Entrada", "Saída", "Saldo Após Linha", "Categoria"],
                 width="stretch",
+                height=500,
                 column_config={
                     "id": None, # Oculta a coluna ID
                     "Revisado": st.column_config.CheckboxColumn("Ok", help="Marque se confirmou na conta do banco.", default=False),

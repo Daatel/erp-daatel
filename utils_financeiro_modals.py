@@ -205,14 +205,28 @@ def dialog_confirmar_baixa_lote_pagar(ids_selecionados, df_all_contas, opcoes_ba
             
             # Obtém o credor unificado de forma resiliente
             credor = r.get('Credor', r.get('Fornecedor', ''))
-            credor = str(credor) if pd.notna(credor) else ""
+            credor = str(credor) if pd.notna(credor) and str(credor).strip() not in ('', 'None', 'nan') else ""
+            credor = credor.replace("🔴 [BLOQUEADO FALTAM CANHOTOS] ", "").strip()
             
-            # Obtém histórico e planta de custo de forma resiliente para evitar KeyError
-            fat = r.get('Histórico', r.get('Descrição/Fatura', ''))
-            plant = r.get('Planta de Custo', r.get('Categoria', 'Gasto'))
+            if not credor:
+                df_forn_info = fetch_all("""
+                    SELECT f.nome_fantasia, f.nome, cl.nome as cliente_nome
+                    FROM contas_a_pagar cp
+                    LEFT JOIN fornecedores f ON cp.fornecedor_id = f.id
+                    LEFT JOIN clientes cl ON cp.cliente_id = cl.id
+                    WHERE cp.id = ?
+                """, (c_id,))
+                if not df_forn_info.empty:
+                    fi = df_forn_info.iloc[0]
+                    if pd.notna(fi['nome_fantasia']) and str(fi['nome_fantasia']).strip():
+                        credor = str(fi['nome_fantasia']).strip()
+                    elif pd.notna(fi['nome']) and str(fi['nome']).strip():
+                        credor = str(fi['nome']).strip()
+                    elif pd.notna(fi['cliente_nome']) and str(fi['cliente_nome']).strip():
+                        credor = str(fi['cliente_nome']).strip()
             
-            # Limpa tag de bloqueio do nome
-            credor = credor.replace("🔴 [BLOQUEADO FALTAM CANHOTOS] ", "")
+            if not credor:
+                credor = "Fornecedor / Credor"
             
             df_cap_cli = fetch_all("SELECT cliente_id FROM contas_a_pagar WHERE id=?", (c_id,))
             cap_cli_id = int(df_cap_cli.iloc[0]['cliente_id']) if not df_cap_cli.empty and pd.notna(df_cap_cli.iloc[0]['cliente_id']) else None

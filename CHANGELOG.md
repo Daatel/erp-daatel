@@ -1,4 +1,10 @@
-# 📋 Histórico de Versões — ERP Fábrica de Alho
+## v2.3.0 — 2026-09-08 (Sessão: Resolução de Filtros Temporais & Padronização de Históricos de Fornecedores no Financeiro)
+
+### 💵 Financeiro & Caixas e Bancos (`pages/9_Financeiro.py`, `utils_financeiro_modals.py`)
+- **Normalização de Lançamentos de Fornecedores:** Atualizados 79 lançamentos do mês de agosto/2026 em `fluxo_caixa` para incluir o nome do credor e a tag `(Fornecedor)` no histórico.
+- **Resolução Resiliente na Liquidação de Duplicatas (`utils_financeiro_modals.py`):** Diálogo de confirmação de baixa atualizado para consultar dinamicamente a tabela de fornecedores/clientes quando o nome do credor vier omisso.
+- **Filtro Temporal em Contas a Pagar & Receber (`pages/9_Financeiro.py`):** Adicionado o seletor `Período` ("Este mês", "Hoje", "Últimos 7 dias", "Últimos 30 dias", "Personalizado", "Todas as Datas") nas abas Contas a Pagar e Contas a Receber, no mesmo padrão de Caixas e Bancos.
+- **Ajuste de Altura Visual da Grid:** Definido `height=500` no `st.data_editor` da aba Caixas e Bancos para padronização e rolagem fluida sem corte de linhas.
 
 ---
 
