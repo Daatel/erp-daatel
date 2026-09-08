@@ -1,3 +1,12 @@
+## v2.5.2 — 2026-09-08 (Sessão: Remoção do Falso Caixa no DRE / Conciliação Rígida Competência DRE vs Extrato Razão)
+
+### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
+- **Remoção da Linha Falsa de "Resultado Líquido de Caixa":** Removido o Bloco VII que subtraía o CAPEX do Lucro Líquido e denominava incorretamente o resultado como *"Resultado Líquido de Caixa da Operação (R$ 80.931,95)"*, gerando confusão financeira com o extrato bancário real.
+- **Card de Conciliação Contábil & Financeira:** Inserida nota explicativa formal na Seção VII conciliando com transparência a **Visão por Competência do DRE** (Vendas Faturadas R$ 260.620,00 -> Lucro Líquido R$ 109.449,62) com a **Visão Efetiva de Caixa do Extrato Razão** (Entradas R$ 230.662,45 - Saídas R$ 228.705,56 = Variação de Caixa R$ +1.956,89 / Saldo Final R$ 4.535,93).
+- **Esclarecimento de Contas a Receber:** Explicitada a diferença de ~R$ 78k decorrente de vendas a prazo/boletos emitidos em Agosto com recebimento futuro nos meses seguintes.
+
+---
+
 ## v2.5.1 — 2026-09-08 (Sessão: Reclassificação Estrita de Fretes e Comissões / Correção de CMV e Despesas Comerciais)
 
 ### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)

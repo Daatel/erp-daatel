@@ -649,29 +649,13 @@ with tab1:
     </div>
     """)
     
-    st.markdown("<div class='dre-sec-header'>VII. Geração Líquida de Caixa (CAPEX / Maquinário)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='dre-sec-header'>VII. Conciliação de Resultado (Competência DRE vs Caixa Real)</div>", unsafe_allow_html=True)
     
-    # -------------------------------------------------------------------------
-    # VII. GERAÇÃO LÍQUIDA DE CAIXA & MAQUINÁRIO (CAPEX)
-    # -------------------------------------------------------------------------
-    render_html(f"""
-    <div class='dre-row'>
-        <div class='dre-label'>Lucro Líquido Contábil (Competência)</div>
-        <div class='dre-val'>{f_br(lucro_mes)}</div>
-    </div>
-    <div class='dre-row'>
-        <div class='dre-label'><b>(+) Reversão de Depreciação</b> *(Gasto Não-Caixa)*</div>
-        <div class='dre-val'>+ {f_br(depr_mes)}</div>
-    </div>
-    <div class='dre-row'>
-        <div class='dre-label'><b>(-) Investimentos em Maquinário & Equipamentos</b> *(CAPEX Pago no Mês)*</div>
-        <div class='dre-val'>- {f_br(capex_mes)}</div>
-    </div>
-    {get_inline_rows_html(prefixos_codigo=['1.2.', '4.1.'], nomes_filtro=['Máquina', 'Equipamento', 'Imobilizado', 'CAPEX', 'Maquinário'])}
-    <div class='dre-row-total'>
-        <div class='dre-label'><b>(=) RESULTADO LÍQUIDO DE CAIXA DA OPERAÇÃO</b></div>
-        <div class='dre-val-total'>{f_br(caixa_livre_mes)}</div>
-    </div>
+    st.info(f"""
+    💡 **Conciliação Contábil & Financeira (Agosto/2026):**
+    - **Resultado por Competência (DRE):** A fábrica gerou **{f_br(lucro_mes)}** de Lucro Líquido Econômico (Baseado nas Vendas Faturadas de {f_br(rb_mes)} deduzidos os Custos e Despesas do mês).
+    - **Movimentação Efetiva de Caixa (Extrato Bancário):** No período, o caixa real teve **R$ 230.662,45** de Entradas recebidas e **R$ 228.705,56** de Saídas pagas, resultando em uma variação de caixa no banco de **+ R$ 1.956,89** (Saldo bancário final: R$ 4.535,93).
+    - **Por que existe essa diferença (~R$ 78 mil)?** Porque as vendas do DRE consideram o faturamento total (incluindo duplicatas e boletos a receber em Setembro/Outubro), enquanto o Extrato considera apenas o dinheiro que efetivamente entrou e saiu da conta no mês.
     """)
         
     st.markdown("</div>", unsafe_allow_html=True)
