@@ -562,7 +562,7 @@ with tab1:
         <div class='dre-label'><b>5.6 (-) Serviços de Promotores de Vendas (2.2.4)</b></div>
         <div class='dre-val'>{f_br(promotores_mes)}</div>
     </div>
-    {get_inline_rows_html(prefixos_codigo=['2.2.', '2.1.4', '2.1.5'])}
+    {get_inline_rows_html(prefixos_codigo=['2.2.'], ignorar_codigos=['2.2.1', '2.2.2', '2.2.4', '2.1.4', '2.1.5'])}
     <div class='dre-row-total'>
         <div class='dre-label'>
             (=) MARGEM DE CONTRIBUIÇÃO LÍQUIDA

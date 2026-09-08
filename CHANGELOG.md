@@ -1,3 +1,11 @@
+## v2.5.4 — 2026-09-08 (Sessão: Remoção de Linhas Duplicadas no Grupo 5 / Despesas Comerciais Variáveis)
+
+### 🏛️ Demonstrativo Gerencial do Resultado (`pages/10_DRE.py`)
+- **Eliminação de Duplicidade Visual:** Removida a renderização redundante das subcontas `2.1.5`, `2.1.4`, `2.2.1`, `2.2.2` e `2.2.4` no final do Grupo 5, eliminando a exibição duplicada que apresentava `5.2 (-) Fretes de Entrega` e `2.1.5 - Fretes sobre Vendas` simultaneamente para o mesmo valor.
+- **Exibição Única e Consolidada:** As despesas comerciais são apresentadas estritamente nas linhas estruturadas `5.1` a `5.6` sem duplicações filhas.
+
+---
+
 ## v2.5.3 — 2026-09-08 (Sessão: Reformulação para DRE Gerencial & Nota Explicativa de Investimentos)
 
 ### 🏛️ Demonstrativo Gerencial do Resultado (`pages/10_DRE.py`)
