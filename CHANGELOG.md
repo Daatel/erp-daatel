@@ -1,3 +1,12 @@
+## v2.5.5 — 2026-09-08 (Sessão: Correção da Dupla Dedução de Manutenção / Filtro Estrito de CAPEX)
+
+### 🏛️ Demonstrativo Gerencial do Resultado (`pages/10_DRE.py`)
+- **Correção da Dupla Dedução de Manutenção (Código 2.3.3):** Corrigido o filtro de CAPEX para excluir a conta `2.3.3 - Manutenção de Máquinas e Utensílios` (despesa fixa operacional de R$ 30.149,99) da Seção VII (Investimentos em Maquinário).
+- **Causa da Duplicidade:** O filtro anterior utilizava busca por palavra-chave `str.contains('Máquina')`, capturando a manutenção fabril operacional e deduzindo-a duas vezes (no grupo 6 de Custos Fixos e novamente no grupo VII).
+- **Filtro Estrito de CAPEX:** A Seção VII passa a considerar exclusivamente contas de investimentos imobilizados em ativos (`3.3.1 - Compra de Máquinas, Freezers em Comodato ou Veículos` R$ 22.500,00 e grupos `1.2.`/`4.1.`), eliminando a distorção no Resultado Gerencial Líquido da Fábrica.
+
+---
+
 ## v2.5.4 — 2026-09-08 (Sessão: Remoção de Linhas Duplicadas no Grupo 5 / Despesas Comerciais Variáveis)
 
 ### 🏛️ Demonstrativo Gerencial do Resultado (`pages/10_DRE.py`)

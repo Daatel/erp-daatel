@@ -300,8 +300,9 @@ div_mes = float(df_cap_mes[df_cap_mes['pc_nome'].str.contains('Dividendos|Distri
 retido_mes = lucro_mes - div_mes
 
 # CAPEX / Maquinário e Geração Líquida de Caixa
-capex_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith(('1.2.', '4.1.'), na=False) | df_cap_mes['pc_nome'].str.contains('Máquina|Equipamento|Imobilizado|CAPEX|Maquinário', case=False, na=False) | df_cap_mes['descricao'].str.contains('Máquina|Equipamento|Maquinário', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
-caixa_livre_mes = lucro_mes + depr_mes - capex_mes
+is_capex = (df_cap_mes['codigo'].str.startswith(('3.3.', '1.2.', '4.1.'), na=False) | (df_cap_mes['pc_nome'].str.contains('Compra de Máquinas|Imobilizado|CAPEX', case=False, na=False) & ~df_cap_mes['codigo'].str.startswith('2.', na=False))) if not df_cap_mes.empty else pd.Series([], dtype=bool)
+capex_mes = float(df_cap_mes[is_capex]['valor'].sum()) if not df_cap_mes.empty else 0.0
+caixa_livre_mes = lucro_mes - capex_mes
 
 # Ponto de Equilíbrio
 break_even = (df_mes_val / (mc_perc / 100)) if mc_perc > 0 else 0.0
@@ -660,7 +661,7 @@ with tab1:
         <div class='dre-label'><b>(-) Desembolsos de Investimentos</b> *(Compra de Máquinas, Equipamentos e Imobilizado)*</div>
         <div class='dre-val'>- {f_br(capex_mes)}</div>
     </div>
-    {get_inline_rows_html(prefixos_codigo=['1.2.', '4.1.'], nomes_filtro=['Máquina', 'Equipamento', 'Imobilizado', 'CAPEX', 'Maquinário'])}
+    {get_inline_rows_html(prefixos_codigo=['3.3.', '1.2.', '4.1.'], nomes_filtro=['Compra de Máquinas', 'Imobilizado', 'CAPEX'], ignorar_codigos=['2.3.3', '2.3.'])}
     <div class='dre-row-total'>
         <div class='dre-label'><b>(=) RESULTADO GERENCIAL LÍQUIDO DA FÁBRICA</b></div>
         <div class='dre-val-total'>{f_br(caixa_livre_mes)}</div>
