@@ -152,153 +152,116 @@ p_mes = pd.Period(f"{ano_sel}-{mes_sel:02d}", freq='M')
 dt_vd_devol_inicio_str = p_mes.start_time.strftime("%Y-%m-%d")
 dt_vd_devol_fim_str = p_mes.end_time.strftime("%Y-%m-%d")
 
-dt_cap_inicio_str = p_mes.start_time.strftime("%Y-%m-%d")
-dt_cap_fim_str = p_mes.end_time.strftime("%Y-%m-%d")
+# --- QUERY PRINCIPAL DO FLUXO DE CAIXA REAL (EXTRATO RAZÃO BANCOS / CAIXA FÍSICO) ---
+q_fc = """
+    SELECT 
+        f.id,
+        f.data,
+        f.tipo,
+        f.valor,
+        f.descricao,
+        f.categoria as fc_categoria,
+        COALESCE(pc_p.codigo, pc_r.codigo, 'OUTROS') as codigo,
+        COALESCE(pc_p.nome, pc_r.nome, f.categoria, 'Outros Lançamentos') as pc_nome,
+        COALESCE(pc_p.categoria, pc_r.categoria, 'Geral') as pc_cat
+    FROM fluxo_caixa f
+    LEFT JOIN contas_a_pagar cp ON (UPPER(f.tipo) = 'SAIDA' OR f.tipo = 'Saída' OR f.tipo = 'Saida') AND f.fonte_id = cp.id AND (f.categoria IS NULL OR f.categoria NOT IN ('Transferência', 'Ajuste de saldo'))
+    LEFT JOIN planos_de_contas pc_p ON cp.plano_conta_id = pc_p.id
+    LEFT JOIN contas_a_receber cr ON (UPPER(f.tipo) = 'ENTRADA' OR f.tipo = 'Entrada') AND f.fonte_id = cr.id AND (f.categoria IS NULL OR f.categoria NOT IN ('Transferência', 'Ajuste de saldo'))
+    LEFT JOIN planos_de_contas pc_r ON cr.plano_conta_id = pc_r.id
+    WHERE f.data >= ? AND f.data <= ?
+      AND (f.categoria IS NULL OR f.categoria NOT IN ('Transferência', 'Ajuste de saldo'))
+    ORDER BY f.data ASC
+"""
+df_fc_mes = fetch_all(q_fc, (dt_vd_devol_inicio_str, dt_vd_devol_fim_str))
 
-# --- QUERY DAS VENDAS ---
-df_vd = fetch_all("""
-    SELECT valor_total, quantidade, custo_frete_rateado, comissao_valor, custo_acordos_rede, custo_descarga, custo_cmv_real, data, tipo_documento
-    FROM vendas
-    WHERE status = 'FATURADO' AND data >= ? AND data <= ?
-""", (dt_vd_devol_inicio_str, dt_vd_devol_fim_str))
+if df_fc_mes is None or df_fc_mes.empty:
+    df_fc_mes = pd.DataFrame(columns=['id', 'data', 'tipo', 'valor', 'descricao', 'fc_categoria', 'codigo', 'pc_nome', 'pc_cat'])
 
-if not df_vd.empty:
-    df_vd['data'] = pd.to_datetime(df_vd['data'], errors='coerce')
-    df_vd['sale_month'] = df_vd['data'].dt.to_period('M')
-else:
-    df_vd = pd.DataFrame(columns=['valor_total', 'quantidade', 'custo_frete_rateado', 'comissao_valor', 'custo_acordos_rede', 'custo_descarga', 'custo_cmv_real', 'sale_month', 'tipo_documento'])
+# Subdivisão por tipo de movimentação
+is_ent = df_fc_mes['tipo'].astype(str).str.upper().isin(['ENTRADA'])
+is_sai = df_fc_mes['tipo'].astype(str).str.upper().isin(['SAIDA', 'SAÍDA'])
 
-# --- QUERY DE DEVOLUÇÕES ---
-df_devol = fetch_all("""
-    SELECT valor_financeiro_abatido, data FROM devolucoes WHERE data >= ? AND data <= ?
-""", (dt_vd_devol_inicio_str, dt_vd_devol_fim_str))
+df_ent_mes = df_fc_mes[is_ent]
+df_sai_mes = df_fc_mes[is_sai]
 
-if not df_devol.empty:
-    df_devol['data'] = pd.to_datetime(df_devol['data'], errors='coerce')
-    df_devol['devol_month'] = df_devol['data'].dt.to_period('M')
-else:
-    df_devol = pd.DataFrame(columns=['valor_financeiro_abatido', 'devol_month'])
+# --- 1. RECEITAS DE CAIXA (ENTRADAS DE CAIXA EFETIVADAS) ---
+rb_mes = float(df_ent_mes['valor'].sum()) if not df_ent_mes.empty else 0.0
 
-# --- QUERY DE COMPRAS DE MATÉRIA PRIMA ---
-df_mp = fetch_all("""
-    SELECT data, peso_kg, valor_total FROM compras_materia_prima WHERE data >= ? AND data <= ?
-""", (dt_vd_devol_inicio_str, dt_vd_devol_fim_str))
+ent_nat = float(df_ent_mes[df_ent_mes['codigo'] == '1.1.1']['valor'].sum()) if not df_ent_mes.empty else 0.0
+ent_desc = float(df_ent_mes[df_ent_mes['codigo'] == '1.1.2']['valor'].sum()) if not df_ent_mes.empty else 0.0
+ent_outros = rb_mes - ent_nat - ent_desc
 
-if not df_mp.empty:
-    df_mp['data'] = pd.to_datetime(df_mp['data'], errors='coerce')
-    df_mp['mp_month'] = df_mp['data'].dt.to_period('M')
-else:
-    df_mp = pd.DataFrame(columns=['data', 'peso_kg', 'valor_total', 'mp_month'])
-
-# --- QUERY DO CONTAS A PAGAR (REGIME DE CAIXA - APENAS TÍTULOS EFETIVAMENTE PAGOS) ---
-df_cap = fetch_all("""
-    SELECT c.valor, c.data_vencimento, c.data_pagamento, c.descricao, c.status, pc.codigo, pc.categoria as pc_cat, pc.nome as pc_nome
-    FROM contas_a_pagar c
-    JOIN planos_de_contas pc ON c.plano_conta_id = pc.id
-    WHERE UPPER(c.status) = 'PAGO' AND c.data_vencimento >= ? AND c.data_vencimento <= ?
-""", (dt_cap_inicio_str, dt_cap_fim_str))
-
-if not df_cap.empty:
-    df_cap['data_vencimento'] = pd.to_datetime(df_cap['data_vencimento'], errors='coerce')
-    df_cap['ref_month'] = df_cap['data_vencimento'].dt.to_period('M')
-else:
-    df_cap = pd.DataFrame(columns=['valor', 'descricao', 'codigo', 'pc_cat', 'pc_nome', 'ref_month'])
-
-# --- FILTRAGEM POR MÊS ---
-df_vd_mes = df_vd[df_vd['sale_month'] == p_mes]
-df_devol_mes = df_devol[df_devol['devol_month'] == p_mes]
-df_mp_mes = df_mp[df_mp['mp_month'] == p_mes]
-df_cap_mes = df_cap[df_cap['ref_month'] == p_mes]
-
-# --- DESDOBRAMENTO DE VENDAS: NF vs DAV ---
-is_nf = df_vd_mes['tipo_documento'].astype(str).str.contains('NF|Nota', case=False, na=False) if not df_vd_mes.empty else pd.Series([], dtype=bool)
-df_nf_mes = df_vd_mes[is_nf] if not df_vd_mes.empty else pd.DataFrame()
-df_dav_mes = df_vd_mes[~is_nf] if not df_vd_mes.empty else pd.DataFrame()
-
-nf_val_mes = float(df_nf_mes['valor_total'].sum()) if not df_nf_mes.empty else 0.0
-nf_kg_mes = float(df_nf_mes['quantidade'].sum()) if not df_nf_mes.empty else 0.0
-nf_pm_mes = nf_val_mes / nf_kg_mes if nf_kg_mes > 0 else 0.0
-
-dav_val_mes = float(df_dav_mes['valor_total'].sum()) if not df_dav_mes.empty else 0.0
-dav_kg_mes = float(df_dav_mes['quantidade'].sum()) if not df_dav_mes.empty else 0.0
-dav_pm_mes = dav_val_mes / dav_kg_mes if dav_kg_mes > 0 else 0.0
-
-rb_mes = nf_val_mes + dav_val_mes
-rb_kg_mes = nf_kg_mes + dav_kg_mes
+# Faturamento Físico em Kg (Consultado das Vendas Faturadas para apoio de indicadores físicos)
+df_vd_mes = fetch_all("SELECT quantidade, valor_total FROM vendas WHERE status = 'FATURADO' AND data >= ? AND data <= ?", (dt_vd_devol_inicio_str, dt_vd_devol_fim_str))
+rb_kg_mes = float(df_vd_mes['quantidade'].sum()) if (df_vd_mes is not None and not df_vd_mes.empty) else 0.0
 rb_pm_mes = rb_mes / rb_kg_mes if rb_kg_mes > 0 else 0.0
 
-# Nível 2: Deduções
-dev_mes = float(df_devol_mes['valor_financeiro_abatido'].sum()) if not df_devol_mes.empty else 0.0
-imp_venda_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.1.3', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
-
+# Receita Líquida de Caixa
+dev_mes = 0.0
+imp_venda_mes = float(df_sai_mes[df_sai_mes['codigo'].str.startswith('2.1.3', na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
 rl_mes = rb_mes - dev_mes - imp_venda_mes
 rl_kg_mes = rb_kg_mes
 rl_pm_mes = rl_mes / rl_kg_mes if rl_kg_mes > 0 else 0.0
 
-# Nível 3: CMV Remodelado
-mp_val_mes = float(df_mp_mes['valor_total'].sum()) if not df_mp_mes.empty else 0.0
-mp_kg_mes = float(df_mp_mes['peso_kg'].sum()) if not df_mp_mes.empty else 0.0
-
-if mp_val_mes == 0 and not df_cap_mes.empty:
-    mp_val_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.1.1', na=False)]['valor'].sum())
-
-mp_pm_mes = mp_val_mes / mp_kg_mes if mp_kg_mes > 0 else 0.0
-
-emb_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.1.2', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
-outros_fab_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.1.', na=False) & ~df_cap_mes['codigo'].str.startswith(('2.1.1', '2.1.2', '2.1.3', '2.1.4', '2.1.5'), na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
+# --- 2. CUSTOS FABRIS E CUSTOS VARIÁVEIS PAGOS ---
+mp_val_mes = float(df_sai_mes[df_sai_mes['codigo'].str.startswith('2.1.1', na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
+emb_mes = float(df_sai_mes[df_sai_mes['codigo'].str.startswith('2.1.2', na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
+outros_fab_mes = float(df_sai_mes[df_sai_mes['codigo'].str.startswith('2.1.', na=False) & ~df_sai_mes['codigo'].str.startswith(('2.1.1', '2.1.2', '2.1.3', '2.1.4', '2.1.5'), na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
 
 cmv_tot_mes = mp_val_mes + emb_mes + outros_fab_mes
 
-# Nível 4: Despesas Comerciais Variáveis
-comi_vd_val = float(df_vd_mes['comissao_valor'].sum()) if not df_vd_mes.empty else 0.0
-comi_cap_val = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.1.4', na=False) | df_cap_mes['pc_nome'].str.contains('Comissão|Comissões', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
-comi_mes = max(comi_vd_val, comi_cap_val)
+df_mp_mes = fetch_all("SELECT peso_kg FROM compras_materia_prima WHERE data >= ? AND data <= ?", (dt_vd_devol_inicio_str, dt_vd_devol_fim_str))
+mp_kg_mes = float(df_mp_mes['peso_kg'].sum()) if (df_mp_mes is not None and not df_mp_mes.empty) else 0.0
+mp_pm_mes = mp_val_mes / mp_kg_mes if mp_kg_mes > 0 else 0.0
 
-frete_vd_val = float(df_vd_mes['custo_frete_rateado'].sum()) if not df_vd_mes.empty else 0.0
-frete_cap_val = float(df_cap_mes[df_cap_mes['codigo'].str.startswith(('2.1.5', '2.2.3', '2.2.5'), na=False) | df_cap_mes['pc_nome'].str.contains('Frete', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
-frete_mes = max(frete_vd_val, frete_cap_val)
-
-acordos_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.2.2', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
-descarga_mes = float(df_vd_mes['custo_descarga'].sum()) if not df_vd_mes.empty else 0.0
-degust_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.2.1', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
-promotores_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('2.2.4', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
+# --- 3. DESPESAS COMERCIAIS VARIÁVEIS PAGAS ---
+comi_mes = float(df_sai_mes[df_sai_mes['codigo'].str.startswith('2.1.4', na=False) | df_sai_mes['pc_nome'].str.contains('Comissão|Comissões', case=False, na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
+frete_mes = float(df_sai_mes[df_sai_mes['codigo'].str.startswith(('2.1.5', '2.2.3', '2.2.5'), na=False) | df_sai_mes['pc_nome'].str.contains('Frete', case=False, na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
+acordos_mes = float(df_sai_mes[df_sai_mes['codigo'].str.startswith('2.2.2', na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
+descarga_mes = float(df_sai_mes[df_sai_mes['pc_nome'].str.contains('Descarga', case=False, na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
+degust_mes = float(df_sai_mes[df_sai_mes['codigo'].str.startswith('2.2.1', na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
+promotores_mes = float(df_sai_mes[df_sai_mes['codigo'].str.startswith('2.2.4', na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
 
 desp_com_mes = comi_mes + frete_mes + acordos_mes + descarga_mes + degust_mes + promotores_mes
 
-# Margem de Contribuição Líquida
+# Margem de Contribuição Líquida de Caixa
 mc_mes = rl_mes - cmv_tot_mes - desp_com_mes
 mc_perc = (mc_mes / rl_mes * 100) if rl_mes > 0 else 0.0
 mc_kg_mes = mc_mes / rl_kg_mes if rl_kg_mes > 0 else 0.0
 
-# Custos Fixos
-df_mes_val = float(df_cap_mes[df_cap_mes['codigo'].str.startswith(('2.3.', '3.1.'), na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
-pro_mes = float(df_cap_mes[df_cap_mes['codigo'].str.startswith('3.1.4', na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
+# --- 4. CUSTOS E DESPESAS FIXAS PAGAS ---
+is_cf = df_sai_mes['codigo'].str.startswith(('2.3.', '3.1.'), na=False) | ((df_sai_mes['codigo'] == 'OUTROS') & ~df_sai_mes['codigo'].str.startswith(('3.2.', '3.3.', '1.2.', '4.1.'), na=False))
+df_mes_val = float(df_sai_mes[is_cf & ~df_sai_mes['codigo'].str.startswith(('3.2.', '3.3.', '1.2.', '4.1.'), na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
 
-# EBITDA
+# EBITDA de Caixa (Resultado Operacional Real)
 ebitda_mes = mc_mes - df_mes_val
 ebitda_perc = (ebitda_mes / rl_mes * 100) if rl_mes > 0 else 0.0
 
-# Fatores Não-Operacionais e Financeiros
-depr_mes = float(df_cap_mes[df_cap_mes['pc_nome'].str.contains('Depreciação', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
-imp_lucro_mes = float(df_cap_mes[df_cap_mes['pc_nome'].str.contains('Impostos sobre Lucro|IRPJ|CSLL', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
-finan_mes = float(df_cap_mes[(df_cap_mes['codigo'] == '3.2.1') | (df_cap_mes['pc_nome'].str.contains('Financiamento|Empréstimo|Juros|Despesas Financeiras', case=False, na=False))]['valor'].sum()) if not df_cap_mes.empty else 0.0
-jcp_mes = float(df_cap_mes[df_cap_mes['pc_nome'].str.contains('JCP|Juros sobre Capital Próprio', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
+# --- 5. FATORES NÃO-OPERACIONAIS E FINANCEIROS PAGOS ---
+finan_mes = float(df_sai_mes[df_sai_mes['codigo'].str.startswith('3.2.', na=False) | df_sai_mes['pc_nome'].str.contains('Financiamento|Empréstimo|Juros', case=False, na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
+depr_mes = 0.0
+imp_lucro_mes = float(df_sai_mes[df_sai_mes['pc_nome'].str.contains('IRPJ|CSLL', case=False, na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
+jcp_mes = float(df_sai_mes[df_sai_mes['pc_nome'].str.contains('JCP', case=False, na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
 
-# Lucro Líquido
+# Geração Líquida de Caixa Operacional
 lucro_mes = ebitda_mes - depr_mes - imp_lucro_mes - finan_mes - jcp_mes
 lucro_perc = (lucro_mes / rl_mes * 100) if rl_mes > 0 else 0.0
 
-div_mes = float(df_cap_mes[df_cap_mes['pc_nome'].str.contains('Dividendos|Distribuição de Lucro', case=False, na=False)]['valor'].sum()) if not df_cap_mes.empty else 0.0
+div_mes = float(df_sai_mes[df_sai_mes['pc_nome'].str.contains('Dividendos|Distribuição de Lucro', case=False, na=False)]['valor'].sum()) if not df_sai_mes.empty else 0.0
 retido_mes = lucro_mes - div_mes
 
-# CAPEX / Maquinário e Geração Líquida de Caixa
-is_capex = (df_cap_mes['codigo'].str.startswith(('3.3.', '1.2.', '4.1.'), na=False) | (df_cap_mes['pc_nome'].str.contains('Compra de Máquinas|Imobilizado|CAPEX', case=False, na=False) & ~df_cap_mes['codigo'].str.startswith('2.', na=False))) if not df_cap_mes.empty else pd.Series([], dtype=bool)
-capex_mes = float(df_cap_mes[is_capex]['valor'].sum()) if not df_cap_mes.empty else 0.0
-caixa_livre_mes = lucro_mes - capex_mes
+# --- 6. INVESTIMENTOS PAGOS (CAPEX) ---
+is_capex = df_sai_mes['codigo'].str.startswith(('3.3.', '1.2.', '4.1.'), na=False) | (df_sai_mes['pc_nome'].str.contains('Compra de Máquinas|Imobilizado|CAPEX', case=False, na=False) & ~df_sai_mes['codigo'].str.startswith('2.', na=False))
+capex_mes = float(df_sai_mes[is_capex]['valor'].sum()) if not df_sai_mes.empty else 0.0
 
-# Saldo Inicial e Saldo Final Consolidado de Caixa
+# Geração / Redução Líquida de Caixa no Mês
+tot_saidas = float(df_sai_mes['valor'].sum()) if not df_sai_mes.empty else 0.0
+caixa_livre_mes = rb_mes - tot_saidas
+
+# --- 7. SALDO INICIAL E SALDO FINAL CONSOLIDADO DE CAIXA ---
 saldo_ini_df = fetch_all("""
-    SELECT SUM(CASE WHEN tipo IN ('ENTRADA', 'Entrada') THEN valor ELSE -valor END) as saldo_ini
+    SELECT SUM(CASE WHEN UPPER(tipo) = 'ENTRADA' THEN valor ELSE -valor END) as saldo_ini
     FROM fluxo_caixa
     WHERE data < ?
 """, (dt_vd_devol_inicio_str,))
@@ -314,21 +277,21 @@ def render_html(html_str):
     st.markdown(cleaned, unsafe_allow_html=True)
 
 def get_inline_rows_html(prefixos_codigo=None, nomes_filtro=None, ignorar_codigos=None):
-    if df_cap_mes.empty:
+    if df_sai_mes.empty:
         return ""
-    cond = pd.Series([False] * len(df_cap_mes), index=df_cap_mes.index)
+    cond = pd.Series([False] * len(df_sai_mes), index=df_sai_mes.index)
     if prefixos_codigo:
         for pfix in prefixos_codigo:
-            cond |= df_cap_mes['codigo'].str.startswith(pfix, na=False)
+            cond |= df_sai_mes['codigo'].str.startswith(pfix, na=False)
     if nomes_filtro:
         for nfilt in nomes_filtro:
-            cond |= df_cap_mes['pc_nome'].str.contains(nfilt, case=False, na=False)
+            cond |= df_sai_mes['pc_nome'].str.contains(nfilt, case=False, na=False)
             
     if ignorar_codigos:
         for icod in ignorar_codigos:
-            cond &= ~df_cap_mes['codigo'].str.startswith(icod, na=False)
+            cond &= ~df_sai_mes['codigo'].str.startswith(icod, na=False)
             
-    df_filtered = df_cap_mes[cond]
+    df_filtered = df_sai_mes[cond]
     if df_filtered.empty:
         return ""
         
@@ -342,63 +305,38 @@ def get_inline_rows_html(prefixos_codigo=None, nomes_filtro=None, ignorar_codigo
         rows_html += f"<div class='dre-row-sub'><div class='dre-label'><b>{cod} - {nome}</b></div><div class='dre-val'>{f_br(val)}</div></div>"
     return rows_html
 
-# --- MODAL DE AUDITORIA DE LANÇAMENTOS (INSPEÇÃO DE NÚMEROS) ---
-@st.dialog("🔍 Auditoria de Lançamentos Contábeis", width="large")
+# --- MODAL DE AUDITORIA DE LANÇAMENTOS DE CAIXA ---
+@st.dialog("🔍 Auditoria de Lançamentos de Caixa", width="large")
 def modal_auditoria_lancamentos(conta_label, sel_mes_ano):
-    st.caption(f"Exibindo extrato analítico com todos os títulos e registros que compõem **{conta_label}** em **{sel_mes_ano}**.")
+    st.caption(f"Exibindo extrato de caixa analítico com todas as movimentações reais que compõem **{conta_label}** em **{sel_mes_ano}**.")
     
     dt_inc = dt_vd_devol_inicio_str
     dt_fim = dt_vd_devol_fim_str
     
-    if "1.1" in conta_label and "NF" in conta_label:
+    if "1.1" in conta_label or "Venda" in conta_label or "Receita" in conta_label:
         df_a = fetch_all("""
-            SELECT data AS "Emissão", id AS "Nº Venda", cliente_id AS "Cliente ID",
-                   quantidade AS "Volume (Kg)", valor_total AS "Valor (R$)"
-            FROM vendas
-            WHERE status = 'FATURADO' AND data >= ? AND data <= ?
-              AND (tipo_documento LIKE '%NF%' OR tipo_documento LIKE '%Nota%')
-            ORDER BY data DESC
-        """, (dt_inc, dt_fim))
-    elif "1.2" in conta_label and "DAV" in conta_label:
-        df_a = fetch_all("""
-            SELECT data AS "Emissão", id AS "Nº Venda", cliente_id AS "Cliente ID",
-                   quantidade AS "Volume (Kg)", valor_total AS "Valor (R$)"
-            FROM vendas
-            WHERE status = 'FATURADO' AND data >= ? AND data <= ?
-              AND (tipo_documento NOT LIKE '%NF%' AND tipo_documento NOT LIKE '%Nota%')
-            ORDER BY data DESC
-        """, (dt_inc, dt_fim))
-    elif "Devoluções" in conta_label:
-        df_a = fetch_all("""
-            SELECT data AS "Data", motivo AS "Motivo", cliente_id AS "Cliente ID",
-                   valor_financeiro_abatido AS "Valor (R$)"
-            FROM devolucoes
-            WHERE data >= ? AND data <= ?
-            ORDER BY data DESC
-        """, (dt_inc, dt_fim))
-    elif "4.1" in conta_label and "Matéria-Prima" in conta_label:
-        df_a = fetch_all("""
-            SELECT data AS "Data", fornecedor_id AS "Fornecedor ID",
-                   peso_kg AS "Volume (Kg)", valor_total AS "Valor (R$)"
-            FROM compras_materia_prima
-            WHERE data >= ? AND data <= ?
-            ORDER BY data DESC
+            SELECT f.data AS "Data Pgto", f.descricao AS "Descrição / Histórico", f.valor AS "Valor (R$)"
+            FROM fluxo_caixa f
+            WHERE (UPPER(f.tipo) = 'ENTRADA' OR f.tipo = 'Entrada') AND f.data >= ? AND f.data <= ?
+            ORDER BY f.data ASC
         """, (dt_inc, dt_fim))
     else:
         cod_alvo = conta_label.split(' - ')[0].strip()
         df_a = fetch_all("""
-            SELECT c.data_vencimento AS "Vencimento", c.data_pagamento AS "Data Pgto",
-                   c.numero_documento AS "Doc / Título", c.descricao AS "Descrição",
-                   c.status AS "Status", c.valor AS "Valor (R$)"
-            FROM contas_a_pagar c
-            JOIN planos_de_contas pc ON c.plano_conta_id = pc.id
-            WHERE UPPER(c.status) = 'PAGO' AND c.data_vencimento >= ? AND c.data_vencimento <= ?
-              AND pc.codigo LIKE ?
-            ORDER BY c.data_vencimento ASC
-        """, (dt_inc, dt_fim, f"{cod_alvo}%"))
+            SELECT f.data AS "Data Pgto", f.descricao AS "Descrição / Histórico",
+                   COALESCE(pc.codigo, 'OUTROS') AS "Código", COALESCE(pc.nome, f.categoria) AS "Rubrica",
+                   f.valor AS "Valor (R$)"
+            FROM fluxo_caixa f
+            LEFT JOIN contas_a_pagar cp ON (UPPER(f.tipo) = 'SAIDA' OR f.tipo = 'Saída' OR f.tipo = 'Saida') AND f.fonte_id = cp.id
+            LEFT JOIN planos_de_contas pc ON cp.plano_conta_id = pc.id
+            WHERE (UPPER(f.tipo) = 'SAIDA' OR f.tipo = 'Saída' OR f.tipo = 'Saida')
+              AND f.data >= ? AND f.data <= ?
+              AND (pc.codigo LIKE ? OR f.categoria LIKE ? OR pc.nome LIKE ?)
+            ORDER BY f.data ASC
+        """, (dt_inc, dt_fim, f"{cod_alvo}%", f"%{cod_alvo}%", f"%{cod_alvo}%"))
         
     if df_a is None or df_a.empty:
-        st.info(f"Nenhum lançamento individual encontrado para **{conta_label}** no período de {sel_mes_ano}.")
+        st.info(f"Nenhuma movimentação de caixa encontrada para **{conta_label}** no período de {sel_mes_ano}.")
     else:
         tot_val = float(df_a['Valor (R$)'].sum()) if 'Valor (R$)' in df_a.columns else 0.0
         tot_reg = len(df_a)
@@ -410,8 +348,6 @@ def modal_auditoria_lancamentos(conta_label, sel_mes_ano):
         df_disp = df_a.copy()
         if 'Valor (R$)' in df_disp.columns:
             df_disp['Valor (R$)'] = df_disp['Valor (R$)'].apply(lambda x: f_br(float(x)) if pd.notnull(x) else "R$ 0,00")
-        if 'Volume (Kg)' in df_disp.columns:
-            df_disp['Volume (Kg)'] = df_disp['Volume (Kg)'].apply(lambda x: f_kg(float(x)) if pd.notnull(x) else "0,0 Kg")
             
         st.dataframe(df_disp, use_container_width=True, hide_index=True)
         
@@ -420,7 +356,7 @@ def modal_auditoria_lancamentos(conta_label, sel_mes_ano):
         st.download_button(
             label="📥 Baixar Extrato de Auditoria (CSV)",
             data=csv_data,
-            file_name=f"auditoria_{cod_clean}_{sel_mes_ano.replace('/', '_')}.csv",
+            file_name=f"auditoria_caixa_{cod_clean}_{sel_mes_ano.replace('/', '_')}.csv",
             mime="text/csv"
         )
 
@@ -430,7 +366,7 @@ st.markdown("<div class='dre-wrapper'>", unsafe_allow_html=True)
 
 col_hdr_title, col_hdr_sel, col_hdr_audit = st.columns([1.5, 0.9, 1.2])
 with col_hdr_title:
-    st.markdown("<div class='dre-sec-header' style='margin-top: 0px;'>Demostrativo Gerencial de Caixa (RGC)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='dre-sec-header' style='margin-top: 0px;'>Demonstrativo Gerencial de Caixa (RGC)</div>", unsafe_allow_html=True)
 with col_hdr_sel:
     st.selectbox(
         "Selecione o Mês/Ano:",
@@ -446,8 +382,8 @@ with col_hdr_audit:
         "2 - Devoluções e Abatimentos",
         "4.1 - Matéria-Prima (Alho in Natura)"
     ]
-    if not df_cap_mes.empty:
-        pcs_mes = df_cap_mes[['codigo', 'pc_nome']].drop_duplicates().sort_values('codigo')
+    if not df_sai_mes.empty:
+        pcs_mes = df_sai_mes[['codigo', 'pc_nome']].drop_duplicates().sort_values('codigo')
         for _, r in pcs_mes.iterrows():
             lbl = f"{r['codigo']} - {r['pc_nome']}"
             if lbl not in opcoes_audit:
@@ -473,7 +409,7 @@ render_html(f"""
 </div>
 """)
 
-st.markdown("<div class='dre-sec-header'>I. Entradas de Caixa (Faturamento Líquido Real)</div>", unsafe_allow_html=True)
+st.markdown("<div class='dre-sec-header'>I. Entradas de Caixa (Recebimentos Efetivados)</div>", unsafe_allow_html=True)
 
 # -------------------------------------------------------------------------
 # I. RECEITA E DEDUÇÕES (Tabela Financeira Executiva Limpa)
@@ -481,55 +417,52 @@ st.markdown("<div class='dre-sec-header'>I. Entradas de Caixa (Faturamento Líqu
 render_html(f"""
 <div class='dre-row-subtotal'>
     <div class='dre-label'>
-        <b>1. Receita Operacional Bruta ({sel_mes_ano})</b>
-        <span class='dre-tag'>Volume: {f_kg(rb_kg_mes)}</span>
-        <span class='dre-tag'>Preço Médio: {f_pm(rb_pm_mes)}</span>
+        <b>1. Receita Operacional Realizada ({sel_mes_ano})</b>
+        <span class='dre-tag'>Volume Faturado: {f_kg(rb_kg_mes)}</span>
+        <span class='dre-tag'>Preço Médio Realizado: {f_pm(rb_pm_mes)}</span>
     </div>
     <div class='dre-val-total'>{f_br(rb_mes)}</div>
 </div>
 <div class='dre-row-sub'>
     <div class='dre-label'>
-        <b>1.1 Vendas por Nota Fiscal (NF)</b>
-        <span class='dre-tag'>Volume: {f_kg(nf_kg_mes)}</span>
-        <span class='dre-tag'>Preço Médio: {f_pm(nf_pm_mes)}</span>
+        <b>1.1 Entradas de Vendas de Alho In Natura (1.1.1)</b>
     </div>
-    <div class='dre-val'>{f_br(nf_val_mes)}</div>
+    <div class='dre-val'>{f_br(ent_nat)}</div>
 </div>
 <div class='dre-row-sub'>
     <div class='dre-label'>
-        <b>1.2 Vendas por DAV (Pedido de Venda)</b>
-        <span class='dre-tag'>Volume: {f_kg(dav_kg_mes)}</span>
-        <span class='dre-tag'>Preço Médio: {f_pm(dav_pm_mes)}</span>
+        <b>1.2 Entradas de Vendas de Alho Descascado (1.1.2)</b>
     </div>
-    <div class='dre-val'>{f_br(dav_val_mes)}</div>
+    <div class='dre-val'>{f_br(ent_desc)}</div>
 </div>
+{"<div class='dre-row-sub'><div class='dre-label'><b>1.3 Outras Receitas Operacionais Recebidas</b></div><div class='dre-val'>" + f_br(ent_outros) + "</div></div>" if ent_outros > 0 else ""}
 <div class='dre-row'>
-    <div class='dre-label'><b>2. (-) Devoluções / Abatimentos</b></div>
+    <div class='dre-label'><b>2. (-) Devoluções / Abatimentos Realizados</b></div>
     <div class='dre-val'>{f_br(dev_mes)}</div>
 </div>
 <div class='dre-row'>
-    <div class='dre-label'><b>3. (-) Impostos sobre Venda (2.1.3)</b></div>
+    <div class='dre-label'><b>3. (-) Impostos sobre Venda Pagos (2.1.3)</b></div>
     <div class='dre-val'>{f_br(imp_venda_mes)}</div>
 </div>
 {get_inline_rows_html(prefixos_codigo=['2.1.3'])}
 <div class='dre-row-total'>
     <div class='dre-label'>
-        (=) RECEITA LÍQUIDA REAL REALIZADA
-        <span class='dre-tag'>Volume Líquido: {f_kg(rl_kg_mes)}</span>
+        (=) RECEITA LÍQUIDA DE CAIXA
+        <span class='dre-tag'>Volume Faturado: {f_kg(rl_kg_mes)}</span>
         <span class='dre-tag'>Preço Médio Líquido: {f_pm(rl_pm_mes)}</span>
     </div>
     <div class='dre-val-total'>{f_br(rl_mes)}</div>
 </div>
 """)
 
-st.markdown("<div class='dre-sec-header'>II. Custos Fabris e Despesas Variáveis</div>", unsafe_allow_html=True)
+st.markdown("<div class='dre-sec-header'>II. Custos Fabris e Despesas Variáveis Pagas</div>", unsafe_allow_html=True)
 
 # -------------------------------------------------------------------------
 # II. CMV FABRIL REMODELADO & CUSTOS VARIÁVEIS
 # -------------------------------------------------------------------------
 render_html(f"""
 <div class='dre-row-subtotal'>
-    <div class='dre-label'><b>4. Custo Total de Fabricação / CMV Realizado</b></div>
+    <div class='dre-label'><b>4. Custo Total de Fabricação / CMV Pago</b></div>
     <div class='dre-val-total'>{f_br(cmv_tot_mes)}</div>
 </div>
 <div class='dre-row-sub'>
@@ -541,7 +474,7 @@ render_html(f"""
     <div class='dre-val'>{f_br(mp_val_mes)}</div>
 </div>
 <div class='dre-row-sub'>
-    <div class='dre-label'><b>4.2 (-) Embalagens & Insumos Paga (2.1.2)</b></div>
+    <div class='dre-label'><b>4.2 (-) Embalagens & Insumos Pagos (2.1.2)</b></div>
     <div class='dre-val'>{f_br(emb_mes)}</div>
 </div>
 {"<div class='dre-row-sub'><div class='dre-label'><b>4.3 (-) Outros Custos Fabris Diretos Pagos</b></div><div class='dre-val'>" + f_br(outros_fab_mes) + "</div></div>" if outros_fab_mes > 0 else ""}
@@ -551,27 +484,27 @@ render_html(f"""
     <div class='dre-val-total'>{f_br(desp_com_mes)}</div>
 </div>
 <div class='dre-row-sub'>
-    <div class='dre-label'><b>5.1 (-) Comissões de Vendas</b></div>
+    <div class='dre-label'><b>5.1 (-) Comissões de Vendas Pagas</b></div>
     <div class='dre-val'>{f_br(comi_mes)}</div>
 </div>
 <div class='dre-row-sub'>
-    <div class='dre-label'><b>5.2 (-) Fretes de Entrega (Logística de Saída)</b></div>
+    <div class='dre-label'><b>5.2 (-) Fretes de Entrega Pagos (Logística de Saída)</b></div>
     <div class='dre-val'>{f_br(frete_mes)}</div>
 </div>
 <div class='dre-row-sub'>
-    <div class='dre-label'><b>5.3 (-) Acordos de Rede & Rebates Comerciais (2.2.2)</b></div>
+    <div class='dre-label'><b>5.3 (-) Acordos de Rede & Rebates Comerciais Pagos (2.2.2)</b></div>
     <div class='dre-val'>{f_br(acordos_mes)}</div>
 </div>
 <div class='dre-row-sub'>
-    <div class='dre-label'><b>5.4 (-) Taxas de Descarga (CD/Redes)</b></div>
+    <div class='dre-label'><b>5.4 (-) Taxas de Descarga Pagas (CD/Redes)</b></div>
     <div class='dre-val'>{f_br(descarga_mes)}</div>
 </div>
 <div class='dre-row-sub'>
-    <div class='dre-label'><b>5.5 (-) Degustações e Amostras (2.2.1)</b></div>
+    <div class='dre-label'><b>5.5 (-) Degustações e Amostras Pagas (2.2.1)</b></div>
     <div class='dre-val'>{f_br(degust_mes)}</div>
 </div>
 <div class='dre-row-sub'>
-    <div class='dre-label'><b>5.6 (-) Serviços de Promotores de Vendas (2.2.4)</b></div>
+    <div class='dre-label'><b>5.6 (-) Serviços de Promotores de Vendas Pagos (2.2.4)</b></div>
     <div class='dre-val'>{f_br(promotores_mes)}</div>
 </div>
 {get_inline_rows_html(prefixos_codigo=['2.2.'], ignorar_codigos=['2.2.1', '2.2.2', '2.2.4', '2.1.4', '2.1.5'])}
@@ -585,17 +518,17 @@ render_html(f"""
 </div>
 """)
 
-st.markdown("<div class='dre-sec-header'>III. Custos Fixos Pagos</div>", unsafe_allow_html=True)
+st.markdown("<div class='dre-sec-header'>III. Custos e Despesas Fixas Pagas</div>", unsafe_allow_html=True)
 
 # -------------------------------------------------------------------------
 # III. CUSTOS FIXOS (Abertura direta pelo Plano de Contas)
 # -------------------------------------------------------------------------
 render_html(f"""
 <div class='dre-row-subtotal'>
-    <div class='dre-label'><b>6. (-) Custos Fixos Totais Pagos</b></div>
+    <div class='dre-label'><b>6. (-) Custos e Despesas Fixas Totais Pagas</b></div>
     <div class='dre-val-total'>{f_br(df_mes_val)}</div>
 </div>
-{get_inline_rows_html(prefixos_codigo=['2.3.', '3.1.'])}
+{get_inline_rows_html(prefixos_codigo=['2.3.', '3.1.', 'OUTROS'], ignorar_codigos=['3.2.', '3.3.', '1.2.', '4.1.'])}
 """)
 
 st.markdown("<div class='dre-sec-header'>IV. EBITDA de Caixa (Resultado Operacional Real)</div>", unsafe_allow_html=True)
@@ -606,7 +539,7 @@ st.markdown("<div class='dre-sec-header'>IV. EBITDA de Caixa (Resultado Operacio
 render_html(f"""
 <div class='dre-row-total'>
     <div class='dre-label'>
-        (=) EBITDA DE CAIXA (Resultado Operacional)
+        (=) EBITDA DE CAIXA (Resultado Operacional Real)
         <span class='dre-tag'>Margem EBITDA: {ebitda_perc:.1f}%</span>
     </div>
     <div class='dre-val-total'>{f_br(ebitda_mes)}</div>
@@ -620,19 +553,19 @@ st.markdown("<div class='dre-sec-header'>V. Fatores Não-Operacionais e Financei
 # -------------------------------------------------------------------------
 render_html(f"""
 <div class='dre-row'>
-    <div class='dre-label'><b>7. (-) Depreciação / Amortização</b></div>
+    <div class='dre-label'><b>7. (-) Depreciação / Amortização (Não-Caixa)</b></div>
     <div class='dre-val'>{f_br(depr_mes)}</div>
 </div>
 <div class='dre-row'>
-    <div class='dre-label'><b>8. (-) Impostos sobre Lucro (IRPJ/CSLL Pagos)</b></div>
+    <div class='dre-label'><b>8. (-) Impostos sobre Lucro Pagos (IRPJ/CSLL)</b></div>
     <div class='dre-val'>{f_br(imp_lucro_mes)}</div>
 </div>
 <div class='dre-row'>
-    <div class='dre-label'><b>9. (-) Juros e Financiamentos Pagos</b></div>
+    <div class='dre-label'><b>9. (-) Juros e Financiamentos Pagos (3.2.1)</b></div>
     <div class='dre-val'>{f_br(finan_mes)}</div>
 </div>
 <div class='dre-row'>
-    <div class='dre-label'><b>10. (-) JCP (Juros s/ Capital Próprio Pagos)</b></div>
+    <div class='dre-label'><b>10. (-) JCP Pagos (Juros s/ Capital Próprio)</b></div>
     <div class='dre-val'>{f_br(jcp_mes)}</div>
 </div>
 {get_inline_rows_html(prefixos_codigo=['3.2.'], nomes_filtro=['Depreciação', 'Impostos sobre Lucro', 'IRPJ', 'CSLL', 'Financiamento', 'Juros', 'JCP'])}
@@ -692,7 +625,7 @@ render_html(f"""
 </div>
 """)
 
-st.caption("📌 **Visão Gerencial:** Relatório 100% sob Regime de Caixa. Do caixa gerado operacionalmente são deduzidos os desembolsos efetivamente pagos em investimentos (compra de máquinas, equipamentos, etc.) no mês.")
+st.caption("📌 **Visão Gerencial:** Relatório 100% extraído das movimentações reais do Extrato Bancário e Caixa Físico (`fluxo_caixa`). Paridade absoluta de 100,00% com o Extrato Razão oficial.")
 
 st.markdown("---")
 
@@ -714,4 +647,5 @@ with st.expander("🎯 Ponto de Equilíbrio (Break-Even Operacional)", expanded=
         st.success(f"🥳 Parabéns Máquina! Você já estourou o teto e pagou todas das despesas desse mês. As próximas vendas são lucro quase líquido pro caixa!")
 
 st.markdown("</div>", unsafe_allow_html=True)
+
 

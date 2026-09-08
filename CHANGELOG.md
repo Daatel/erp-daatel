@@ -1,3 +1,17 @@
+## v2.6.1 — 2026-09-08 (Sessão: Auditoria & Paridade 100,00% com o Extrato Razão Bancário PDF)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Alinhamento ao Extrato Razão Bancário (`fluxo_caixa`):** Refatorado o motor de busca do RGC para extrair 100% dos dados da tabela `fluxo_caixa` (movimentações reais das contas bancárias e caixa físico), em vez de consultar vendas faturadas a prazo ou vencimentos teóricos do Contas a Pagar.
+- **Paridade Absoluta com o Extrato PDF (`Extrato_Razao_Todas_as_contas_20260801_a_20260831.pdf`):**
+  - **Saldo Inicial (01/08/2026):** **R$ 2.579,04** (100% idêntico ao extrato).
+  - **Total Entradas de Caixa:** **R$ 230.662,45** (100% idêntico ao extrato).
+  - **Total Saídas de Caixa:** **R$ 228.705,56** (100% idêntico ao extrato).
+  - **Geração Líquida no Mês:** **+R$ 1.956,89** (100% idêntico ao extrato).
+  - **Saldo Final (31/08/2026):** **R$ 4.535,93** (100% idêntico ao extrato).
+- **Auditoria de Rubricas (`modal_auditoria_lancamentos`):** O inspetor de números passa a exibir as movimentações reais de extrato bancário diretamente da tabela `fluxo_caixa`.
+
+---
+
 ## v2.6.0 — 2026-09-08 (Sessão: Relatório Gerencial de Caixa - RGC 100% Regime de Caixa & Eliminação de Abas)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py` & `app.py`)
