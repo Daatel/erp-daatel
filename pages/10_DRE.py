@@ -389,13 +389,22 @@ with col_hdr_audit:
             if lbl not in opcoes_audit:
                 opcoes_audit.append(lbl)
                 
-    rubrica_sel = st.selectbox(
+    def on_audit_change():
+        selected = st.session_state.get("sel_audit_rubrica")
+        if selected and selected != "🔍 Auditar Rubrica / Conta...":
+            st.session_state["active_audit_rubrica"] = selected
+            st.session_state["sel_audit_rubrica"] = "🔍 Auditar Rubrica / Conta..."
+            
+    st.selectbox(
         "🔍 Inspecionar Conta:",
         opcoes_audit,
-        key="sel_audit_rubrica"
+        key="sel_audit_rubrica",
+        on_change=on_audit_change
     )
-    if rubrica_sel and rubrica_sel != "🔍 Auditar Rubrica / Conta...":
-        modal_auditoria_lancamentos(rubrica_sel, sel_mes_ano)
+    
+    active_rubrica = st.session_state.pop("active_audit_rubrica", None)
+    if active_rubrica:
+        modal_auditoria_lancamentos(active_rubrica, sel_mes_ano)
 
 # -------------------------------------------------------------------------
 # ABERTURA DO CAIXA (SALDO INICIAL)

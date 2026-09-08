@@ -1,3 +1,11 @@
+## v2.6.2 — 2026-09-08 (Sessão: Auto-Reset do Seletor de Inspeção de Contas / Limpeza do State)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Auto-Reset do Seletor `🔍 Inspecionar Conta`:** Implementado o callback `on_audit_change()` no `st.selectbox`, que restaura a caixa de seleção para o estado inicial neutro (`🔍 Auditar Rubrica / Conta...`) assim que a conta é selecionada.
+- **Eliminação de Modal Congelado:** Impede que o Streamlit preserve a rubrica selecionada no `session_state` e continue reabrindo a janela de detalhamento em refreshes ou acessos posteriores.
+
+---
+
 ## v2.6.1 — 2026-09-08 (Sessão: Auditoria & Paridade 100,00% com o Extrato Razão Bancário PDF)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
