@@ -1,3 +1,12 @@
+## v2.4.2 — 2026-09-08 (Sessão: Desdobramento NF vs DAV & Redesign Visual Executivo da DRE)
+
+### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)
+- **Título da Seção I:** Renomeado de `"I. Faturamento Bruto & Volume de Vendas"` para simplesmente `"I. Faturamento Bruto"`.
+- **Desdobramento de Vendas por Documento (1.1 NF vs 1.2 DAV):** A `Receita Operacional Bruta` foi desmembrada em `1.1 Vendas por Nota Fiscal (NF)` e `1.2 Vendas por DAV (Pedido de Venda)`, apresentando **volume em Kg**, **preço médio (R$/Kg)** e **valor total (R$)** individualizado para cada tipo de documento.
+- **Redesign Visual Executivo Unificado (Eliminação dos Múltiplos Tamanhos de Fonte):** Substituídos os cartões isolados de `st.metric` por um layout financeiro padronizado em CSS (`.dre-row`, `.dre-row-sub`, `.dre-row-total`), garantindo alinhamento perfeito, mesmo tamanho de fonte entre descrição e valores, indentação hierárquica e destaque sutil para subtotais/totais.
+
+---
+
 ## v2.4.1 — 2026-09-08 (Sessão: Simplificação Visual da DRE & Reposicionamento do Seletor de Mês)
 
 ### 🏛️ Demonstrativo do Resultado do Exercício (`pages/10_DRE.py`)

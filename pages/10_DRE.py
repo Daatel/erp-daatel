@@ -18,14 +18,116 @@ h1 {
     font-size: 2.2rem !important;
     font-weight: 700 !important;
     margin-top: -15px !important;
-    margin-bottom: 0px !important;
+    margin-bottom: 10px !important;
     color: #1e293b !important;
+}
+.dre-container {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.dre-sec-header {
+    background-color: #f8fafc;
+    border-left: 4px solid #3b82f6;
+    padding: 8px 12px;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: #1e293b;
+    margin-top: 15px;
+    margin-bottom: 12px;
+    border-radius: 0 6px 6px 0;
+}
+.dre-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.98rem;
+    color: #334155;
+}
+.dre-row:hover {
+    background-color: #f8fafc;
+}
+.dre-row-sub {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 12px 7px 32px;
+    border-bottom: 1px dashed #f1f5f9;
+    font-size: 0.92rem;
+    color: #475569;
+    background-color: #fafafa;
+}
+.dre-row-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 11px 12px;
+    background-color: #f1f5f9;
+    border-top: 2px solid #cbd5e1;
+    border-bottom: 2px solid #334155;
+    font-weight: 700;
+    font-size: 1.08rem;
+    color: #0f172a;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    border-radius: 4px;
+}
+.dre-row-subtotal {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background-color: #f8fafc;
+    border-top: 1px solid #cbd5e1;
+    font-weight: 700;
+    font-size: 1.02rem;
+    color: #1e293b;
+}
+.dre-label {
+    flex: 1;
+}
+.dre-tag {
+    display: inline-block;
+    background-color: #e2e8f0;
+    color: #334155;
+    font-size: 0.8rem;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-left: 8px;
+    font-weight: 500;
+}
+.dre-tag-green {
+    background-color: #dcfce7;
+    color: #166534;
+}
+.dre-tag-blue {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+.dre-val {
+    font-weight: 600;
+    font-size: 1.02rem;
+    color: #0f172a;
+    text-align: right;
+    min-width: 140px;
+}
+.dre-val-total {
+    font-weight: 800;
+    font-size: 1.12rem;
+    color: #0f172a;
+    text-align: right;
+    min-width: 140px;
 }
 .stExpander {
     border: 1px solid #e2e8f0 !important;
     border-radius: 8px !important;
     margin-top: 6px !important;
-    margin-bottom: 6px !important;
+    margin-bottom: 12px !important;
 }
 </style>
 <h1>Demonstrativo do Resultado do Exercício (DRE)</h1>
@@ -52,7 +154,6 @@ for ano in [hoje.year - 1, hoje.year, hoje.year + 1]:
 default_label = f"{meses_nomes[hoje.month-1]}/{hoje.year}"
 default_idx = opcoes_meses.index(default_label) if default_label in opcoes_meses else len(opcoes_meses) // 2
 
-# Sync states for DRE tabs selectbox
 if "sel_mes_ano_tab1" not in st.session_state:
     st.session_state["sel_mes_ano_tab1"] = default_label
 if "sel_mes_ano_tab2" not in st.session_state:
@@ -64,17 +165,14 @@ def sync_tab1():
 def sync_tab2():
     st.session_state["sel_mes_ano_tab1"] = st.session_state["sel_mes_ano_tab2"]
 
-# Determine current active selection
 sel_mes_ano = st.session_state.get("sel_mes_ano_tab1", default_label)
 
 nome_mes, ano_sel = sel_mes_ano.split("/")
 ano_sel = int(ano_sel)
 mes_sel = meses_nomes.index(nome_mes) + 1
 
-# Pandas period for selected month
 p_mes = pd.Period(f"{ano_sel}-{mes_sel:02d}", freq='M')
 
-# Dates for DB query ranges
 dt_vd_devol_inicio_str = p_mes.start_time.strftime("%Y-%m-%d")
 dt_vd_devol_fim_str = p_mes.end_time.strftime("%Y-%m-%d")
 
@@ -83,7 +181,7 @@ dt_cap_fim_str = (p_mes + 1).end_time.strftime("%Y-%m-%d")
 
 # --- QUERY DAS VENDAS ---
 df_vd = fetch_all("""
-    SELECT valor_total, quantidade, custo_frete_rateado, comissao_valor, custo_acordos_rede, custo_descarga, custo_cmv_real, data
+    SELECT valor_total, quantidade, custo_frete_rateado, comissao_valor, custo_acordos_rede, custo_descarga, custo_cmv_real, data, tipo_documento
     FROM vendas
     WHERE status = 'FATURADO' AND data >= ? AND data <= ?
 """, (dt_vd_devol_inicio_str, dt_vd_devol_fim_str))
@@ -92,7 +190,7 @@ if not df_vd.empty:
     df_vd['data'] = pd.to_datetime(df_vd['data'], errors='coerce')
     df_vd['sale_month'] = df_vd['data'].dt.to_period('M')
 else:
-    df_vd = pd.DataFrame(columns=['valor_total', 'quantidade', 'custo_frete_rateado', 'comissao_valor', 'custo_acordos_rede', 'custo_descarga', 'custo_cmv_real', 'sale_month'])
+    df_vd = pd.DataFrame(columns=['valor_total', 'quantidade', 'custo_frete_rateado', 'comissao_valor', 'custo_acordos_rede', 'custo_descarga', 'custo_cmv_real', 'sale_month', 'tipo_documento'])
 
 # --- QUERY DE DEVOLUÇÕES ---
 df_devol = fetch_all("""
@@ -128,7 +226,6 @@ if not df_cap.empty:
     df_cap['data_vencimento'] = pd.to_datetime(df_cap['data_vencimento'], errors='coerce')
     df_cap['venc_month'] = df_cap['data_vencimento'].dt.to_period('M')
     
-    # Define reference month based on whether it is a fixed expense or not
     is_fixed = df_cap['codigo'].str.startswith(('2.3.', '3.1.'), na=False) & ~df_cap['codigo'].str.startswith('2.3.6', na=False)
     
     df_cap['ref_month'] = df_cap['venc_month']
@@ -142,11 +239,21 @@ df_devol_mes = df_devol[df_devol['devol_month'] == p_mes]
 df_mp_mes = df_mp[df_mp['mp_month'] == p_mes]
 df_cap_mes = df_cap[df_cap['ref_month'] == p_mes]
 
-# --- CALCULADORA CONTÁBIL (REGIME DE COMPETÊNCIA) ---
+# --- DESDOBRAMENTO DE VENDAS: NF vs DAV ---
+is_nf = df_vd_mes['tipo_documento'].astype(str).str.contains('NF|Nota', case=False, na=False) if not df_vd_mes.empty else pd.Series([], dtype=bool)
+df_nf_mes = df_vd_mes[is_nf] if not df_vd_mes.empty else pd.DataFrame()
+df_dav_mes = df_vd_mes[~is_nf] if not df_vd_mes.empty else pd.DataFrame()
 
-# Nível 1: Receita Operacional Bruta
-rb_mes = float(df_vd_mes['valor_total'].sum()) if not df_vd_mes.empty else 0.0
-rb_kg_mes = float(df_vd_mes['quantidade'].sum()) if not df_vd_mes.empty else 0.0
+nf_val_mes = float(df_nf_mes['valor_total'].sum()) if not df_nf_mes.empty else 0.0
+nf_kg_mes = float(df_nf_mes['quantidade'].sum()) if not df_nf_mes.empty else 0.0
+nf_pm_mes = nf_val_mes / nf_kg_mes if nf_kg_mes > 0 else 0.0
+
+dav_val_mes = float(df_dav_mes['valor_total'].sum()) if not df_dav_mes.empty else 0.0
+dav_kg_mes = float(df_dav_mes['quantidade'].sum()) if not df_dav_mes.empty else 0.0
+dav_pm_mes = dav_val_mes / dav_kg_mes if dav_kg_mes > 0 else 0.0
+
+rb_mes = nf_val_mes + dav_val_mes
+rb_kg_mes = nf_kg_mes + dav_kg_mes
 rb_pm_mes = rb_mes / rb_kg_mes if rb_kg_mes > 0 else 0.0
 
 # Nível 2: Deduções (Devoluções e Impostos sobre Venda)
@@ -247,9 +354,9 @@ tab1, tab2 = st.tabs(["DRE", "Ponto de Equilíbrio (Break-Even)"])
 
 with tab1:
     # Cabeçalho com o seletor posicionado DIRETAMENTE sobre a coluna de números
-    col_hdr_title, col_hdr_sel = st.columns([2, 1])
+    col_hdr_title, col_hdr_sel = st.columns([2.5, 1])
     with col_hdr_title:
-        st.subheader("I. Faturamento Bruto & Volume de Vendas")
+        st.markdown("<div class='dre-sec-header'>I. Faturamento Bruto</div>", unsafe_allow_html=True)
     with col_hdr_sel:
         st.selectbox(
             "Selecione o Mês/Ano:",
@@ -260,194 +367,237 @@ with tab1:
         )
     
     # -------------------------------------------------------------------------
-    # I. RECEITA E DEDUÇÕES
+    # I. RECEITA E DEDUÇÕES (Tabela Financeira Executiva Unificada)
     # -------------------------------------------------------------------------
-    c1, c2 = st.columns([2, 1])
-    c1.markdown(f"**1. Receita Operacional Bruta ({sel_mes_ano})**\n> 📦 Volume: **{f_kg(rb_kg_mes)}** | Preço Médio: **{f_pm(rb_pm_mes)}**")
-    c2.metric("Valor Total", f_br(rb_mes))
-    
-    c4, c5 = st.columns([2, 1])
-    c4.markdown("**2. (-) Devoluções / Abatimentos**")
-    c5.metric(" ", f_br(dev_mes), label_visibility="collapsed")
-    
-    c_imp1, c_imp2 = st.columns([2, 1])
-    c_imp1.markdown("**3. (-) Impostos sobre Venda (Vencimento no Mês - 2.1.3)**")
-    c_imp2.metric(" ", f_br(imp_venda_mes), label_visibility="collapsed")
-    
-    c7, c8 = st.columns([2, 1])
-    c7.markdown(f"#### (=) RECEITA LÍQUIDA REAL\n> 📦 Volume Líquido: **{f_kg(rl_kg_mes)}** | Preço Médio Líquido: **{f_pm(rl_pm_mes)}**")
-    c8.markdown(f"#### {f_br(rl_mes)}")
+    st.markdown(f"""
+    <div class='dre-row-subtotal'>
+        <div class='dre-label'>
+            <b>1. Receita Operacional Bruta ({sel_mes_ano})</b>
+            <span class='dre-tag dre-tag-blue'>📦 Total: {f_kg(rb_kg_mes)}</span>
+            <span class='dre-tag'>Preço Médio: {f_pm(rb_pm_mes)}</span>
+        </div>
+        <div class='dre-val-total'>{f_br(rb_mes)}</div>
+    </div>
+    <div class='dre-row-sub'>
+        <div class='dre-label'>
+            📄 <b>1.1 Vendas por Nota Fiscal (NF)</b>
+            <span class='dre-tag'>Volume: {f_kg(nf_kg_mes)}</span>
+            <span class='dre-tag'>Preço Médio: {f_pm(nf_pm_mes)}</span>
+        </div>
+        <div class='dre-val'>{f_br(nf_val_mes)}</div>
+    </div>
+    <div class='dre-row-sub'>
+        <div class='dre-label'>
+            📋 <b>1.2 Vendas por DAV (Pedido de Venda)</b>
+            <span class='dre-tag'>Volume: {f_kg(dav_kg_mes)}</span>
+            <span class='dre-tag'>Preço Médio: {f_pm(dav_pm_mes)}</span>
+        </div>
+        <div class='dre-val'>{f_br(dav_val_mes)}</div>
+    </div>
+    <div class='dre-row'>
+        <div class='dre-label'><b>2. (-) Devoluções / Abatimentos</b></div>
+        <div class='dre-val'>{f_br(dev_mes)}</div>
+    </div>
+    <div class='dre-row'>
+        <div class='dre-label'><b>3. (-) Impostos sobre Venda (Vencimento no Mês - 2.1.3)</b></div>
+        <div class='dre-val'>{f_br(imp_venda_mes)}</div>
+    </div>
+    <div class='dre-row-total'>
+        <div class='dre-label'>
+            (=) RECEITA LÍQUIDA REAL
+            <span class='dre-tag dre-tag-green'>📦 Volume Líquido: {f_kg(rl_kg_mes)}</span>
+            <span class='dre-tag'>Preço Médio Líquido: {f_pm(rl_pm_mes)}</span>
+        </div>
+        <div class='dre-val-total'>{f_br(rl_mes)}</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     with st.expander("🔍 Detalhar Deduções e Impostos no Plano de Contas"):
         render_drilldown("Deduções e Impostos", prefixos_codigo=['2.1.3'])
         
-    st.markdown("---")
+    st.markdown("<div class='dre-sec-header'>II. Motores de Custo Variável & CMV Fabril</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # II. CMV FABRIL REMODELADO & CUSTOS VARIÁVEIS
     # -------------------------------------------------------------------------
-    st.subheader("II. Motores de Custo Variável & CMV Fabril")
+    st.markdown(f"""
+    <div class='dre-row-subtotal'>
+        <div class='dre-label'><b>4. Custo Total de Fabricação / CMV</b></div>
+        <div class='dre-val-total'>{f_br(cmv_tot_mes)}</div>
+    </div>
+    <div class='dre-row-sub'>
+        <div class='dre-label'>
+            🧄 <b>4.1 (-) Matéria-Prima Comprada (Alho in Natura)</b>
+            <span class='dre-tag dre-tag-blue'>Compras: {f_kg(mp_kg_mes)}</span>
+            <span class='dre-tag'>Custo Médio: {f_pm(mp_pm_mes)}</span>
+        </div>
+        <div class='dre-val'>{f_br(mp_val_mes)}</div>
+    </div>
+    <div class='dre-row-sub'>
+        <div class='dre-label'>📦 <b>4.2 (-) Embalagens & Insumos de Acondicionamento (2.1.2)</b></div>
+        <div class='dre-val'>{f_br(emb_mes)}</div>
+    </div>
+    """ + (f"""
+    <div class='dre-row-sub'>
+        <div class='dre-label'>🛠️ <b>4.3 (-) Outros Custos Fabris Diretos</b></div>
+        <div class='dre-val'>{f_br(outros_fab_mes)}</div>
+    </div>
+    """ if outros_fab_mes > 0 else "") + f"""
     
-    ca, cb = st.columns([2, 1])
-    ca.markdown(f"**4.1 (-) Matéria-Prima Comprada (Alho in Natura / Insumo Principal)**\n> 🧄 Compras no Mês: **{f_kg(mp_kg_mes)}** | Custo Médio: **{f_pm(mp_pm_mes)}**")
-    cb.metric("Valor Total", f_br(mp_val_mes), delta="Saída Insumos", delta_color="inverse")
+    <div class='dre-row-subtotal' style='margin-top: 10px;'>
+        <div class='dre-label'><b>5. Despesas Comerciais Variáveis</b></div>
+        <div class='dre-val-total'>{f_br(desp_com_mes)}</div>
+    </div>
+    <div class='dre-row-sub'>
+        <div class='dre-label'>🚚 <b>5.1 (-) Fretes de Entrega & Comissões de Venda</b></div>
+        <div class='dre-val'>{f_br(frete_mes + comi_mes)}</div>
+    </div>
+    <div class='dre-row-sub'>
+        <div class='dre-label'>🤝 <b>5.2 (-) Acordos de Rede & Rebates Comerciais (2.2.2)</b></div>
+        <div class='dre-val'>{f_br(acordos_mes)}</div>
+    </div>
+    <div class='dre-row-sub'>
+        <div class='dre-label'>📦 <b>5.3 (-) Taxas de Descarga (CD/Redes)</b></div>
+        <div class='dre-val'>{f_br(descarga_mes)}</div>
+    </div>
+    <div class='dre-row-sub'>
+        <div class='dre-label'>🍷 <b>5.4 (-) Degustações e Amostras (2.2.1)</b></div>
+        <div class='dre-val'>{f_br(degust_mes)}</div>
+    </div>
+    <div class='dre-row-sub'>
+        <div class='dre-label'>🧑‍💼 <b>5.5 (-) Serviços de Promotores de Vendas (2.2.4)</b></div>
+        <div class='dre-val'>{f_br(promotores_mes)}</div>
+    </div>
     
-    c_e1, c_e2 = st.columns([2, 1])
-    c_e1.markdown("**4.2 (-) Embalagens & Insumos de Acondicionamento (2.1.2)**")
-    c_e2.metric(" ", f_br(emb_mes), label_visibility="collapsed")
-    
-    if outros_fab_mes > 0:
-        c_o1, c_o2 = st.columns([2, 1])
-        c_o1.markdown("**4.3 (-) Outros Custos Fabris Diretos**")
-        c_o2.metric(" ", f_br(outros_fab_mes), label_visibility="collapsed")
-        
-    c_cmv_t1, c_cmv_t2 = st.columns([2, 1])
-    c_cmv_t1.markdown("**(=) CUSTO TOTAL DE FABRICAÇÃO / CMV**")
-    c_cmv_t2.markdown(f"**{f_br(cmv_tot_mes)}**")
-    
-    st.markdown("#### 🚚 Despesas Comerciais Variáveis")
-    
-    c_c1, c_c2 = st.columns([2, 1])
-    c_c1.markdown("**5.1 (-) Fretes de Entrega & Comissões de Venda**")
-    c_c2.metric(" ", f_br(frete_mes + comi_mes), label_visibility="collapsed")
-    
-    c_a1, c_a2 = st.columns([2, 1])
-    c_a1.markdown("**5.2 (-) Acordos de Rede & Rebates Comerciais (2.2.2)**")
-    c_a2.metric(" ", f_br(acordos_mes), label_visibility="collapsed")
-    
-    c_d1, c_d2 = st.columns([2, 1])
-    c_d1.markdown("**5.3 (-) Taxas de Descarga (CD/Redes)**")
-    c_d2.metric(" ", f_br(descarga_mes), label_visibility="collapsed")
-    
-    c_deg1, c_deg2 = st.columns([2, 1])
-    c_deg1.markdown("**5.4 (-) Degustações e Amostras (2.2.1)**")
-    c_deg2.metric(" ", f_br(degust_mes), label_visibility="collapsed")
-    
-    c_prm1, c_prm2 = st.columns([2, 1])
-    c_prm1.markdown("**5.5 (-) Serviços de Promotores de Vendas (2.2.4)**")
-    c_prm2.metric(" ", f_br(promotores_mes), label_visibility="collapsed")
-    
-    cd, ce = st.columns([2, 1])
-    cd.markdown(f"#### (=) MARGEM DE CONTRIBUIÇÃO LÍQUIDA   🛡️ `{mc_perc:.1f}%` \n> 🎯 Margem por Kg: **{f_pm(mc_kg_mes)}**")
-    ce.markdown(f"#### {f_br(mc_mes)}")
+    <div class='dre-row-total'>
+        <div class='dre-label'>
+            (=) MARGEM DE CONTRIBUIÇÃO LÍQUIDA
+            <span class='dre-tag dre-tag-green'>🛡️ Margem: {mc_perc:.1f}%</span>
+            <span class='dre-tag'>Margem/Kg: {f_pm(mc_kg_mes)}</span>
+        </div>
+        <div class='dre-val-total'>{f_br(mc_mes)}</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     with st.expander("🔍 Detalhar Custos e Despesas Variáveis no Plano de Contas"):
         render_drilldown("Custos Variáveis e Comerciais", prefixos_codigo=['2.1.', '2.2.'])
         
-    st.markdown("---")
+    st.markdown("<div class='dre-sec-header'>III. O Peso Existencial (Despesas Engessadas)</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # III. DESPESAS FIXAS
     # -------------------------------------------------------------------------
-    st.subheader("III. O Peso Existencial (Despesas Engessadas)")
-    
-    cg, ch = st.columns([2, 1])
-    cg.markdown("**6. (-) Desp. Fixas Totais (Vencimento no Mês Seguinte)**")
-    ch.metric("Valor Total", f_br(df_mes_val), delta="Saída", delta_color="inverse")
-    
-    c_pro1, c_pro2 = st.columns([2, 1])
-    c_pro1.markdown(">*Dessa Fila: (-) Pró-Labore (Salário Sócio)*")
-    c_pro2.markdown(f">*{f_br(pro_mes)}*")
+    st.markdown(f"""
+    <div class='dre-row'>
+        <div class='dre-label'><b>6. (-) Desp. Fixas Totais (Vencimento no Mês Seguinte)</b></div>
+        <div class='dre-val'>{f_br(df_mes_val)}</div>
+    </div>
+    <div class='dre-row-sub'>
+        <div class='dre-label'>👤 <i>Dessa Fila: (-) Pró-Labore (Salário Sócio)</i></div>
+        <div class='dre-val'><i>{f_br(pro_mes)}</i></div>
+    </div>
+    """, unsafe_allow_html=True)
     
     with st.expander("🔍 Detalhar Despesas Fixas no Plano de Contas"):
         render_drilldown("Despesas Fixas", prefixos_codigo=['2.3.', '3.1.'])
         
-    st.markdown("---")
+    st.markdown("<div class='dre-sec-header'>IV. Resultado Operacional (EBITDA)</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # IV. EBITDA
     # -------------------------------------------------------------------------
-    st.subheader("IV. Resultado Operacional (EBITDA)")
-    cj, ck = st.columns([2, 1])
-    cj.markdown(f"### 🛡️ EBITDA `{ebitda_perc:.1f}%`")
-    if ebitda_mes < 0:
-        str_ebitda = f"🛑 {f_br(ebitda_mes)}"
-    else:
-        str_ebitda = f"✔️ {f_br(ebitda_mes)}"
-    ck.markdown(f"### {str_ebitda}")
+    str_ebitda = f"🛑 {f_br(ebitda_mes)}" if ebitda_mes < 0 else f"✔️ {f_br(ebitda_mes)}"
+    st.markdown(f"""
+    <div class='dre-row-total'>
+        <div class='dre-label'>
+            🛡️ (=) EBITDA (Resultado Operacional)
+            <span class='dre-tag dre-tag-green'>EBITDA: {ebitda_perc:.1f}%</span>
+        </div>
+        <div class='dre-val-total'>{str_ebitda}</div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    st.markdown("---")
+    st.markdown("<div class='dre-sec-header'>V. Fatores Não-Operacionais e Financeiros</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # V. FATORES FINANCEIROS & LUCRO LÍQUIDO
     # -------------------------------------------------------------------------
-    st.subheader("V. Fatores Não-Operacionais e Financeiros")
-    
-    cm1, cm2 = st.columns([2, 1])
-    cm1.markdown("**7. (-) Depreciação / Amortização (Não-Caixa)**")
-    cm2.metric(" ", f_br(depr_mes), label_visibility="collapsed")
-    
-    cn1, cn2 = st.columns([2, 1])
-    cn1.markdown("**8. (-) Impostos sobre Lucro (IRPJ/CSLL)**")
-    cn2.metric(" ", f_br(imp_lucro_mes), label_visibility="collapsed")
-    
-    co1, co2 = st.columns([2, 1])
-    co1.markdown("**9. (-) Juros e Financiamentos**")
-    co2.metric(" ", f_br(finan_mes), label_visibility="collapsed")
-    
-    cq1, cq2 = st.columns([2, 1])
-    cq1.markdown("**10. (-) JCP (Juros s/ Capital Próprio)**")
-    cq2.metric(" ", f_br(jcp_mes), label_visibility="collapsed")
+    st.markdown(f"""
+    <div class='dre-row'>
+        <div class='dre-label'><b>7. (-) Depreciação / Amortização (Gasto Não-Caixa)</b></div>
+        <div class='dre-val'>{f_br(depr_mes)}</div>
+    </div>
+    <div class='dre-row'>
+        <div class='dre-label'><b>8. (-) Impostos sobre Lucro (IRPJ/CSLL)</b></div>
+        <div class='dre-val'>{f_br(imp_lucro_mes)}</div>
+    </div>
+    <div class='dre-row'>
+        <div class='dre-label'><b>9. (-) Juros e Financiamentos</b></div>
+        <div class='dre-val'>{f_br(finan_mes)}</div>
+    </div>
+    <div class='dre-row'>
+        <div class='dre-label'><b>10. (-) JCP (Juros s/ Capital Próprio)</b></div>
+        <div class='dre-val'>{f_br(jcp_mes)}</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     with st.expander("🔍 Detalhar Fatores Não-Operacionais e Financeiros no Plano de Contas"):
         render_drilldown("Fatores Financeiros", prefixos_codigo=['3.2.'], nomes_filtro=['Depreciação', 'Impostos sobre Lucro', 'IRPJ', 'CSLL', 'Financiamento', 'Juros', 'JCP'])
         
-    st.markdown("---")
+    st.markdown("<div class='dre-sec-header'>VI. Lucratividade do Exercício (Competência)</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # VI. LUCRO LÍQUIDO & DIVIDENDOS
     # -------------------------------------------------------------------------
-    st.subheader("👑 VI. Lucratividade do Exercício (Competência)")
+    str_ret = f"🛑 {f_br(retido_mes)}" if retido_mes < 0 else f"🚀 {f_br(retido_mes)}"
+    st.markdown(f"""
+    <div class='dre-row-subtotal'>
+        <div class='dre-label'>
+            👑 <b>11. (=) LUCRO LÍQUIDO TOTAL GERADO</b>
+            <span class='dre-tag dre-tag-green'>Lucratividade: {lucro_perc:.1f}%</span>
+        </div>
+        <div class='dre-val-total'>{f_br(lucro_mes)}</div>
+    </div>
+    <div class='dre-row-sub'>
+        <div class='dre-label'>🏦 <b>12. (-) Dividendos (Saque/Distribuição do Sócio)</b></div>
+        <div class='dre-val'>{f_br(div_mes)}</div>
+    </div>
+    <div class='dre-row-total'>
+        <div class='dre-label'>💎 <b>(=) LUCRO RETIDO (PATRIMÔNIO CNPJ)</b></div>
+        <div class='dre-val-total'>{str_ret}</div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    cr1, cr2 = st.columns([2, 1])
-    cr1.markdown(f"#### 11.(=) LUCRO LÍQUIDO TOTAL GERADO `{lucro_perc:.1f}%`")
-    cr2.markdown(f"#### {f_br(lucro_mes)}")
-    
-    cs1, cs2 = st.columns([2, 1])
-    cs1.markdown("**12. (-) Dividendos (Saque/Distrib. do Sócio)**")
-    cs2.metric(" ", f_br(div_mes), label_visibility="collapsed")
-    
-    ct1, ct2 = st.columns([2, 1])
-    ct1.markdown(f"### 💎 LUCRO RETIDO (PATRIMÔNIO CNPJ)")
-    if retido_mes < 0:
-        str_ret = f"🛑 {f_br(retido_mes)}"
-    else:
-        str_ret = f"🚀 {f_br(retido_mes)}"
-    ct2.markdown(f"### {str_ret}")
-    
-    st.markdown("---")
+    st.markdown("<div class='dre-sec-header'>VII. Geração Líquida de Caixa & Investimentos (CAPEX / Maquinário)</div>", unsafe_allow_html=True)
     
     # -------------------------------------------------------------------------
     # VII. GERAÇÃO LÍQUIDA DE CAIXA & MAQUINÁRIO (CAPEX)
     # -------------------------------------------------------------------------
-    st.subheader("⚙️ VII. Geração Líquida de Caixa & Investimentos (CAPEX / Maquinário)")
-    st.markdown("> **Conciliação Executiva (Bolso da Fábrica):** Ajusta o Lucro Líquido contábil pela reversão da depreciação (não-caixa) e deduz os desembolsos reais de parcelas/compras de máquinas e equipamentos no período.")
-    
-    cx1, cx2 = st.columns([2, 1])
-    cx1.markdown("Lucro Líquido Contábil (Competência)")
-    cx2.markdown(f"**{f_br(lucro_mes)}**")
-    
-    cx4, cx5 = st.columns([2, 1])
-    cx4.markdown("(+) Reversão de Depreciação *(Gasto Não-Caixa)*")
-    cx5.markdown(f"+ {f_br(depr_mes)}")
-    
-    cx7, cx8 = st.columns([2, 1])
-    cx7.markdown("(-) Investimentos em Maquinário & Equipamentos *(CAPEX Pago no Mês)*")
-    cx8.markdown(f"- {f_br(capex_mes)}")
-    
-    cxf1, cxf2 = st.columns([2, 1])
-    cxf1.markdown("### 💰 (=) RESULTADO LÍQUIDO DE CAIXA DA OPERAÇÃO")
-    if caixa_livre_mes < 0:
-        str_cx = f"🛑 {f_br(caixa_livre_mes)}"
-    else:
-        str_cx = f"🚀 {f_br(caixa_livre_mes)}"
-    cxf2.markdown(f"### {str_cx}")
+    str_cx = f"🛑 {f_br(caixa_livre_mes)}" if caixa_livre_mes < 0 else f"🚀 {f_br(caixa_livre_mes)}"
+    st.markdown(f"""
+    <div class='dre-row'>
+        <div class='dre-label'>Lucro Líquido Contábil (Competência)</div>
+        <div class='dre-val'>{f_br(lucro_mes)}</div>
+    </div>
+    <div class='dre-row'>
+        <div class='dre-label'><b>(+) Reversão de Depreciação</b> *(Gasto Não-Caixa)*</div>
+        <div class='dre-val'>+ {f_br(depr_mes)}</div>
+    </div>
+    <div class='dre-row'>
+        <div class='dre-label'><b>(-) Investimentos em Maquinário & Equipamentos</b> *(CAPEX Pago no Mês)*</div>
+        <div class='dre-val'>- {f_br(capex_mes)}</div>
+    </div>
+    <div class='dre-row-total'>
+        <div class='dre-label'>💰 <b>(=) RESULTADO LÍQUIDO DE CAIXA DA OPERAÇÃO</b></div>
+        <div class='dre-val-total'>{str_cx}</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     with st.expander("🔍 Detalhar Compras de Maquinário / CAPEX no Plano de Contas"):
         render_drilldown("Investimentos e Maquinário", prefixos_codigo=['1.2.', '4.1.'], nomes_filtro=['Máquina', 'Equipamento', 'Imobilizado', 'CAPEX', 'Maquinário'])
 
 with tab2:
-    col_b_title, col_b_sel = st.columns([2, 1])
+    col_b_title, col_b_sel = st.columns([2.5, 1])
     with col_b_title:
         st.subheader("Ponto de Sobrevivência (Break-Even)")
     with col_b_sel:
