@@ -1,3 +1,11 @@
+## v2.8.3 — 2026-09-08 (Sessão: Correção do PostgreSQL SQL Boolean + FPDF2 cell TypeError)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Correção de Consulta SQL (PostgreSQL/Supabase):** Substituída a expressão de comparação `(p.is_materia_prima = TRUE OR p.is_materia_prima = 1)` por `p.is_materia_prima IS TRUE`, eliminando o erro `operator does not exist: boolean = integer`.
+- **Correção da Assinatura do FPDF2 (`ExecutivePDF.cell`):** Atualizado o método `cell()` para aceitar `**kwargs` e converter `style='F'` para `fill=True`, além de substituir todas as chamadas por `fill=True`, prevenindo exceções de `TypeError` no Streamlit Cloud.
+
+---
+
 ## v2.8.2 — 2026-09-08 (Sessão: Reorganização da Barra de Ferramentas do Cabeçalho do RGC)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)

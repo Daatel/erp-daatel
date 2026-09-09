@@ -140,10 +140,14 @@ class ExecutivePDF(FPDF):
         super().__init__()
         self.sel_mes_ano = sel_mes_ano
 
-    def cell(self, w=0, h=0, text="", border=0, new_x="RIGHT", new_y="TOP", align="", fill=False, link=""):
+    def cell(self, w=0, h=0, text="", border=0, new_x="RIGHT", new_y="TOP", align="", fill=False, link="", **kwargs):
         if text:
             text = to_latin1(text)
-        return super().cell(w=w, h=h, text=text, border=border, new_x=new_x, new_y=new_y, align=align, fill=fill, link=link)
+        if "style" in kwargs:
+            if kwargs["style"] in ("F", "FD", True):
+                fill = True
+            del kwargs["style"]
+        return super().cell(w=w, h=h, text=text, border=border, new_x=new_x, new_y=new_y, align=align, fill=fill, link=link, **kwargs)
 
 def gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, ent_outros, dev_mes, imp_venda_mes, rl_mes, cmv_tot_mes, mp_val_mes, emb_mes, outros_fab_mes, desp_com_mes, comi_mes, frete_mes, acordos_mes, descarga_mes, degust_mes, promotores_mes, mc_mes, df_mes_val, ebitda_mes, depr_mes, imp_lucro_mes, finan_mes, jcp_mes, lucro_mes, div_mes, retido_mes, capex_mes, caixa_livre_mes, saldo_final_caixa, df_sai_mes):
     pdf = ExecutivePDF(sel_mes_ano)
@@ -153,7 +157,7 @@ def gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, e
     pdf.set_font('Helvetica', 'B', 13)
     pdf.set_fill_color(15, 23, 42)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 10, "DAATEL ERP - RELATORIO GERENCIAL DE CAIXA (RGC)", align='C', style='F', new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(0, 10, "DAATEL ERP - RELATORIO GERENCIAL DE CAIXA (RGC)", align='C', fill=True, new_x='LMARGIN', new_y='NEXT')
     
     pdf.set_font('Helvetica', '', 10)
     pdf.set_text_color(71, 85, 105)
@@ -163,8 +167,8 @@ def gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, e
     pdf.set_font('Helvetica', 'B', 10)
     pdf.set_fill_color(224, 242, 254)
     pdf.set_text_color(3, 105, 161)
-    pdf.cell(135, 8, " (+) SALDO INICIAL CONSOLIDADO DE CAIXA (Abertura)", border=1, style='F')
-    pdf.cell(55, 8, f"R$ {saldo_inicial_caixa:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."), border=1, align='R', style='F', new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(135, 8, " (+) SALDO INICIAL CONSOLIDADO DE CAIXA (Abertura)", border=1, fill=True)
+    pdf.cell(55, 8, f"R$ {saldo_inicial_caixa:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."), border=1, align='R', fill=True, new_x='LMARGIN', new_y='NEXT')
 
     pdf.set_text_color(15, 23, 42)
 
@@ -216,15 +220,15 @@ def gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, e
             pdf.set_font('Helvetica', '', 8.5)
             pdf.set_fill_color(255, 255, 255)
 
-        pdf.cell(135, 6, f" {desc}", border=1, style='F')
-        pdf.cell(55, 6, val_str, border=1, align='R', style='F', new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(135, 6, f" {desc}", border=1, fill=True)
+        pdf.cell(55, 6, val_str, border=1, align='R', fill=True, new_x='LMARGIN', new_y='NEXT')
 
     pdf.ln(2)
     pdf.set_font('Helvetica', 'B', 10)
     pdf.set_fill_color(220, 252, 231)
     pdf.set_text_color(21, 128, 61)
-    pdf.cell(135, 8, " (=) SALDO FINAL CONSOLIDADO DE CAIXA (Fechamento)", border=1, style='F')
-    pdf.cell(55, 8, f"R$ {saldo_final_caixa:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."), border=1, align='R', style='F', new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(135, 8, " (=) SALDO FINAL CONSOLIDADO DE CAIXA (Fechamento)", border=1, fill=True)
+    pdf.cell(55, 8, f"R$ {saldo_final_caixa:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."), border=1, align='R', fill=True, new_x='LMARGIN', new_y='NEXT')
 
     pdf_bytes = pdf.output()
     return bytes(pdf_bytes) if isinstance(pdf_bytes, bytearray) else pdf_bytes
@@ -442,7 +446,7 @@ if mp_kg_mes == 0:
         FROM estoque_movimentos em
         JOIN produtos p ON em.produto_id = p.id
         WHERE UPPER(em.tipo_movimento) = 'ENTRADA'
-          AND (p.is_materia_prima = TRUE OR p.is_materia_prima = 1)
+          AND p.is_materia_prima IS TRUE
           AND em.data >= ? AND em.data <= ?
     """, (dt_vd_devol_inicio_str, dt_vd_devol_fim_str))
     if df_est_mp is not None and not df_est_mp.empty:
