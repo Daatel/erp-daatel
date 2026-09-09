@@ -1,3 +1,10 @@
+## v2.8.2 — 2026-09-08 (Sessão: Reorganização da Barra de Ferramentas do Cabeçalho do RGC)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Ajuste da Disposição do Cabeçalho (Opção 2):** Reorganizada a barra de ferramentas do RGC com o banner de título principal em largura total no topo e uma barra de 4 colunas proporcionais para os seletores de Mês/Ano (30%), Inspeção de Conta (40%) e botões de exportação `📊 Excel` (15%) e `📄 PDF` (15%).
+
+---
+
 ## v2.8.1 — 2026-09-08 (Sessão: Restauração da Diagramação Original + Alinhamento do Cabeçalho)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)

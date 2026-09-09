@@ -604,9 +604,9 @@ def modal_auditoria_lancamentos(conta_label, sel_mes_ano):
 
 st.markdown("<div class='dre-wrapper'>", unsafe_allow_html=True)
 
-col_hdr_title, col_hdr_sel, col_hdr_audit, col_btn_excel, col_btn_pdf = st.columns([1.4, 0.9, 1.1, 0.8, 0.8])
-with col_hdr_title:
-    st.markdown("<div class='dre-sec-header' style='margin-top: 0px;'>Demonstrativo Gerencial de Caixa (RGC)</div>", unsafe_allow_html=True)
+st.markdown("<div class='dre-sec-header' style='margin-top: 0px;'>Demonstrativo Gerencial de Caixa (RGC)</div>", unsafe_allow_html=True)
+
+col_hdr_sel, col_hdr_audit, col_btn_excel, col_btn_pdf = st.columns([1.1, 1.4, 0.75, 0.75])
 with col_hdr_sel:
     st.selectbox(
         "Selecione o Mês/Ano:",
