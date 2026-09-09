@@ -1,3 +1,12 @@
+## v2.7.1 — 2026-09-08 (Sessão: Redesign Visual Executive do PDF, Excel e Web UI no RGC)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Redesign do PDF Executive (`fpdf2`):** Implementada a classe `ExecutivePDF` com banner de cabeçalho corporativo (`#0F172A`), rodapé dinâmico com paginação e confidencialidade, além de um **Painel de Cards KPI no topo** (Saldo Inicial em Azul Sky, Geração Líquida em Verde/Vermelho e Saldo Final em Índigo), tabela com alternância de linhas e linhas separadoras sutis (`#E2E8F0`).
+- **Redesign do Excel (`openpyxl`):** Habilitada a grade nativa do Excel (`showGridLines = True`), adicionado banner de cabeçalho com altura ajustada (32px), tipografia refinada em Segoe UI, numeração de moeda com formato profissional (`R$ #,##0.00;[Red]-R$ #,##0.00;"-"`) e alinhamentos milimétricos.
+- **Redesign da Interface Web (HTML/CSS):** Atualizada a folha de estilos com cantos arredondados, sombras suaves, gradiente no cabeçalho das seções, tags em pilhas elegantes e efeitos hover suaves.
+
+---
+
 ## v2.7.0 — 2026-09-08 (Sessão: Botões de Exportação Excel .xlsx e PDF no RGC + Correção PostgreSQL)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
