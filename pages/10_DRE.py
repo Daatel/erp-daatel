@@ -148,10 +148,29 @@ def gerar_excel_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc,
     return output_excel.getvalue()
 
 
+def to_latin1(text):
+    if not isinstance(text, str):
+        text = str(text)
+    text = (text.replace("—", "-")
+                .replace("–", "-")
+                .replace("“", '"')
+                .replace("”", '"')
+                .replace("’", "'")
+                .replace("‘", "'")
+                .replace("•", "*")
+                .replace("…", "..."))
+    return text.encode('latin-1', 'replace').decode('latin-1')
+
+
 class ExecutivePDF(FPDF):
     def __init__(self, sel_mes_ano):
         super().__init__()
         self.sel_mes_ano = sel_mes_ano
+
+    def cell(self, w=0, h=0, text="", border=0, new_x="RIGHT", new_y="TOP", align="", fill=False, link=""):
+        if text:
+            text = to_latin1(text)
+        return super().cell(w=w, h=h, text=text, border=border, new_x=new_x, new_y=new_y, align=align, fill=fill, link=link)
 
     def header(self):
         self.set_fill_color(15, 23, 42)
@@ -160,19 +179,19 @@ class ExecutivePDF(FPDF):
         self.set_font('Helvetica', 'B', 11)
         self.set_text_color(255, 255, 255)
         self.set_xy(10, 4)
-        self.cell(0, 6, "DAATEL ERP — GESTÃO INDUSTRIAL & FINANCEIRA", align='L')
+        self.cell(0, 6, "DAATEL ERP - GESTÃO INDUSTRIAL & FINANCEIRA", align='L')
         
         self.set_font('Helvetica', '', 8.5)
         self.set_text_color(203, 213, 225)
         self.set_xy(10, 10.5)
-        self.cell(0, 5, f"DEMONSTRATIVO GERENCIAL DE CAIXA (RGC) — MÊS DE REFERÊNCIA: {self.sel_mes_ano.upper()}", align='L')
+        self.cell(0, 5, f"DEMONSTRATIVO GERENCIAL DE CAIXA (RGC) - MÊS DE REFERÊNCIA: {self.sel_mes_ano.upper()}", align='L')
         self.ln(10)
 
     def footer(self):
         self.set_y(-12)
         self.set_font('Helvetica', 'I', 8)
         self.set_text_color(148, 163, 184)
-        self.cell(0, 6, f"DAATEL ERP — Documento Gerencial Confidencial — Página {self.page_no()}/{{nb}}", align='C')
+        self.cell(0, 6, f"DAATEL ERP - Documento Gerencial Confidencial - Página {self.page_no()}/{{nb}}", align='C')
 
 
 def gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, ent_outros, dev_mes, imp_venda_mes, rl_mes, cmv_tot_mes, mp_val_mes, emb_mes, outros_fab_mes, desp_com_mes, comi_mes, frete_mes, acordos_mes, descarga_mes, degust_mes, promotores_mes, mc_mes, df_mes_val, ebitda_mes, depr_mes, imp_lucro_mes, finan_mes, jcp_mes, lucro_mes, div_mes, retido_mes, capex_mes, caixa_livre_mes, saldo_final_caixa, df_sai_mes):

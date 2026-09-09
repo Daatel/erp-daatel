@@ -1,3 +1,10 @@
+## v2.7.3 — 2026-09-08 (Sessão: Sanitização Unicode / Latin-1 no Gerador PDF)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Sanitização de Caracteres Unicode (`to_latin1`):** Adicionada função de conversão e sobrescrito o método `ExecutivePDF.cell()` para sanitizar automaticamente qualquer caractere Unicode fora da tabela ISO-8859-1 (como travessões `—`, aspas inteligentes e nomes de rubricas vindos do banco de dados). Elimina a exceção `FPDFUnicodeEncodingException` no Streamlit Cloud.
+
+---
+
 ## v2.7.2 — 2026-09-08 (Sessão: Correção da Assinatura do FPDF2 rect style= em Produção)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
