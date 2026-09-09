@@ -1,3 +1,12 @@
+## v2.8.0 — 2026-09-08 (Sessão: Refatoração 100% Nativa do Streamlit & Eliminação de HTML/CSS)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Eliminação Completa de HTML/CSS Injetado:** Removidas todas as chamadas `render_html()`, concatenações de tags `<div>` e blocos de `<style>` customizados, tornando o relatório 100% dependente de componentes nativos da API do Streamlit (`st.container`, `st.columns`, `st.subheader`, `st.divider`, `st.caption`, `st.metric`).
+- **Renderização Nativa Robusta (`render_linha_rgc`):** Implementada função de layout nativa utilizando `st.columns([1.2, 5.8, 2.5])` com destaques de cores nativas do Streamlit (`:blue[...]`, `:green[...]`, `:orange[...]`).
+- **Imunidade a Erros de Renderização**: Elimina qualquer fragilidade de parsing HTML ou incompatibilidade de estilos com temas do Streamlit Cloud.
+
+---
+
 ## v2.7.3 — 2026-09-08 (Sessão: Sanitização Unicode / Latin-1 no Gerador PDF)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)

@@ -338,120 +338,6 @@ def gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, e
     pdf_bytes = pdf.output()
     return bytes(pdf_bytes) if isinstance(pdf_bytes, bytearray) else pdf_bytes
 
-st.markdown("""
-<style>
-.block-container {
-    padding-top: 1.5rem !important;
-    padding-bottom: 1rem !important;
-}
-h1 {
-    font-size: 2.2rem !important;
-    font-weight: 800 !important;
-    letter-spacing: -0.02em !important;
-    margin-top: -15px !important;
-    margin-bottom: 12px !important;
-    color: #0f172a !important;
-}
-.dre-wrapper {
-    max-width: 980px;
-    margin: 0 auto;
-}
-.dre-sec-header {
-    background: linear-gradient(90deg, #f1f5f9 0%, #f8fafc 100%);
-    border-left: 5px solid #0f172a;
-    padding: 10px 16px;
-    font-weight: 700;
-    font-size: 1.12rem;
-    color: #0f172a;
-    margin-top: 22px;
-    margin-bottom: 12px;
-    border-radius: 0 8px 8px 0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-}
-.dre-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 9px 14px;
-    border-bottom: 1px solid #f1f5f9;
-    font-size: 0.95rem;
-    color: #334155;
-    transition: background-color 0.15s ease;
-}
-.dre-row:hover {
-    background-color: #f8fafc;
-}
-.dre-row-sub {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 7px 14px 7px 32px;
-    border-bottom: 1px dashed #e2e8f0;
-    font-size: 0.90rem;
-    color: #475569;
-    background-color: #fafafa;
-}
-.dre-row-total {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    background-color: #f1f5f9;
-    border-top: 2px solid #cbd5e1;
-    border-bottom: 2px solid #0f172a;
-    font-weight: 700;
-    font-size: 1.05rem;
-    color: #0f172a;
-    margin-top: 6px;
-    margin-bottom: 6px;
-    border-radius: 6px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.03);
-}
-.dre-row-subtotal {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 14px;
-    background-color: #f8fafc;
-    border-top: 1px solid #cbd5e1;
-    font-weight: 700;
-    font-size: 1.00rem;
-    color: #1e293b;
-    border-radius: 4px;
-}
-.dre-label {
-    flex: 1;
-}
-.dre-tag {
-    display: inline-block;
-    background-color: #e2e8f0;
-    color: #334155;
-    font-size: 0.8rem;
-    padding: 3px 8px;
-    border-radius: 6px;
-    margin-left: 10px;
-    font-weight: 500;
-}
-.dre-val {
-    font-weight: 600;
-    font-size: 0.98rem;
-    color: #0f172a;
-    text-align: right;
-    width: 160px;
-    margin-left: 20px;
-}
-.dre-val-total {
-    font-weight: 800;
-    font-size: 1.10rem;
-    color: #0f172a;
-    text-align: right;
-    width: 160px;
-    margin-left: 20px;
-}
-</style>
-<h1>Relatório Gerencial de Caixa (RGC)</h1>
-""", unsafe_allow_html=True)
-
 def f_br(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
@@ -624,14 +510,47 @@ saldo_final_caixa = saldo_inicial_caixa + caixa_livre_mes
 # Ponto de Equilíbrio
 break_even = (df_mes_val / (mc_perc / 100)) if mc_perc > 0 else 0.0
 
-# --- FUNÇÃO AUXILIAR DE RENDERIZAÇÃO E DETALHAMENTO INLINE PELO PLANO DE CONTAS ---
-def render_html(html_str):
-    cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
-    st.markdown(cleaned, unsafe_allow_html=True)
+# --- FUNÇÃO NATIVA DE EXIBIÇÃO DE LINHA RGC ---
+def render_linha_rgc(cod, desc, val, rtype="normal", tags=None):
+    col_c, col_d, col_v = st.columns([1.2, 5.8, 2.5])
+    val_fmt = f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    tag_str = f" &nbsp; *({' | '.join(tags)})*" if tags else ""
+    
+    if rtype == "ini":
+        col_c.markdown(f"**:blue[{cod}]**")
+        col_d.markdown(f"### :blue[{desc}]")
+        col_v.markdown(f"### :blue[{val_fmt}]")
+    elif rtype == "total":
+        col_c.markdown(f"**`{cod}`**")
+        col_d.markdown(f"#### **{desc}**{tag_str}")
+        col_v.markdown(f"#### **{val_fmt}**")
+        st.divider()
+    elif rtype == "subtotal":
+        col_c.markdown(f"**{cod}**")
+        col_d.markdown(f"**{desc}**{tag_str}")
+        col_v.markdown(f"**{val_fmt}**")
+    elif rtype == "capex":
+        col_c.markdown(f"**:orange[{cod}]**")
+        col_d.markdown(f"### :orange[{desc}]")
+        col_v.markdown(f"### :orange[{val_fmt}]")
+        st.divider()
+    elif rtype == "fim":
+        col_c.markdown(f"**:green[{cod}]**")
+        col_d.markdown(f"### :green[{desc}]")
+        col_v.markdown(f"### :green[{val_fmt}]")
+        st.divider()
+    elif rtype == "detail":
+        col_c.caption(f"└ {cod}")
+        col_d.caption(f"↳ {desc}")
+        col_v.caption(f"{val_fmt}")
+    else:
+        col_c.write(f"`{cod}`" if cod else "")
+        col_d.write(f"{desc}{tag_str}")
+        col_v.write(f"{val_fmt}")
 
-def get_inline_rows_html(prefixos_codigo=None, nomes_filtro=None, ignorar_codigos=None):
+def render_detalhes_plano(prefixos_codigo=None, nomes_filtro=None, ignorar_codigos=None):
     if df_sai_mes.empty:
-        return ""
+        return
     cond = pd.Series([False] * len(df_sai_mes), index=df_sai_mes.index)
     if prefixos_codigo:
         for pfix in prefixos_codigo:
@@ -646,17 +565,12 @@ def get_inline_rows_html(prefixos_codigo=None, nomes_filtro=None, ignorar_codigo
             
     df_filtered = df_sai_mes[cond]
     if df_filtered.empty:
-        return ""
+        return
         
     grouped = df_filtered.groupby(['codigo', 'pc_nome'])['valor'].sum().reset_index().sort_values(by='codigo')
-    
-    rows_html = ""
     for _, r in grouped.iterrows():
-        cod = r['codigo']
-        nome = r['pc_nome']
-        val = float(r['valor'])
-        rows_html += f"<div class='dre-row-sub'><div class='dre-label'><b>{cod} - {nome}</b></div><div class='dre-val'>{f_br(val)}</div></div>"
-    return rows_html
+        render_linha_rgc(str(r['codigo']), r['pc_nome'], float(r['valor']), rtype="detail")
+
 
 # --- MODAL DE AUDITORIA DE LANÇAMENTOS DE CAIXA ---
 @st.dialog("🔍 Auditoria de Lançamentos de Caixa", width="large")
@@ -713,13 +627,12 @@ def modal_auditoria_lancamentos(conta_label, sel_mes_ano):
             mime="text/csv"
         )
 
-# -------- RENDERIZAÇÃO VISUAL ---------
+# -------- RENDERIZAÇÃO VISUAL NATIVA DO STREAMLIT ---------
 
-st.markdown("<div class='dre-wrapper'>", unsafe_allow_html=True)
+st.title("🏛️ Relatório Gerencial de Caixa (RGC)")
 
-col_hdr_title, col_hdr_sel, col_hdr_audit = st.columns([1.5, 0.9, 1.2])
-with col_hdr_title:
-    st.markdown("<div class='dre-sec-header' style='margin-top: 0px;'>Demonstrativo Gerencial de Caixa (RGC)</div>", unsafe_allow_html=True)
+col_hdr_sel, col_hdr_audit, col_exp_1, col_exp_2 = st.columns([1.2, 1.4, 1.2, 1.2])
+
 with col_hdr_sel:
     st.selectbox(
         "Selecione o Mês/Ano:",
@@ -727,6 +640,7 @@ with col_hdr_sel:
         index=opcoes_meses.index(sel_mes_ano) if sel_mes_ano in opcoes_meses else default_idx,
         key="sel_mes_ano"
     )
+
 with col_hdr_audit:
     opcoes_audit = [
         "🔍 Auditar Rubrica / Conta...",
@@ -759,263 +673,114 @@ with col_hdr_audit:
     if active_rubrica:
         modal_auditoria_lancamentos(active_rubrica, sel_mes_ano)
 
-# --- BOTOES DE EXPORTACAO (EXCEL & PDF) ---
-col_exp_1, col_exp_2, _ = st.columns([1.3, 1.3, 1.4])
 with col_exp_1:
     excel_bytes = gerar_excel_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, ent_outros, dev_mes, imp_venda_mes, rl_mes, cmv_tot_mes, mp_val_mes, emb_mes, outros_fab_mes, desp_com_mes, comi_mes, frete_mes, acordos_mes, descarga_mes, degust_mes, promotores_mes, mc_mes, df_mes_val, ebitda_mes, depr_mes, imp_lucro_mes, finan_mes, jcp_mes, lucro_mes, div_mes, retido_mes, capex_mes, caixa_livre_mes, saldo_final_caixa, df_sai_mes)
     st.download_button(
-        label="📊 Exportar RGC (Excel .xlsx)",
+        label="📊 Excel (.xlsx)",
         data=excel_bytes,
         file_name=f"Relatorio_Gerencial_Caixa_{sel_mes_ano.replace('/', '_')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
+
 with col_exp_2:
     pdf_bytes = gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, ent_outros, dev_mes, imp_venda_mes, rl_mes, cmv_tot_mes, mp_val_mes, emb_mes, outros_fab_mes, desp_com_mes, comi_mes, frete_mes, acordos_mes, descarga_mes, degust_mes, promotores_mes, mc_mes, df_mes_val, ebitda_mes, depr_mes, imp_lucro_mes, finan_mes, jcp_mes, lucro_mes, div_mes, retido_mes, capex_mes, caixa_livre_mes, saldo_final_caixa, df_sai_mes)
     st.download_button(
-        label="📄 Exportar RGC (PDF)",
+        label="📄 PDF",
         data=pdf_bytes,
         file_name=f"Relatorio_Gerencial_Caixa_{sel_mes_ano.replace('/', '_')}.pdf",
         mime="application/pdf",
         use_container_width=True
     )
 
-# -------------------------------------------------------------------------
-# ABERTURA DO CAIXA (SALDO INICIAL)
-# -------------------------------------------------------------------------
-render_html(f"""
-<div class='dre-row-total' style='background-color: #e0f2fe; border-top: 2px solid #0284c7; border-bottom: 2px solid #0284c7; color: #0369a1; margin-top: 10px; margin-bottom: 20px;'>
-    <div class='dre-label'>
-        <b style='font-size: 1.1rem;'>(+) SALDO INICIAL CONSOLIDADO DE CAIXA (Abertura do Mês)</b>
-    </div>
-    <div class='dre-val-total' style='color: #0369a1; font-size: 1.15rem;'>{f_br(saldo_inicial_caixa)}</div>
-</div>
-""")
+st.divider()
 
-st.markdown("<div class='dre-sec-header'>I. Entradas de Caixa (Recebimentos Efetivados)</div>", unsafe_allow_html=True)
+# ABERTURA DO CAIXA
+with st.container(border=True):
+    render_linha_rgc("INICIAL", "(+) SALDO INICIAL CONSOLIDADO DE CAIXA (Abertura do Mês)", saldo_inicial_caixa, rtype="ini")
 
-# -------------------------------------------------------------------------
-# I. RECEITA E DEDUÇÕES (Tabela Financeira Executiva Limpa)
-# -------------------------------------------------------------------------
-render_html(f"""
-<div class='dre-row-subtotal'>
-    <div class='dre-label'>
-        <b>1. Receita Operacional Realizada ({sel_mes_ano})</b>
-        <span class='dre-tag'>Volume Faturado: {f_kg(rb_kg_mes)}</span>
-        <span class='dre-tag'>Preço Médio Realizado: {f_pm(rb_pm_mes)}</span>
-    </div>
-    <div class='dre-val-total'>{f_br(rb_mes)}</div>
-</div>
-<div class='dre-row-sub'>
-    <div class='dre-label'>
-        <b>1.1 Entradas de Vendas de Alho In Natura (1.1.1)</b>
-    </div>
-    <div class='dre-val'>{f_br(ent_nat)}</div>
-</div>
-<div class='dre-row-sub'>
-    <div class='dre-label'>
-        <b>1.2 Entradas de Vendas de Alho Descascado (1.1.2)</b>
-    </div>
-    <div class='dre-val'>{f_br(ent_desc)}</div>
-</div>
-{"<div class='dre-row-sub'><div class='dre-label'><b>1.3 Outras Receitas Operacionais Recebidas</b></div><div class='dre-val'>" + f_br(ent_outros) + "</div></div>" if ent_outros > 0 else ""}
-<div class='dre-row'>
-    <div class='dre-label'><b>2. (-) Devoluções / Abatimentos Realizados</b></div>
-    <div class='dre-val'>{f_br(dev_mes)}</div>
-</div>
-<div class='dre-row'>
-    <div class='dre-label'><b>3. (-) Impostos sobre Venda Pagos (2.1.3)</b></div>
-    <div class='dre-val'>{f_br(imp_venda_mes)}</div>
-</div>
-{get_inline_rows_html(prefixos_codigo=['2.1.3'])}
-<div class='dre-row-total'>
-    <div class='dre-label'>
-        (=) RECEITA LÍQUIDA DE CAIXA
-        <span class='dre-tag'>Volume Faturado: {f_kg(rl_kg_mes)}</span>
-        <span class='dre-tag'>Preço Médio Líquido: {f_pm(rl_pm_mes)}</span>
-    </div>
-    <div class='dre-val-total'>{f_br(rl_mes)}</div>
-</div>
-""")
+# I. ENTRADAS DE CAIXA
+st.subheader("I. Entradas de Caixa (Recebimentos Efetivados)")
+with st.container(border=True):
+    render_linha_rgc("1.0", f"1. Receita Operacional Realizada ({sel_mes_ano})", rb_mes, rtype="subtotal", tags=[f"Volume: {f_kg(rb_kg_mes)}", f"Preço Médio: {f_pm(rb_pm_mes)}"])
+    render_linha_rgc("1.1.1", "1.1 Entradas de Vendas de Alho In Natura", ent_nat)
+    render_linha_rgc("1.1.2", "1.2 Entradas de Vendas de Alho Descascado", ent_desc)
+    if ent_outros > 0:
+        render_linha_rgc("1.3", "1.3 Outras Receitas Operacionais Recebidas", ent_outros)
+    render_linha_rgc("2.0", "2. (-) Devoluções / Abatimentos Realizados", dev_mes)
+    render_linha_rgc("2.1.3", "3. (-) Impostos sobre Venda Pagos", imp_venda_mes)
+    render_detalhes_plano(prefixos_codigo=['2.1.3'])
+    render_linha_rgc("RL", "(=) RECEITA LÍQUIDA DE CAIXA", rl_mes, rtype="total", tags=[f"Volume: {f_kg(rl_kg_mes)}", f"PM Líquido: {f_pm(rl_pm_mes)}"])
 
-st.markdown("<div class='dre-sec-header'>II. Custos Fabris e Despesas Variáveis Pagas</div>", unsafe_allow_html=True)
+# II. CUSTOS FABRIS E VARIÁVEIS PAGOS
+st.subheader("II. Custos Fabris e Despesas Variáveis Pagas")
+with st.container(border=True):
+    render_linha_rgc("4.0", "4. Custo Total de Fabricação / CMV Pago", cmv_tot_mes, rtype="subtotal")
+    mp_tags = [f"Compras: {f_kg(mp_kg_mes)}", f"Custo Médio: {f_pm(mp_pm_mes)}"] if mp_kg_mes > 0 else ["Lançamentos no Contas a Pagar"]
+    render_linha_rgc("2.1.1", "4.1 (-) Matéria-Prima Paga (Alho in Natura)", mp_val_mes, tags=mp_tags)
+    render_linha_rgc("2.1.2", "4.2 (-) Embalagens & Insumos Pagos", emb_mes)
+    if outros_fab_mes > 0:
+        render_linha_rgc("2.1.X", "4.3 (-) Outros Custos Fabris Diretos Pagos", outros_fab_mes)
+    render_detalhes_plano(prefixos_codigo=['2.1.'], ignorar_codigos=['2.1.1', '2.1.2', '2.1.3', '2.1.4', '2.1.5'])
+    
+    st.markdown("---")
+    render_linha_rgc("5.0", "5. Despesas Comerciais Variáveis Pagas", desp_com_mes, rtype="subtotal")
+    render_linha_rgc("2.1.4", "5.1 (-) Comissões de Vendas Pagas", comi_mes)
+    render_linha_rgc("2.1.5", "5.2 (-) Fretes de Entrega Pagos (Logística de Saída)", frete_mes)
+    render_linha_rgc("2.2.2", "5.3 (-) Acordos de Rede & Rebates Comerciais Pagos", acordos_mes)
+    render_linha_rgc("2.2.0", "5.4 (-) Taxas de Descarga Pagas (CD/Redes)", descarga_mes)
+    render_linha_rgc("2.2.1", "5.5 (-) Degustações e Amostras Pagas", degust_mes)
+    render_linha_rgc("2.2.4", "5.6 (-) Serviços de Promotores de Vendas Pagos", promotores_mes)
+    render_detalhes_plano(prefixos_codigo=['2.2.'], ignorar_codigos=['2.2.1', '2.2.2', '2.2.4', '2.1.4', '2.1.5'])
+    
+    render_linha_rgc("MC", "(=) MARGEM DE CONTRIBUIÇÃO LÍQUIDA DE CAIXA", mc_mes, rtype="total", tags=[f"Margem: {mc_perc:.1f}%", f"Margem/Kg: {f_pm(mc_kg_mes)}"])
 
-# -------------------------------------------------------------------------
-# II. CMV FABRIL REMODELADO & CUSTOS VARIÁVEIS
-# -------------------------------------------------------------------------
-render_html(f"""
-<div class='dre-row-subtotal'>
-    <div class='dre-label'><b>4. Custo Total de Fabricação / CMV Pago</b></div>
-    <div class='dre-val-total'>{f_br(cmv_tot_mes)}</div>
-</div>
-<div class='dre-row-sub'>
-    <div class='dre-label'>
-        <b>4.1 (-) Matéria-Prima Paga (Alho in Natura)</b>
-        {tags_mp_html}
-    </div>
-    <div class='dre-val'>{f_br(mp_val_mes)}</div>
-</div>
-<div class='dre-row-sub'>
-    <div class='dre-label'><b>4.2 (-) Embalagens & Insumos Pagos (2.1.2)</b></div>
-    <div class='dre-val'>{f_br(emb_mes)}</div>
-</div>
-{"<div class='dre-row-sub'><div class='dre-label'><b>4.3 (-) Outros Custos Fabris Diretos Pagos</b></div><div class='dre-val'>" + f_br(outros_fab_mes) + "</div></div>" if outros_fab_mes > 0 else ""}
-{get_inline_rows_html(prefixos_codigo=['2.1.'], ignorar_codigos=['2.1.1', '2.1.2', '2.1.3', '2.1.4', '2.1.5'])}
-<div class='dre-row-subtotal' style='margin-top: 10px;'>
-    <div class='dre-label'><b>5. Despesas Comerciais Variáveis Pagas</b></div>
-    <div class='dre-val-total'>{f_br(desp_com_mes)}</div>
-</div>
-<div class='dre-row-sub'>
-    <div class='dre-label'><b>5.1 (-) Comissões de Vendas Pagas</b></div>
-    <div class='dre-val'>{f_br(comi_mes)}</div>
-</div>
-<div class='dre-row-sub'>
-    <div class='dre-label'><b>5.2 (-) Fretes de Entrega Pagos (Logística de Saída)</b></div>
-    <div class='dre-val'>{f_br(frete_mes)}</div>
-</div>
-<div class='dre-row-sub'>
-    <div class='dre-label'><b>5.3 (-) Acordos de Rede & Rebates Comerciais Pagos (2.2.2)</b></div>
-    <div class='dre-val'>{f_br(acordos_mes)}</div>
-</div>
-<div class='dre-row-sub'>
-    <div class='dre-label'><b>5.4 (-) Taxas de Descarga Pagas (CD/Redes)</b></div>
-    <div class='dre-val'>{f_br(descarga_mes)}</div>
-</div>
-<div class='dre-row-sub'>
-    <div class='dre-label'><b>5.5 (-) Degustações e Amostras Pagas (2.2.1)</b></div>
-    <div class='dre-val'>{f_br(degust_mes)}</div>
-</div>
-<div class='dre-row-sub'>
-    <div class='dre-label'><b>5.6 (-) Serviços de Promotores de Vendas Pagos (2.2.4)</b></div>
-    <div class='dre-val'>{f_br(promotores_mes)}</div>
-</div>
-{get_inline_rows_html(prefixos_codigo=['2.2.'], ignorar_codigos=['2.2.1', '2.2.2', '2.2.4', '2.1.4', '2.1.5'])}
-<div class='dre-row-total'>
-    <div class='dre-label'>
-        (=) MARGEM DE CONTRIBUIÇÃO LÍQUIDA DE CAIXA
-        <span class='dre-tag'>Margem: {mc_perc:.1f}%</span>
-        <span class='dre-tag'>Margem/Kg: {f_pm(mc_kg_mes)}</span>
-    </div>
-    <div class='dre-val-total'>{f_br(mc_mes)}</div>
-</div>
-""")
+# III. CUSTOS FIXOS PAGOS
+st.subheader("III. Custos e Despesas Fixas Pagas")
+with st.container(border=True):
+    render_linha_rgc("6.0", "6. (-) Custos e Despesas Fixas Totais Pagas", df_mes_val, rtype="subtotal")
+    render_detalhes_plano(prefixos_codigo=['2.3.', '3.1.', 'OUTROS'], ignorar_codigos=['3.2.', '3.3.', '1.2.', '4.1.'])
 
-st.markdown("<div class='dre-sec-header'>III. Custos e Despesas Fixas Pagas</div>", unsafe_allow_html=True)
-
-# -------------------------------------------------------------------------
-# III. CUSTOS FIXOS (Abertura direta pelo Plano de Contas)
-# -------------------------------------------------------------------------
-render_html(f"""
-<div class='dre-row-subtotal'>
-    <div class='dre-label'><b>6. (-) Custos e Despesas Fixas Totais Pagas</b></div>
-    <div class='dre-val-total'>{f_br(df_mes_val)}</div>
-</div>
-{get_inline_rows_html(prefixos_codigo=['2.3.', '3.1.', 'OUTROS'], ignorar_codigos=['3.2.', '3.3.', '1.2.', '4.1.'])}
-""")
-
-st.markdown("<div class='dre-sec-header'>IV. EBITDA de Caixa (Resultado Operacional Real)</div>", unsafe_allow_html=True)
-
-# -------------------------------------------------------------------------
 # IV. EBITDA
-# -------------------------------------------------------------------------
-render_html(f"""
-<div class='dre-row-total'>
-    <div class='dre-label'>
-        (=) EBITDA DE CAIXA (Resultado Operacional Real)
-        <span class='dre-tag'>Margem EBITDA: {ebitda_perc:.1f}%</span>
-    </div>
-    <div class='dre-val-total'>{f_br(ebitda_mes)}</div>
-</div>
-""")
+st.subheader("IV. EBITDA de Caixa (Resultado Operacional Real)")
+with st.container(border=True):
+    render_linha_rgc("EBITDA", "(=) EBITDA DE CAIXA (Resultado Operacional Real)", ebitda_mes, rtype="total", tags=[f"Margem EBITDA: {ebitda_perc:.1f}%"])
 
-st.markdown("<div class='dre-sec-header'>V. Fatores Não-Operacionais e Financeiros Pagos</div>", unsafe_allow_html=True)
+# V. FATORES NÃO-OPERACIONAIS E FINANCEIROS
+st.subheader("V. Fatores Não-Operacionais e Financeiros Pagos")
+with st.container(border=True):
+    render_linha_rgc("3.1.9", "7. (-) Depreciação / Amortização (Não-Caixa)", depr_mes)
+    render_linha_rgc("3.2.0", "8. (-) Impostos sobre Lucro Pagos (IRPJ/CSLL)", imp_lucro_mes)
+    render_linha_rgc("3.2.1", "9. (-) Juros e Financiamentos Pagos", finan_mes)
+    render_linha_rgc("3.2.2", "10. (-) JCP Pagos (Juros s/ Capital Próprio)", jcp_mes)
+    render_detalhes_plano(prefixos_codigo=['3.2.'], nomes_filtro=['Depreciação', 'Impostos sobre Lucro', 'IRPJ', 'CSLL', 'Financiamento', 'Juros', 'JCP'])
 
-# -------------------------------------------------------------------------
-# V. FATORES FINANCEIROS & LUCRO LÍQUIDO
-# -------------------------------------------------------------------------
-render_html(f"""
-<div class='dre-row'>
-    <div class='dre-label'><b>7. (-) Depreciação / Amortização (Não-Caixa)</b></div>
-    <div class='dre-val'>{f_br(depr_mes)}</div>
-</div>
-<div class='dre-row'>
-    <div class='dre-label'><b>8. (-) Impostos sobre Lucro Pagos (IRPJ/CSLL)</b></div>
-    <div class='dre-val'>{f_br(imp_lucro_mes)}</div>
-</div>
-<div class='dre-row'>
-    <div class='dre-label'><b>9. (-) Juros e Financiamentos Pagos (3.2.1)</b></div>
-    <div class='dre-val'>{f_br(finan_mes)}</div>
-</div>
-<div class='dre-row'>
-    <div class='dre-label'><b>10. (-) JCP Pagos (Juros s/ Capital Próprio)</b></div>
-    <div class='dre-val'>{f_br(jcp_mes)}</div>
-</div>
-{get_inline_rows_html(prefixos_codigo=['3.2.'], nomes_filtro=['Depreciação', 'Impostos sobre Lucro', 'IRPJ', 'CSLL', 'Financiamento', 'Juros', 'JCP'])}
-""")
+# VI. GERAÇÃO LÍQUIDA DE CAIXA OPERACIONAL
+st.subheader("VI. Geração Líquida de Caixa Operacional")
+with st.container(border=True):
+    render_linha_rgc("GER", "11. (=) GERAÇÃO LÍQUIDA DE CAIXA OPERACIONAL", lucro_mes, rtype="subtotal", tags=[f"Lucratividade: {lucro_perc:.1f}%"])
+    render_linha_rgc("DIV", "12. (-) Dividendos (Saque/Distribuição Efetivada ao Sócio)", div_mes)
+    render_linha_rgc("RET", "(=) GERAÇÃO RETIDA DE CAIXA OPERACIONAL", retido_mes, rtype="total")
 
-st.markdown("<div class='dre-sec-header'>VI. Geração Líquida de Caixa Operacional</div>", unsafe_allow_html=True)
+# VII. DESEMBOLSOS DE INVESTIMENTOS (CAPEX)
+st.subheader("VII. Desembolsos de Investimentos (CAPEX)")
+with st.container(border=True):
+    render_linha_rgc("GER", "Geração Líquida de Caixa Operacional", lucro_mes)
+    render_linha_rgc("CAPEX", "(-) Desembolsos de Investimentos Pagos (Compra de Máquinas e Equipamentos)", capex_mes)
+    render_detalhes_plano(prefixos_codigo=['3.3.', '1.2.', '4.1.'], nomes_filtro=['Compra de Máquinas', 'Imobilizado', 'CAPEX'], ignorar_codigos=['2.3.3', '2.3.'])
+    render_linha_rgc("VAR", "(=) GERAÇÃO / REDUÇÃO LÍQUIDA DE CAIXA NO MÊS", caixa_livre_mes, rtype="capex")
 
-# -------------------------------------------------------------------------
-# VI. LUCRO LÍQUIDO & DIVIDENDOS
-# -------------------------------------------------------------------------
-render_html(f"""
-<div class='dre-row-subtotal'>
-    <div class='dre-label'>
-        <b>11. (=) GERAÇÃO LÍQUIDA DE CAIXA OPERACIONAL</b>
-        <span class='dre-tag'>Lucratividade: {lucro_perc:.1f}%</span>
-    </div>
-    <div class='dre-val-total'>{f_br(lucro_mes)}</div>
-</div>
-<div class='dre-row-sub'>
-    <div class='dre-label'><b>12. (-) Dividendos (Saque/Distribuição Efetivada ao Sócio)</b></div>
-    <div class='dre-val'>{f_br(div_mes)}</div>
-</div>
-<div class='dre-row-total'>
-    <div class='dre-label'><b>(=) GERAÇÃO RETIDA DE CAIXA OPERACIONAL</b></div>
-    <div class='dre-val-total'>{f_br(retido_mes)}</div>
-</div>
-""")
-
-st.markdown("<div class='dre-sec-header'>VII. Desembolsos de Investimentos (CAPEX)</div>", unsafe_allow_html=True)
-
-render_html(f"""
-<div class='dre-row'>
-    <div class='dre-label'>Geração Líquida de Caixa Operacional</div>
-    <div class='dre-val'>{f_br(lucro_mes)}</div>
-</div>
-<div class='dre-row'>
-    <div class='dre-label'><b>(-) Desembolsos de Investimentos Pagos</b> *(Compra de Máquinas, Equipamentos e Imobilizado)*</div>
-    <div class='dre-val'>- {f_br(capex_mes)}</div>
-</div>
-{get_inline_rows_html(prefixos_codigo=['3.3.', '1.2.', '4.1.'], nomes_filtro=['Compra de Máquinas', 'Imobilizado', 'CAPEX'], ignorar_codigos=['2.3.3', '2.3.'])}
-<div class='dre-row-total' style='background-color: #fef08a; border-top: 2px solid #eab308; border-bottom: 2px solid #ca8a04; color: #854d0e;'>
-    <div class='dre-label'><b style='font-size: 1.05rem;'>(=) GERAÇÃO / REDUÇÃO LÍQUIDA DE CAIXA NO MÊS</b></div>
-    <div class='dre-val-total' style='color: #854d0e; font-size: 1.1rem;'>{f_br(caixa_livre_mes)}</div>
-</div>
-""")
-
-# -------------------------------------------------------------------------
 # FECHAMENTO DO CAIXA (SALDO FINAL)
-# -------------------------------------------------------------------------
-render_html(f"""
-<div class='dre-row-total' style='background-color: #dcfce7; border-top: 2px solid #16a34a; border-bottom: 2px solid #16a34a; color: #15803d; margin-top: 25px; margin-bottom: 20px;'>
-    <div class='dre-label'>
-        <b style='font-size: 1.15rem;'>(=) SALDO FINAL CONSOLIDADO DE CAIXA (Fechamento do Mês)</b>
-        <span class='dre-tag' style='background-color: #bbf7d0; color: #166534;'>Geração Líquida no Mês: {f_br(caixa_livre_mes)}</span>
-    </div>
-    <div class='dre-val-total' style='color: #15803d; font-size: 1.2rem;'>{f_br(saldo_final_caixa)}</div>
-</div>
-""")
+with st.container(border=True):
+    render_linha_rgc("FINAL", "(=) SALDO FINAL CONSOLIDADO DE CAIXA (Fechamento do Mês)", saldo_final_caixa, rtype="fim", tags=[f"Geração Líquida: {f_br(caixa_livre_mes)}"])
 
 st.caption("📌 **Visão Gerencial:** Relatório 100% extraído das movimentações reais do Extrato Bancário e Caixa Físico (`fluxo_caixa`). Paridade absoluta de 100,00% com o Extrato Razão oficial.")
 
-st.markdown("---")
+st.divider()
 
-# -------------------------------------------------------------------------
 # VIII. PONTO DE EQUILÍBRIO (BREAK-EVEN) EM EXPANDER
-# -------------------------------------------------------------------------
 with st.expander("🎯 Ponto de Equilíbrio (Break-Even Operacional)", expanded=False):
-    st.markdown(f"> **O que é isso?** É o ponto exato de faturamento onde a sua fábrica zera todas as contas operacionais (EBITDA Zero) e passa a ter fluxo positivo para pagar bancos e lucros. Vender abaixo disso significa tirar dinheiro do próprio bolso para a fábrica abrir as portas.")
+    st.markdown("> **O que é isso?** É o ponto exato de faturamento onde a sua fábrica zera todas as contas operacionais (EBITDA Zero) e passa a ter fluxo positivo para pagar bancos e lucros. Vender abaixo disso significa tirar dinheiro do próprio bolso para a fábrica abrir as portas.")
     
     colB1, colB2 = st.columns(2)
     colB1.metric("Faturamento Mínimo para Sobrevivência (Mês)", f_br(break_even))
@@ -1028,6 +793,5 @@ with st.expander("🎯 Ponto de Equilíbrio (Break-Even Operacional)", expanded=
         colB2.metric("Oceano Azul (Faturamento Acima do Ponto):", f_br(lucro_acima), delta="Zona de Lucro", delta_color="normal")
         st.success(f"🥳 Parabéns Máquina! Você já estourou o teto e pagou todas das despesas desse mês. As próximas vendas são lucro quase líquido pro caixa!")
 
-st.markdown("</div>", unsafe_allow_html=True)
 
 
