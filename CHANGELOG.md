@@ -1,3 +1,11 @@
+## v2.8.1 — 2026-09-08 (Sessão: Restauração da Diagramação Original + Alinhamento do Cabeçalho)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Restauração da Diagramação Visual Executiva Original:** Restaurada 100% da diagramação visual original com CSS/HTML refinado, cores executivas e estrutura perfeita da tabela RGC.
+- **Disposição dos Botões de Exportação no Cabeçalho**: Os botões de exportação `📊 Excel` e `📄 PDF` foram posicionados de forma limpa na mesma linha do cabeçalho de seletores (`col_hdr_title, col_hdr_sel, col_hdr_audit, col_btn_excel, col_btn_pdf = st.columns(...)`).
+
+---
+
 ## v2.8.0 — 2026-09-08 (Sessão: Refatoração 100% Nativa do Streamlit & Eliminação de HTML/CSS)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
