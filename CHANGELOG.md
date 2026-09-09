@@ -1,3 +1,10 @@
+## v2.8.4 — 2026-09-08 (Sessão: Atualização do Texto da Legenda de Visão Gerencial)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Texto da Legenda Atualizado:** Atualizada a legenda de rodapé para: *"📌 **Visão Gerencial:** Relatório em regime de caixa extraído das movimentações consolidadas pelos extratos bancários e movimentações da tesouraria."*
+
+---
+
 ## v2.8.3 — 2026-09-08 (Sessão: Correção do PostgreSQL SQL Boolean + FPDF2 cell TypeError)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)

@@ -899,7 +899,7 @@ render_html(f"""
 </div>
 """)
 
-st.caption("📌 **Visão Gerencial:** Relatório 100% extraído das movimentações reais do Extrato Bancário e Caixa Físico (`fluxo_caixa`). Paridade absoluta de 100,00% com o Extrato Razão oficial.")
+st.caption("📌 **Visão Gerencial:** Relatório em regime de caixa extraído das movimentações consolidadas pelos extratos bancários e movimentações da tesouraria.")
 
 st.markdown("---")
 
