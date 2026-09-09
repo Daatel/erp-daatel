@@ -155,7 +155,7 @@ class ExecutivePDF(FPDF):
 
     def header(self):
         self.set_fill_color(15, 23, 42)
-        self.rect(0, 0, 210, 20, fill='F')
+        self.rect(0, 0, 210, 20, style='F')
         
         self.set_font('Helvetica', 'B', 11)
         self.set_text_color(255, 255, 255)
@@ -190,7 +190,7 @@ def gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, e
     # Card 1: Opening Cash Balance
     pdf.set_fill_color(224, 242, 254)
     pdf.set_draw_color(2, 132, 199)
-    pdf.rect(10, 24, 61, 14, fill='FD')
+    pdf.rect(10, 24, 61, 14, style='FD')
     pdf.set_xy(12, 25)
     pdf.set_font('Helvetica', 'B', 7)
     pdf.set_text_color(3, 105, 161)
@@ -205,7 +205,7 @@ def gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, e
     cg_brd = (22, 163, 74) if caixa_livre_mes >= 0 else (220, 38, 38)
     pdf.set_fill_color(*cg_bg)
     pdf.set_draw_color(*cg_brd)
-    pdf.rect(74.5, 24, 61, 14, fill='FD')
+    pdf.rect(74.5, 24, 61, 14, style='FD')
     pdf.set_xy(76.5, 25)
     pdf.set_font('Helvetica', 'B', 7)
     pdf.set_text_color(*cg_txt)
@@ -217,7 +217,7 @@ def gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, e
     # Card 3: Closing Cash Balance
     pdf.set_fill_color(238, 242, 255)
     pdf.set_draw_color(99, 102, 241)
-    pdf.rect(139, 24, 61, 14, fill='FD')
+    pdf.rect(139, 24, 61, 14, style='FD')
     pdf.set_xy(141, 25)
     pdf.set_font('Helvetica', 'B', 7)
     pdf.set_text_color(67, 56, 202)

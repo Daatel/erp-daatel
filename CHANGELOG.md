@@ -1,3 +1,10 @@
+## v2.7.2 — 2026-09-08 (Sessão: Correção da Assinatura do FPDF2 rect style= em Produção)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Correção da Assinatura do `fpdf2` (`rect()`):** Substituído o argumento incorreto `fill='F'` / `fill='FD'` por `style='F'` / `style='FD'` nas chamadas de desenho do retângulo de cabeçalho e cards KPI. Essa alteração resolve o `TypeError` em versões recentes do `fpdf2` no ambiente Streamlit Cloud (Python 3.14).
+
+---
+
 ## v2.7.1 — 2026-09-08 (Sessão: Redesign Visual Executive do PDF, Excel e Web UI no RGC)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
