@@ -39,7 +39,7 @@ def gerar_excel_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc,
     )
 
     ws.merge_cells('A1:C1')
-    ws['A1'] = f'DAATEL ERP - RELATÓRIO GERENCIAL DE CAIXA (RGC) - {sel_mes_ano}'
+    ws['A1'] = f'EMPÓRIO DO ALHO - RELATÓRIO GERENCIAL DE CAIXA (RGC) - {sel_mes_ano}'
     ws['A1'].font = title_font
     ws['A1'].fill = title_fill
     ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
@@ -140,6 +140,12 @@ class ExecutivePDF(FPDF):
         super().__init__()
         self.sel_mes_ano = sel_mes_ano
 
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("Helvetica", "I", 8)
+        self.set_text_color(148, 163, 184)
+        self.cell(0, 10, "Powered by DAATEL - Wisdom Into Technology", align="R")
+
     def cell(self, w=0, h=0, text="", border=0, new_x="RIGHT", new_y="TOP", align="", fill=False, link="", **kwargs):
         if text:
             text = to_latin1(text)
@@ -157,7 +163,7 @@ def gerar_pdf_rgc(sel_mes_ano, saldo_inicial_caixa, rb_mes, ent_nat, ent_desc, e
     pdf.set_font('Helvetica', 'B', 13)
     pdf.set_fill_color(15, 23, 42)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 10, "DAATEL ERP - RELATORIO GERENCIAL DE CAIXA (RGC)", align='C', fill=True, new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(0, 10, "EMPORIO DO ALHO - RELATORIO GERENCIAL DE CAIXA (RGC)", align='C', fill=True, new_x='LMARGIN', new_y='NEXT')
     
     pdf.set_font('Helvetica', '', 10)
     pdf.set_text_color(71, 85, 105)

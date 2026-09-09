@@ -1,3 +1,11 @@
+## v2.8.5 — 2026-09-08 (Sessão: Personalização de Cabeçalho e Rodapé dos Relatórios Impressos)
+
+### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
+- **Cabeçalho Impresso Personalizado (PDF / Excel):** Atualizado o título principal para *"EMPÓRIO DO ALHO - RELATÓRIO GERENCIAL DE CAIXA (RGC)"*.
+- **Rodapé Discreto no PDF:** Adicionado rodapé no PDF impresso com fonte pequena (size 8), discreta e alinhada à direita: *"Powered by DAATEL - Wisdom Into Technology"*.
+
+---
+
 ## v2.8.4 — 2026-09-08 (Sessão: Atualização do Texto da Legenda de Visão Gerencial)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)
