@@ -28,7 +28,10 @@ def buscar_dados_venda(venda_id):
     df_venda = fetch_all(f"""
         SELECT v.id, v.data, v.quantidade, v.valor_unitario, v.valor_total, 
                v.custo_frete_rateado, v.numero_documento, v.tipo_documento, v.pedido_grupo, v.observacoes,
-               c.nome as cliente_nome, c.cnpj_cpf as cliente_cnpj, c.uf as uf, c.status,
+               c.id as cliente_id, c.nome as cliente_nome, c.nome_fantasia as cliente_fantasia, 
+               c.cnpj_cpf as cliente_cnpj, c.inscricao_estadual as cliente_ie, c.endereco as cliente_endereco, 
+               c.bairro as cliente_bairro, c.cidade as cliente_cidade, c.uf as cliente_uf, 
+               c.cep as cliente_cep, c.telefone as cliente_telefone, c.email as cliente_email, c.status,
                p.nome as produto_nome, p.id as p_id,
                f.nome as vendedor_nome
         FROM vendas v
@@ -49,6 +52,26 @@ def buscar_dados_venda(venda_id):
     hora_str = dt_obj.strftime('%H:%M:%S') if pd.notna(dt_obj) else "00:00:00"
     validade_str = (dt_obj + timedelta(days=30)).strftime('%d/%m/%Y') if pd.notna(dt_obj) else ""
     
+    # Busca dados da Empresa Emitente
+    df_emp = fetch_all("SELECT * FROM empresa_config LIMIT 1")
+    emp_razao = "EMPORIO DO ALHO RJ LTDA - EMPORIO DO ALHO"
+    emp_cnpj = "61.088.045/0001-54"
+    emp_ie = "15550880"
+    emp_endereco = "Alameda PRESIDENTE WILSON - QUADRA 4 LT 29, S/N - JARDIM ... Duque de Caxias - RJ"
+    emp_fone = "(32) 98856 1305"
+    if not df_emp.empty:
+        r_emp = df_emp.iloc[0]
+        if pd.notna(r_emp.get('razao_social')) and str(r_emp.get('razao_social')).strip():
+            emp_razao = f"{r_emp.get('razao_social')} - {r_emp.get('nome_fantasia') or r_emp.get('razao_social')}"
+        if pd.notna(r_emp.get('cnpj')) and str(r_emp.get('cnpj')).strip():
+            emp_cnpj = str(r_emp.get('cnpj'))
+        if pd.notna(r_emp.get('inscricao_estadual')) and str(r_emp.get('inscricao_estadual')).strip():
+            emp_ie = str(r_emp.get('inscricao_estadual'))
+        if pd.notna(r_emp.get('endereco_completo')) and str(r_emp.get('endereco_completo')).strip():
+            emp_endereco = str(r_emp.get('endereco_completo'))
+        if pd.notna(r_emp.get('telefone')) and str(r_emp.get('telefone')).strip():
+            emp_fone = str(r_emp.get('telefone'))
+
     produtos = []
     total_qtd = 0.0
     subtotal = 0.0
@@ -69,6 +92,52 @@ def buscar_dados_venda(venda_id):
         subtotal += float(item['valor_total'] or 0)
         frete_total += float(item['custo_frete_rateado'] or 0)
     
+    def _limpar_campo(val):
+        if val is None or pd.isna(val):
+            return ""
+        v = str(val).strip(" ,")
+        if v.lower() in ("none", "nan", "null", "0", ""):
+            return ""
+        return v
+
+    def _montar_endereco(end_raw, bairro_raw, cidade_raw, uf_raw, cep_raw):
+        end = _limpar_campo(end_raw)
+        bairro = _limpar_campo(bairro_raw)
+        cidade = _limpar_campo(cidade_raw)
+        uf = _limpar_campo(uf_raw)
+        cep = _limpar_campo(cep_raw)
+
+        partes = []
+        if end:
+            partes.append(end)
+        if bairro:
+            partes.append(f"Bairro: {bairro}")
+        if cidade or uf:
+            cid_uf = f"{cidade} / {uf}".strip(" /")
+            if cid_uf:
+                partes.append(cid_uf)
+        if cep:
+            partes.append(f"CEP: {cep}")
+
+        if partes:
+            return " - ".join(partes)
+
+        return "ENDEREÇO NÃO CADASTRADO (Atualizar no Cadastro do Cliente)"
+
+
+    cli_id_val = row.get('cliente_id') if pd.notna(row.get('cliente_id')) else row.get('id')
+    cli_nome_base = row['cliente_nome'] or ""
+    cli_fantasia = row.get('cliente_fantasia') if pd.notna(row.get('cliente_fantasia')) else cli_nome_base
+    cli_bairro = _limpar_campo(row.get('cliente_bairro'))
+    cli_cidade = _limpar_campo(row.get('cliente_cidade'))
+    cli_uf = _limpar_campo(row.get('cliente_uf') or (row.get('uf') if pd.notna(row.get('uf')) else ""))
+    cli_cid_uf = f"{cli_cidade} / {cli_uf}".strip(" /") if (cli_cidade or cli_uf) else ""
+    cli_cep = _limpar_campo(row.get('cliente_cep'))
+    cli_end = _montar_endereco(row.get('cliente_endereco'), cli_bairro, cli_cidade, cli_uf, cli_cep)
+    cli_ie = _limpar_campo(row.get('cliente_ie')) or "ISENTO"
+    cli_tel = _limpar_campo(row.get('cliente_telefone'))
+    cli_email = _limpar_campo(row.get('cliente_email'))
+
     venda_info = {
         'tipo_documento': row['tipo_documento'] or "",
         'dav_numero': str(row['numero_documento'] or "").zfill(10),
@@ -76,17 +145,22 @@ def buscar_dados_venda(venda_id):
         'data': data_str,
         'hora': hora_str,
         'validade': validade_str,
-        'cliente_nome': f"{row['id']} - {row['cliente_nome']}",
-        'cliente_fantasia': row['cliente_nome'],
+        'cliente_nome': f"{cli_id_val} - {cli_nome_base}",
+        'cliente_fantasia': cli_fantasia,
         'solicitante': "COMPRADOR",
-        'cliente_endereco': "ENDEREÇO DO CLIENTE, S/N",
-        'cliente_cep': "00000-000",
-        'comercial': "", 'fax': "", 'residencial': "", 'email': "",
+        'cliente_endereco': cli_end,
+        'cliente_cep': cli_cep,
+        'comercial': cli_tel, 'fax': "", 'residencial': "", 'email': cli_email,
         'cliente_cnpj': row['cliente_cnpj'] or "00.000.000/0000-00",
-        'cliente_ie': "ISENTO",
-        'cliente_bairro': "CENTRO",
-        'cliente_cidade_uf': f"CIDADE / {row['uf']}",
-        'celular': "",
+        'cliente_ie': cli_ie,
+        'cliente_bairro': cli_bairro,
+        'cliente_cidade_uf': cli_cid_uf,
+        'celular': cli_tel,
+        'emp_razao': emp_razao,
+        'emp_cnpj': emp_cnpj,
+        'emp_ie': emp_ie,
+        'emp_endereco': emp_endereco,
+        'emp_fone': emp_fone,
         'produtos': produtos,
         'total_qtd': f_b(total_qtd),
         'subtotal': f_b(subtotal),
@@ -157,11 +231,11 @@ def gerar_html_dav(info):
         <table>
             <tr>
                 <td class="no-border bl br" colspan="2">
-                    <span class="bold">EMPORIO DO ALHO RJ LTDA - EMPORIO DO ALHO</span><span style="float:right">Página 1/1</span><br>
-                    CNPJ: 61.088.045/0001-54 - Insc. Estadual: 15550880<br>
-                    Alameda PRESIDENTE WILSON - QUADRA 4 LT 29, S/N - JARDIM ... Duque de Caxias - RJ
+                    <span class="bold">{info.get('emp_razao', 'EMPORIO DO ALHO RJ LTDA - EMPORIO DO ALHO')}</span><span style="float:right">Página 1/1</span><br>
+                    CNPJ: {info.get('emp_cnpj', '61.088.045/0001-54')} - Insc. Estadual: {info.get('emp_ie', '15550880')}<br>
+                    {info.get('emp_endereco', 'Alameda PRESIDENTE WILSON - QUADRA 4 LT 29, S/N - JARDIM ... Duque de Caxias - RJ')}
                 </td>
-                <td class="no-border br" style="vertical-align:bottom">Fone: (32) 98856 1305</td>
+                <td class="no-border br" style="vertical-align:bottom">Fone: {info.get('emp_fone', '(32) 98856 1305')}</td>
             </tr>
         </table>
         

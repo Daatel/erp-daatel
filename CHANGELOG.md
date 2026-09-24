@@ -1,3 +1,19 @@
+## v2.8.7 — 2026-09-24 (Documentação e Planejamento do Redesenho de UX de Compras)
+
+### 🛒 Planejamento e Especificação (`PROJETOS_FUTUROS.md`)
+- **Especificação de Redesenho de UX/UI (`pages/2_Compras.py`):** Documentada e registrada a proposta completa de refatoração do módulo de compras para arquitetura em 1 página (Split Panel 60/40), eliminação de travamento por checkbox manual e geração automática de parcelamento a partir das regras do fornecedor.
+
+---
+
+## v2.8.6 — 2026-09-18 (Sessão: Correção da Impressão de Endereços dos Clientes nas DAVs)
+
+### 📄 Impressão de DAVs (`utils_dav.py` & `services/voice_pdf_service.py`)
+- **Sanitização e Formatação de Endereço (`_montar_endereco`):** Adicionada função de tratamento de strings para eliminar valores de lixo de banco (`", "`, `"None"`, `"nan"`, `"null"`, espaços vazios) e garantir a exibição correta do logradouro cadastrado.
+- **Composição Inteligente de Fallback:** Quando o logradouro estiver ausente, o sistema passa a montar o endereço utilizando os dados cadastrais disponíveis de `Bairro`, `Cidade`, `UF` e `CEP`, evitando que o documento saia em branco ou com a indicação genérica de "ENDEREÇO NÃO CADASTRADO".
+- **Geração de PDF do Conector de Voz (`services/voice_pdf_service.py`):** Incluídos os campos de `Endereço`, `Bairro`, `Cidade/UF` e `CPF/CNPJ` na tabela de cabeçalho do PDF gerado pelo serviço de inteligência por voz (Telegram).
+
+---
+
 ## v2.8.5 — 2026-09-08 (Sessão: Personalização de Cabeçalho e Rodapé dos Relatórios Impressos)
 
 ### 🏛️ Relatório Gerencial de Caixa (`pages/10_DRE.py`)

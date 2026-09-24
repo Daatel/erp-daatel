@@ -94,3 +94,17 @@ Abaixo está o mapeamento dos locais e respectivos emojis que foram removidos da
 - **Objetivo:** Permitir que a operadora fotografe a folha diária de pesagem preenchida à mão e importe os dados automaticamente para a mesa de seleção.
 - **Detalhamento Técnico:** Uso da API Gemini Vision (`gemini-1.5-flash`) para extração de JSON estruturado contendo as pesagens individuais e os volumes do lote (alho nobre, segunda linha/bombona e descarte/lixo), realizando match fuzzy de nomes com a equipe presente no dia para evitar digitação manual.
 - **Status:** Planejado para futura implementação.
+
+---
+
+## 🛒 Redesenho de UX/UI do Módulo de Compras e Entradas (1-Page Flow)
+- **Objetivo:** Reformular completamente a interface do módulo de compras (`pages/2_Compras.py`), eliminando o scroll vertical excessivo e os múltiplos cliques/confirmações fragmentadas para tornar o lançamento de notas fiscais rápido, intuitivo e fluido.
+- **Detalhamento do Novo Layout e Funcionalidades:**
+  1. **Layout em Colunas Unificadas (Split Panel 60/40):**
+     - Coluna Esquerda: Cabeçalho da Nota e inclusão direta de itens em tabela/grid limpa.
+     - Coluna Direita (Card Fixo): Resumo financeiro com cálculo de totais, crédito de ICMS, custo efetivo de estoque e visualização das duplicatas em tempo real.
+  2. **Geração Automática de Duplicatas:** Eliminar a necessidade de clicar em botões manuais intermediários ("Gerar pelo Prazo") — as parcelas do Contas a Pagar são sugeridas e calculadas automaticamente a partir da condição padrão cadastrada no fornecedor.
+  3. **Eliminação de Trava Redundante:** Remover a checkbox manual de confirmação final, adotando ação direta via botão único `✅ Confirmar Entrada (Estoque + Contas a Pagar)` que processa simultaneamente o cabeçalho, itens de estoque e títulos no Contas a Pagar.
+  4. **Integração Assistida com Upload de XML:** Pré-preenchimento instantâneo de fornecedor, itens e duplicatas no card unificado com 1 clique de gravação.
+- **Status:** Planejado e aprovado para implementação futura.
+
