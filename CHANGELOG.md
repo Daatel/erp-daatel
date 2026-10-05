@@ -1,3 +1,14 @@
+## v2.8.8 — 2026-10-05 (Sessão: Resiliência de Conexão e Transações PostgreSQL / psycopg2)
+
+### 🗄️ Banco de Dados & Infraestrutura (`database.py` & `app.py`)
+- **Captura Estruturada de Erros SQL (`CursorWrapper`):** Adicionado tratamento em `CursorWrapper.execute` para registrar os atributos `pgcode` e `pgerror` do `psycopg2` em caso de erro na execução de queries.
+- **Prevenção de Estado de Transação Abortada (`InFailedSqlTransaction`):** Adicionado `conn.rollback()` defensivo no início de `_create_tables_internal()` e no tratamento de erro de `check_and_migrate_once()` em `app.py`, garantindo que falhas em consultas de migração não contaminem o pool de conexões.
+- **Migrações Seguras com Autocommit:** Movidas as migrações inline de `ALTER TABLE` para a lista centralizada `alter_queries`, executada em PostgreSQL sob modo `conn.autocommit = True` e tradução para `ADD COLUMN IF NOT EXISTS`.
+- **Persistência de Dados e Commit Efetivo:** Adicionado `conn.commit()` explícito ao término de `_create_tables_internal()` e `create_tables()`.
+- **Manutenção de Identificador Acentuado:** Mantido o campo acentuado `"patrimônio"` em `alter_queries` para preservar total compatibilidade com `pages/11_Ativos_Comodatos.py`.
+
+---
+
 ## v2.8.7 — 2026-09-24 (Documentação e Planejamento do Redesenho de UX de Compras)
 
 ### 🛒 Planejamento e Especificação (`PROJETOS_FUTUROS.md`)

@@ -31,6 +31,11 @@ def check_and_migrate_once():
         release_connection(conn)
         _migration_checked = True
     except Exception:
+        if conn and hasattr(conn, 'rollback'):
+            try:
+                conn.rollback()
+            except Exception:
+                pass
         try:
             from database import release_connection
             if conn:

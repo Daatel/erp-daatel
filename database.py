@@ -140,7 +140,13 @@ class CursorWrapper:
     def __init__(self, cursor):
         self.cursor = cursor
     def execute(self, sql, *args):
-        self.cursor.execute(format_pg(sql), *args)
+        try:
+            self.cursor.execute(format_pg(sql), *args)
+        except Exception as e:
+            pgcode = getattr(e, 'pgcode', None)
+            pgerror = getattr(e, 'pgerror', None)
+            logger.error(f"[DB EXECUTE ERROR] {e} | pgcode={pgcode} | pgerror={pgerror}")
+            raise e
     def fetchone(self):
         return self.cursor.fetchone()
 
@@ -148,6 +154,8 @@ def create_tables():
     conn = get_connection()
     try:
         _create_tables_internal(conn)
+        if hasattr(conn, 'commit'):
+            conn.commit()
     finally:
         release_connection(conn)
 
@@ -184,6 +192,11 @@ def initialize_database():
     return True
 
 def _create_tables_internal(conn):
+    if hasattr(conn, 'rollback'):
+        try:
+            conn.rollback()
+        except Exception:
+            pass
     cursor = CursorWrapper(conn.cursor())
 
     # 0.0. Formas de Pagamento
@@ -942,17 +955,6 @@ def _create_tables_internal(conn):
     )
     ''')
 
-    # Migrations para adicionar campos de estado na tabela rascunhos_voz_telegram
-    try:
-        cursor.execute("ALTER TABLE rascunhos_voz_telegram ADD COLUMN campos_faltantes_json TEXT")
-    except Exception:
-        pass
-
-    try:
-        cursor.execute("ALTER TABLE rascunhos_voz_telegram ADD COLUMN idempotency_key TEXT")
-    except Exception:
-        pass
-
     # 38. Módulo Conector por Voz - Audit Log Dedicado
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS audit_log_voz (
@@ -982,12 +984,6 @@ def _create_tables_internal(conn):
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     ''')
-
-    # Migration para salvar a Chave de API do Gemini no ERP
-    try:
-        cursor.execute("ALTER TABLE empresa_config ADD COLUMN gemini_api_key TEXT")
-    except Exception:
-        pass
 
     # Seed: Cliente CONSUMIDOR para PDV Express
     cursor.execute('''
@@ -1154,7 +1150,13 @@ def _create_tables_internal(conn):
         "ALTER TABLE fornecedores ADD COLUMN nome_fantasia TEXT",
         "ALTER TABLE vendas ADD COLUMN observacoes TEXT",
         "ALTER TABLE contas_bancarias ADD COLUMN limite_credito REAL DEFAULT 0.0",
-        "ALTER TABLE clientes ADD COLUMN plano_conta_id INTEGER"
+        "ALTER TABLE clientes ADD COLUMN plano_conta_id INTEGER",
+        "ALTER TABLE rascunhos_voz_telegram ADD COLUMN campos_faltantes_json TEXT",
+        "ALTER TABLE rascunhos_voz_telegram ADD COLUMN idempotency_key TEXT",
+        "ALTER TABLE empresa_config ADD COLUMN gemini_api_key TEXT",
+        "ALTER TABLE vendas ADD COLUMN flag_op_casada BOOLEAN DEFAULT 0",
+        "ALTER TABLE vendas ADD COLUMN filial_atacadao TEXT",
+        "ALTER TABLE vendas ADD COLUMN pedido_atacadao_numero TEXT"
     ]
     
     index_queries = [
@@ -1231,6 +1233,10 @@ def _create_tables_internal(conn):
 
         cur_ddl.close()
         conn.autocommit = False
+        try:
+            conn.commit()
+        except Exception:
+            pass
     else:
         # SQLite: try/except por statement
         for q in alter_queries:
@@ -1248,6 +1254,7 @@ def _create_tables_internal(conn):
 
         try:
             aplicar_ajuste_bradesco_31_07(conn, is_pg=False)
+            conn.commit()
         except Exception:
             pass
 
